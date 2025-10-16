@@ -71,9 +71,8 @@ namespace poly
          bool is_null() const noexcept { return to_nothing(); }
          bool is_true() const noexcept { return to_boolean() && as_boolean(); }
          bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
-         bool is_scalar() const noexcept { return not is_composite(); }
+         bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
          bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
-         bool is_composite() const noexcept { return to_array() or to_table(); }
          //! @}
       };
 
