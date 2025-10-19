@@ -14,7 +14,7 @@
 
 namespace poly
 {
-   inline namespace v1_0_0
+   inline namespace v1_1_0
    {
       struct node;
 
@@ -74,8 +74,29 @@ namespace poly
          bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
          bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
          //! @}
+
+         //! @{ mutate (and access)
+         auto& operator []( const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
+         {
+            if( not to_array())
+               *this = node::array{};
+            
+            while( as_array().size() <= lookup)
+               as_array().emplace_back();
+
+            return as_array()[ lookup];
+         }
+
+         auto& operator []( const auto& lookup) requires std::is_convertible_v< decltype( lookup), table::key_type>
+         {
+            if( not to_table())
+               *this = node::table{};
+
+            return as_table()[ lookup];
+         }
+         //! @}
       };
 
-   } // v1_0_0
+   } // v1_1_0
 
 } // poly

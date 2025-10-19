@@ -21,7 +21,7 @@
 namespace poly
 {
 
-   inline namespace v1_0_0
+   inline namespace v1_1_0
    {
 
       namespace json
@@ -450,6 +450,6 @@ namespace poly
 
       } // json
 
-   } // v1_0_0
+   } // v1_1_0
 
 } // poly

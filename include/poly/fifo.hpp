@@ -14,7 +14,7 @@
 namespace poly
 {
 
-   inline namespace v1_0_0
+   inline namespace v1_1_0
    {
 
       template< typename Key, typename T>
@@ -103,6 +103,6 @@ namespace poly
 
       };
 
-   } // v1_0_0
+   } // v1_1_0
 
 } // poly

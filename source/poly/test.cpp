@@ -7,116 +7,114 @@
 
 namespace poly
 {
-   inline namespace v1_0_0
+   namespace json
    {
-      namespace json
+      namespace test
       {
-         namespace test
+         namespace cases
          {
-            namespace cases
+            void object()
             {
-               void object()
+               node source;
+
                {
-                  node source{ node::table{}};
-
-                  {
-                     auto& map = source.as_table();
-
-                     map[ "aaa"] = nullptr;
-                     map[ "bbb"] = true;
-                     map[ "ccc"] = -42;
-                     map[ "ddd"] = 3.14;
-                     map[ "eee"] = "qwerty";
-                     map[ "fff"] = node::array{ 123456};
-                     map[ "ggg"] = node::table{ { "xxx", 123}, { "yyy", 456}, { "zzz", 789}};
-                  }
-
-                  node target = parse( write( source));
-
-                  {
-                     auto& table = target.as_table();
-
-                     assert( table[ "aaa"].as_nothing() == nullptr);
-                     assert( table[ "bbb"].as_boolean() == true);
-                     assert( table[ "ccc"].as_integer() == -42);
-                     assert( table[ "ddd"].as_decimal() == 3.14);
-                     assert( table[ "eee"].as_string() == "qwerty");
-                     assert( !table[ "fff"].as_array().empty());
-                     assert( !table[ "ggg"].as_table().empty());
-
-
-                     assert( table[ "aaa"].is_null());
-                     assert( table[ "bbb"].is_true());
-                     assert( table[ "ccc"].is_numeric());
-                     assert( table[ "ddd"].is_numeric());
-                     assert( table[ "eee"].is_scalar());
-                  }
-
-                  assert( target.at( "ggg").at( "yyy").as_integer() == 456);
-                  assert( target.at( "fff").at( 0).as_integer() == 123456);
+                  source[ "aaa"] = nullptr;
+                  source[ "bbb"] = true;
+                  source[ "ccc"] = -42;
+                  source[ "ddd"] = 3.14;
+                  source[ "eee"] = "qwerty";
+                  source[ "fff"][ 0] = 123456;
+                  source[ "ggg"][ "xxx"] = 123;
+                  source[ "ggg"][ "yyy"] = 456;
+                  source[ "ggg"][ "zzz"] = 789;
                }
 
-               namespace detail
-               {
-                  auto roundtrip( const node& node)
-                  {
-                     const auto source = write( node);
-                     const auto target = write( parse( source));
-                     assert( source == target);
-                  }
-               } // detail
+               node target = parse( write( source));
 
-               void scalar()
                {
-                  detail::roundtrip( { nullptr});
-                  detail::roundtrip( { true});
-                  detail::roundtrip( { false});
-                  detail::roundtrip( { 42});
-                  detail::roundtrip( { 3.14});
-                  detail::roundtrip( { " \\ hello \n\u0007\t world \\ "});
+                  assert( target[ "aaa"].as_nothing() == nullptr);
+                  assert( target[ "bbb"].as_boolean() == true);
+                  assert( target[ "ccc"].as_integer() == -42);
+                  assert( target[ "ddd"].as_decimal() == 3.14);
+                  assert( target[ "eee"].as_string() == "qwerty");
+                  assert( !target[ "fff"].as_array().empty());
+                  assert( !target[ "ggg"].as_table().empty());
+
+                  assert( target[ "ggg"][ "xxx"].is_numeric());
+                  assert( target[ "ggg"][ "yyy"].is_numeric());
+                  assert( target[ "ggg"][ "zzz"].is_numeric());
+
+                  assert( target[ "aaa"].is_null());
+                  assert( target[ "bbb"].is_true());
+                  assert( !target[ "bbb"].is_false());
+                  assert( target[ "ccc"].is_numeric());
+                  assert( target[ "ddd"].is_numeric());
+                  assert( target[ "eee"].is_scalar());
                }
 
-               void string()
-               {
-                  {
-                     const auto s = json::parse( R"("\u0041")").as_string();
-                     assert( s.at( 0) == char( 0x41));
-                  }
-
-                  {
-                     const auto s = json::parse( R"("\u00A3")").as_string();
-                     assert( s.size() == 2);
-                     assert( s.at( 0) == char( 0xC2));
-                     assert( s.at( 1) == char( 0xA3));
-                  }
-
-                  {
-                     const auto s = json::parse( R"("\u20AC")").as_string();
-                     assert( s.at( 0) == char( 0xE2));
-                     assert( s.at( 1) == char( 0x82));
-                     assert( s.at( 2) == char( 0xAC));
-                  }
-
-                  {
-                     const auto s = json::parse( R"("\uD83D\uDE00")").as_string();
-                     assert( s.at( 0) == char( 0xF0));
-                     assert( s.at( 1) == char( 0x9F));
-                     assert( s.at( 2) == char( 0x98));
-                     assert( s.at( 3) == char( 0x80));
-                  }
-               }
-
-            } // cases
-
-            void all()
-            {
-               cases::object();
-               cases::scalar();
-               cases::string();
+               assert( target.at( "ggg").at( "yyy").as_integer() == 456);
+               assert( target.at( "fff").at( 0).as_integer() == 123456);
             }
-         } // test
-      }
-   }
+
+            namespace detail
+            {
+               auto roundtrip( const node& node)
+               {
+                  const auto source = write( node);
+                  const auto target = write( parse( source));
+                  assert( source == target);
+               }
+            } // detail
+
+            void scalar()
+            {
+               detail::roundtrip( { nullptr});
+               detail::roundtrip( { true});
+               detail::roundtrip( { false});
+               detail::roundtrip( { 42});
+               detail::roundtrip( { 3.14});
+               detail::roundtrip( { " \\ hello \n\u0007\t world \\ "});
+            }
+
+            void string()
+            {
+               {
+                  const auto s = json::parse( R"("\u0041")").as_string();
+                  assert( s.at( 0) == char( 0x41));
+               }
+
+               {
+                  const auto s = json::parse( R"("\u00A3")").as_string();
+                  assert( s.at( 0) == char( 0xC2));
+                  assert( s.at( 1) == char( 0xA3));
+               }
+
+               {
+                  const auto s = json::parse( R"("\u20AC")").as_string();
+                  assert( s.at( 0) == char( 0xE2));
+                  assert( s.at( 1) == char( 0x82));
+                  assert( s.at( 2) == char( 0xAC));
+               }
+
+               {
+                  const auto s = json::parse( R"("\uD83D\uDE00")").as_string();
+                  assert( s.at( 0) == char( 0xF0));
+                  assert( s.at( 1) == char( 0x9F));
+                  assert( s.at( 2) == char( 0x98));
+                  assert( s.at( 3) == char( 0x80));
+               }
+            }
+
+         } // cases
+
+         void all()
+         {
+            cases::object();
+            cases::scalar();
+            cases::string();
+         }
+      } // test
+   } // json
 } // poly
 
 
