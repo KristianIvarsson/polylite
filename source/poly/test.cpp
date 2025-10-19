@@ -90,28 +90,22 @@ namespace poly
             {
                {
                   const auto s = json::parse( R"("\u0041")").as_string();
-                  assert( s.at( 0) == char( 0x41));
+                  assert( s == "\x41");
                }
 
                {
                   const auto s = json::parse( R"("\u00A3")").as_string();
-                  assert( s.at( 0) == char( 0xC2));
-                  assert( s.at( 1) == char( 0xA3));
+                  assert( s == "\xC2\xA3");
                }
 
                {
                   const auto s = json::parse( R"("\u20AC")").as_string();
-                  assert( s.at( 0) == char( 0xE2));
-                  assert( s.at( 1) == char( 0x82));
-                  assert( s.at( 2) == char( 0xAC));
+                  assert( s == "\xE2\x82\xAC");
                }
 
                {
                   const auto s = json::parse( R"("\uD83D\uDE00")").as_string();
-                  assert( s.at( 0) == char( 0xF0));
-                  assert( s.at( 1) == char( 0x9F));
-                  assert( s.at( 2) == char( 0x98));
-                  assert( s.at( 3) == char( 0x80));
+                  assert( s == "\xF0\x9F\x98\x80");
                }
             }
 

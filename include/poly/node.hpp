@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <variant>
 #include <string>
 #include <vector>
@@ -36,67 +37,72 @@ namespace poly
          //! @}
 
          //! @{ access
-         template< typename type> auto& as( this auto&& self) { return std::get< type>( self); }
+         template< typename type> constexpr auto& as( this auto&& self) { return std::get< type>( self); }
 
-         auto& as_nothing( this auto&& self) { return self.template as< nothing>(); }
-         auto& as_boolean( this auto&& self) { return self.template as< boolean>(); }
-         auto& as_integer( this auto&& self) { return self.template as< integer>(); }
-         auto& as_decimal( this auto&& self) { return self.template as< decimal>(); }
-         auto& as_string( this auto&& self) { return self.template as< string>(); }
-         auto& as_array( this auto&& self) { return self.template as< array>(); }
-         auto& as_table( this auto&& self) { return self.template as< table>(); }
+         constexpr auto& as_nothing( this auto&& self) { return self.template as< nothing>(); }
+         constexpr auto& as_boolean( this auto&& self) { return self.template as< boolean>(); }
+         constexpr auto& as_integer( this auto&& self) { return self.template as< integer>(); }
+         constexpr auto& as_decimal( this auto&& self) { return self.template as< decimal>(); }
+         constexpr auto& as_string( this auto&& self) { return self.template as< string>(); }
+         constexpr auto& as_array( this auto&& self) { return self.template as< array>(); }
+         constexpr auto& as_table( this auto&& self) { return self.template as< table>(); }
 
          auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
          {
-           return self.as_array().at( lookup);
+            return self.as_array().at( lookup);
          }
 
          auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), table::key_type>
          {
-           return self.as_table().at( lookup);
+            return self.as_table().at( lookup);
          }
          //! @}
 
          //! @{ lookup (and access)
-         template< typename type> auto to( this auto&& self) noexcept { return std::get_if< type>( &self); }
+         template< typename type> constexpr auto to( this auto&& self) noexcept { return std::get_if< type>( &self); }
 
-         auto to_nothing( this auto&& self) noexcept { return self.template to< nothing>(); }
-         auto to_boolean( this auto&& self) noexcept { return self.template to< boolean>(); }
-         auto to_integer( this auto&& self) noexcept { return self.template to< integer>(); }
-         auto to_decimal( this auto&& self) noexcept { return self.template to< decimal>(); }
-         auto to_string( this auto&& self) noexcept { return self.template to< string>(); }
-         auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
-         auto to_table( this auto&& self) noexcept { return self.template to< table>(); }
+         constexpr auto to_nothing( this auto&& self) noexcept { return self.template to< nothing>(); }
+         constexpr auto to_boolean( this auto&& self) noexcept { return self.template to< boolean>(); }
+         constexpr auto to_integer( this auto&& self) noexcept { return self.template to< integer>(); }
+         constexpr auto to_decimal( this auto&& self) noexcept { return self.template to< decimal>(); }
+         constexpr auto to_string( this auto&& self) noexcept { return self.template to< string>(); }
+         constexpr auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
+         constexpr auto to_table( this auto&& self) noexcept { return self.template to< table>(); }
 
          template< typename type>
          struct proxy
          {
-            type node = nullptr;
+            explicit proxy( type pointer) : pointer{ pointer} {}
 
-            explicit operator bool () const noexcept { return node; }
-            auto operator ->() const noexcept { return node; }
-            auto& operator *() const noexcept { return *node; }
+            explicit operator bool () const noexcept { return pointer; }
+            auto operator ->() const { assert( pointer); return pointer; }
+            auto& operator *() const { assert( pointer); return *pointer; }
 
             auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), array::size_type>
             {
-               if( node and node->to_array() and lookup < node->as_array().size())
-                  return proxy{ &node->as_array().at( lookup)};
+               if( pointer and pointer->to_array() and lookup < pointer->as_array().size())
+                  return proxy{ &pointer->as_array().at( lookup)};
 
                return proxy{ nullptr};
             }
 
             auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), table::key_type>
             {
-               if( node and node->to_table() and node->as_table().contains( lookup))
-                  return proxy{ &node->as_table().at( lookup)};
+               if( pointer and pointer->to_table() and pointer->as_table().contains( lookup))
+                  return proxy{ &pointer->as_table().at( lookup)};
 
                return proxy{ nullptr};
             }
+
+         private:
+
+            type pointer = nullptr;
+
          };
 
          auto operator ()( const auto& lookup) const noexcept
          {
-            return proxy{ this}( lookup);
+            return proxy< decltype( this)>{ this}( lookup);
          }
          //! @}
 
@@ -122,12 +128,25 @@ namespace poly
          //! @}
 
          //! @{ lookup
-         bool is_null() const noexcept { return to_nothing(); }
-         bool is_true() const noexcept { return to_boolean() && as_boolean(); }
-         bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
-         bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
-         bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
+         constexpr bool is_null() const noexcept { return to_nothing(); }
+         constexpr bool is_true() const noexcept { return to_boolean() && as_boolean(); }
+         constexpr bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
+         constexpr bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
+         constexpr bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
          //! @]}
+
+         //! helper
+         constexpr auto type() const noexcept -> std::string_view
+         {
+            if( to_boolean()) return "boolean";
+            if( to_integer()) return "integer";
+            if( to_decimal()) return "decimal";
+            if( to_string()) return "string";
+            if( to_array()) return "array";
+            if( to_table()) return "table";
+
+            return "nothing";
+         }
       };
 
    } // v1_1_0
