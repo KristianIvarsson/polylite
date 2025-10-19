@@ -68,11 +68,36 @@ namespace poly
          auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
          auto to_table( this auto&& self) noexcept { return self.template to< table>(); }
 
-         bool is_null() const noexcept { return to_nothing(); }
-         bool is_true() const noexcept { return to_boolean() && as_boolean(); }
-         bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
-         bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
-         bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
+         template< typename type>
+         struct proxy
+         {
+            type node = nullptr;
+
+            explicit operator bool () const noexcept { return node; }
+            auto operator ->() const noexcept { return node; }
+            auto& operator *() const noexcept { return *node; }
+
+            auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), array::size_type>
+            {
+               if( node and node->to_array() and lookup < node->as_array().size())
+                  return proxy{ &node->as_array().at( lookup)};
+
+               return proxy{ nullptr};
+            }
+
+            auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), table::key_type>
+            {
+               if( node and node->to_table() and node->as_table().contains( lookup))
+                  return proxy{ &node->as_table().at( lookup)};
+
+               return proxy{ nullptr};
+            }
+         };
+
+         auto operator ()( const auto& lookup) const noexcept
+         {
+            return proxy{ this}( lookup);
+         }
          //! @}
 
          //! @{ mutate (and access)
@@ -95,6 +120,14 @@ namespace poly
             return as_table()[ lookup];
          }
          //! @}
+
+         //! @{ lookup
+         bool is_null() const noexcept { return to_nothing(); }
+         bool is_true() const noexcept { return to_boolean() && as_boolean(); }
+         bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
+         bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
+         bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
+         //! @]}
       };
 
    } // v1_1_0

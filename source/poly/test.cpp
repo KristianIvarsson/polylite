@@ -54,6 +54,16 @@ namespace poly
 
                assert( target.at( "ggg").at( "yyy").as_integer() == 456);
                assert( target.at( "fff").at( 0).as_integer() == 123456);
+
+               {
+                  const node target = parse( write( source));
+
+                  assert( target.at( "fff").at( 0).as_integer() == 123456);
+                  assert( target.at( "ggg").at( "yyy").as_integer() == 456);
+
+                  assert( target( "fff")( 0)->to_integer() != nullptr);
+                  assert( target( "ggg")( "yyy")->to_integer() != nullptr);
+               }
             }
 
             namespace detail
