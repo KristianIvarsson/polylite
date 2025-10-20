@@ -78,35 +78,25 @@ namespace poly
 
             void scalar()
             {
-               detail::roundtrip( { nullptr});
-               detail::roundtrip( { true});
-               detail::roundtrip( { false});
-               detail::roundtrip( { 42});
-               detail::roundtrip( { 3.14});
-               detail::roundtrip( { " \\ hello \n\u0007\t world \\ "});
+               detail::roundtrip( nullptr);
+               detail::roundtrip( true);
+               detail::roundtrip( false);
+               detail::roundtrip( 42);
+               detail::roundtrip( 3.14);
+               detail::roundtrip( " \\ hello \n\u0007\t world \\ ");
             }
 
             void string()
             {
-               {
-                  const auto s = json::parse( R"("\u0041")").as_string();
-                  assert( s == "\x41");
-               }
+               assert( json::parse( R"("\b")").as_string() == "\b");
+               assert( json::parse( R"("\\")").as_string() == "\\");
+               assert( json::parse( R"("\n")").as_string() == "\n");
 
-               {
-                  const auto s = json::parse( R"("\u00A3")").as_string();
-                  assert( s == "\xC2\xA3");
-               }
 
-               {
-                  const auto s = json::parse( R"("\u20AC")").as_string();
-                  assert( s == "\xE2\x82\xAC");
-               }
-
-               {
-                  const auto s = json::parse( R"("\uD83D\uDE00")").as_string();
-                  assert( s == "\xF0\x9F\x98\x80");
-               }
+               assert( json::parse( R"("\u0041")").as_string() == "\x41");
+               assert( json::parse( R"("\u00A3")").as_string() == "\xC2\xA3");
+               assert( json::parse( R"("\u20AC")").as_string() == "\xE2\x82\xAC");
+               assert( json::parse( R"("\uD83D\uDE00")").as_string() == "\xF0\x9F\x98\x80");
             }
 
          } // cases

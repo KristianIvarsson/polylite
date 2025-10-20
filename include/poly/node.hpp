@@ -6,12 +6,12 @@
 
 #pragma once
 
-#include <cassert>
 #include <variant>
 #include <string>
 #include <vector>
-
 #include "fifo.hpp"
+
+#include <cassert>
 
 namespace poly
 {
@@ -72,11 +72,9 @@ namespace poly
          template< typename type>
          struct proxy
          {
-            explicit proxy( type pointer) : pointer{ pointer} {}
-
             explicit operator bool () const noexcept { return pointer; }
-            auto operator ->() const { assert( pointer); return pointer; }
-            auto& operator *() const { assert( pointer); return *pointer; }
+            auto operator ->() const noexcept { assert( pointer); return pointer; }
+            auto& operator *() const noexcept { assert( pointer); return *pointer; }
 
             auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), array::size_type>
             {
@@ -96,13 +94,21 @@ namespace poly
 
          private:
 
-            type pointer = nullptr;
+            friend struct node;
 
+            explicit proxy( type pointer) : pointer{ pointer} {}
+
+            type pointer = nullptr;
          };
 
-         auto operator ()( const auto& lookup) const noexcept
+         auto operator ()( const auto& lookup) const & noexcept
          {
-            return proxy< decltype( this)>{ this}( lookup);
+            return proxy{ this}( lookup);
+         }
+
+         auto operator ()() const & noexcept
+         {
+            return proxy{ this};
          }
          //! @}
 
