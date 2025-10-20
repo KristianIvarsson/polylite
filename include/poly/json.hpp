@@ -31,7 +31,7 @@ namespace poly
          {
             void validate( const char wanted, const char picked)
             {
-               if( wanted != picked) throw std::runtime_error{ std::format( "unexpected character (wanted '{}' [0x{:X}] picked '{}' [0x{:X}])", wanted, wanted, picked, picked)};
+               if( wanted != picked) [[unlikely]] throw std::runtime_error{ std::format( "unexpected character (wanted '{}' [0x{:X}] picked '{}' [0x{:X}])", wanted, wanted, picked, picked)};
             }
 
             struct parser
@@ -48,6 +48,7 @@ namespace poly
                   while( true)
                   {
                      std::string name;
+
                      stream >> std::quoted( name);
 
                      validate( ':', pick());
@@ -149,6 +150,11 @@ namespace poly
                   return code;
                }
 
+               void back()
+               {
+                  stream.unget();
+               }
+
                auto code()
                {
                   const auto lead = unit();
@@ -211,9 +217,9 @@ namespace poly
                            throw std::runtime_error{ std::format( "invalid escape character '{}' [0x{:X}]", sign, sign)};
                         }
                      }
-                     else
+                     else [[likely]]
                      {
-                        if( sign != std::char_traits< decltype( sign)>::eof())
+                        if( sign != std::char_traits< decltype( sign)>::eof()) [[likely]]
                            value.push_back( sign);
                         else
                            throw std::runtime_error{ "unexpected end of stream"};
@@ -227,13 +233,18 @@ namespace poly
 
                   std::string data;
 
-                  while( [](const auto sign)
-                     {
-                        switch( sign)
-                        case '.': case '-': case '+': return true;
-                        return std::isalnum( sign, std::locale::classic());
-                     }( peek()))
-                     data.push_back( pull());
+                  auto good = []( const auto sign)
+                  {
+                     switch( sign)
+                     case '.': case '-': case '+': return sign;
+                     return std::isalnum( sign) ? sign : decltype( sign) {};
+                  };
+
+                  for( ; const auto sign = good( pull()); )
+                     data.push_back( sign);
+                  
+                  back();
+
 
                   if( data == "null")
                      return node::nothing{};
@@ -293,16 +304,16 @@ namespace poly
                {
                   start( '{');
 
-                  auto order = node.size();
-
-                  for( const auto& [name, data] : node)
+                  for( const auto& [ name, data] : node)
                   {
                      insert( name);
-                     indent = false;
+                     if constexpr( spaces) indent = false;
                      std::visit( *this, data);
-                     indent = true;
-                     if( --order) stream << ',';
+                     if constexpr( spaces) indent = true;
+                     stream << ',';
                   }
+
+                  if( !node.empty()) regret();
 
                   close( '}');
                }
@@ -311,64 +322,63 @@ namespace poly
                {
                   start( '[');
 
-                  auto order = node.size();
-
                   for( const auto& data : node)
                   {
                      insert();
                      std::visit( *this, data);
-                     if( --order) stream << ',';
+                     stream << ',';
                   }
+
+                  if( !node.empty()) regret();
 
                   close( ']');
                }
 
-               void operator() ( const node::nothing& node) const
+               void operator() ( const node::nothing& node)
                {
                   stream << "null";
                }
 
-               void operator() ( const node::boolean& node) const
+               void operator() ( const node::boolean& node)
                {
-                  stream << std::boolalpha << node << std::noboolalpha;
+                  stream << ( node ? "true" : "false");
                }
 
-               void operator() ( const node::integer& node) const
+               void operator() ( const node::integer& node)
                {
                   stream << node;
                }
 
-               void operator() ( const node::decimal& node) const
+               void operator() ( const node::decimal& node)
                {
                   if( std::isnan( node) || std::isinf( node))
                      throw std::invalid_argument{ std::format( "invalid decimal node [{}]", node)};
                   stream << node;
                }
 
-               void operator() ( const node::string& node) const
+               void operator() ( const node::string& node)
                {
                   stream << '"';
 
                   for( const auto data : node)
                   {
-                     if( std::iscntrl( data, std::locale::classic()))
+                     if( std::iscntrl( data))
                      {
                         std::ios fmt{ nullptr};
                         fmt.copyfmt( stream);
                         stream << "\\u" << std::setfill( '0') << std::setw( 4) << std::hex << static_cast< int>( data);
                         stream.copyfmt( fmt);
                      }
-                     else
+                     else [[likely]]
                      {
                         switch( data)
                         {
-                        break; case '\\':
-                           stream << "\\\\";
-                        break; case '\"':
-                           stream << "\\\"";
-                        break; default:
-                           stream << data;
+                        case '\\':
+                        case '\"':
+                           stream << "\\";
                         }
+
+                        stream << data;
                      }
                   }
 
@@ -379,12 +389,11 @@ namespace poly
 
                void insert()
                {
-                  static constexpr const auto feed = spaces ? "\n" : "";
-
-                  if( indent)
-                     stream << feed << std::setw( column * spaces) << "";
-                  else
-                     indent = true;
+                  if constexpr( spaces)
+                     if( indent)
+                        stream << '\n' << std::setw( column * spaces) << "";
+                     else
+                        indent = true;
                }
 
                void insert( const std::string::value_type sign)
@@ -393,21 +402,29 @@ namespace poly
                   stream << sign;
                }
 
-               void insert( const std::string name)
+               void insert( const std::string& name)
                {
                   insert();
-                  stream << std::quoted( name) << ( spaces ? ": " : ":");
+                  //stream << std::quoted( name) << ':';
+                  stream << '"' << name << '"' << ':';
+                  
+                  if constexpr( spaces) stream << ' ';
+               }
+
+               void regret()
+               {
+                  stream.seekp( -1, std::ios_base::cur);
                }
 
                void start( const auto sign)
                {
                   insert( sign);
-                  ++column;
+                  if constexpr( spaces) ++column;
                }
 
                void close( const auto sign)
                {
-                  --column;
+                  if constexpr( spaces) --column;
                   insert( sign);
                }
 
