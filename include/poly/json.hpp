@@ -40,7 +40,7 @@ namespace poly
 
                void operator() ( node::table& node)
                {
-                  validate( '{', pick());
+                  validate( '{', pull());
 
                   if( peep() == '}')
                      return skip();
@@ -49,11 +49,13 @@ namespace poly
                   {
                      std::string name;
 
-                     stream >> std::quoted( name);
+                     //stream >> std::quoted( name);
+                     std::getline( stream, name, '"');
+                     std::getline( stream, name, '"');
 
                      validate( ':', pick());
 
-                     std::visit( *this, node.emplace( std::move( name), find()).first->second);
+                     std::visit( *this, node.emplace( std::move( name), detect()).first->second);
 
                      if( const auto sign = pick(); sign != ',')
                         return validate( '}', sign);
@@ -62,14 +64,14 @@ namespace poly
 
                void operator() ( node::array& node)
                {
-                  validate( '[', pick());
+                  validate( '[', pull());
 
                   if( peep() == ']')
                      return skip();
 
                   while( true)
                   {
-                     std::visit( *this, node.emplace_back( find()));
+                     std::visit( *this, node.emplace_back( detect()));
 
                      if( const auto sign = pick(); sign != ',')
                         return validate( ']', sign);
@@ -83,7 +85,7 @@ namespace poly
 
                auto operator()()
                {
-                  auto result = find();
+                  auto result = detect();
                   std::visit( *this, result);
                   validate( std::char_traits< decltype( pick())>::eof(), pick());
                   return result;
@@ -91,29 +93,14 @@ namespace poly
 
             private:
 
-               auto find() -> node
-               {
-                  switch( peep())
-                  {
-                  case '{':
-                     return { node::table{}};
-                  case '[':
-                     return { node::array{}};
-                  case '"':
-                     return string();
-                  default:
-                     return simple();
-                  }
-               }
-
                void leap()
                {
-                  stream >> std::ws;
+                  while( std::isspace( stream.peek())) stream.get();
                }
 
                void skip()
                {
-                  stream.ignore();
+                  stream.get();
                }
 
                char peek()
@@ -123,7 +110,7 @@ namespace poly
 
                char peep()
                {
-                  return ( stream >> std::ws).peek();
+                  return leap(), peek();
                }
 
                char pull()
@@ -133,7 +120,12 @@ namespace poly
 
                char pick()
                {
-                  return ( stream >> std::ws).get();
+                  return leap(), pull();
+               }
+
+               void back()
+               {
+                  stream.unget();
                }
 
                auto unit()
@@ -148,11 +140,6 @@ namespace poly
                      throw std::runtime_error{ std::format( "invalid code point [{}]", std::string_view{ data})};
 
                   return code;
-               }
-
-               void back()
-               {
-                  stream.unget();
                }
 
                auto code()
@@ -175,9 +162,24 @@ namespace poly
                   return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
                }
 
+               auto detect() -> node
+               {
+                  switch( peep())
+                  {
+                  case '{':
+                     return { node::table{}};
+                  case '[':
+                     return { node::array{}};
+                  case '"':
+                     return string();
+                  default:
+                     return simple();
+                  }
+               }
+
                auto string() -> node
                {
-                  validate( '"', pick());
+                  validate( '"', pull());
 
                   std::string value;
 
@@ -229,15 +231,13 @@ namespace poly
 
                auto simple() -> node
                {
-                  leap();
-
                   std::string data;
 
                   auto good = []( const auto sign)
                   {
                      switch( sign)
                      case '.': case '-': case '+': return sign;
-                     return std::isalnum( sign) ? sign : decltype( sign) {};
+                     return std::isalnum( sign) ? sign : decltype( sign){};
                   };
 
                   for( ; const auto sign = good( pull()); )
@@ -364,10 +364,7 @@ namespace poly
                   {
                      if( std::iscntrl( data))
                      {
-                        std::ios fmt{ nullptr};
-                        fmt.copyfmt( stream);
-                        stream << "\\u" << std::setfill( '0') << std::setw( 4) << std::hex << static_cast< int>( data);
-                        stream.copyfmt( fmt);
+                        stream << R"(\u)" << std::format( "{:04x}", data);
                      }
                      else [[likely]]
                      {
