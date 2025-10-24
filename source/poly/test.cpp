@@ -99,6 +99,12 @@ namespace poly
                assert( json::parse( R"("\uD83D\uDE00")").as_string() == "\xF0\x9F\x98\x80");
             }
 
+            void bom()
+            {
+               assert( json::bom::parse( "\xEF\xBB\xBF{}").to_table());
+               assert( json::bom::parse( "{}").to_table());
+            }
+
          } // cases
 
          void all()
@@ -106,6 +112,7 @@ namespace poly
             cases::object();
             cases::scalar();
             cases::string();
+            cases::bom();
          }
       } // test
    } // json

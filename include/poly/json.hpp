@@ -131,12 +131,12 @@ namespace poly
                auto unit()
                {
                   std::array< char, 4> data{};
-                  const auto size = stream.read( data.data(), data.size()).gcount();
+                  const auto count = stream.read( data.data(), data.size()).gcount();
 
                   std::int32_t code;
                   const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
 
-                  if( size != data.size() || result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
+                  if( count != data.size() || result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
                      throw std::runtime_error{ std::format( "invalid code point [{}]", std::string_view{ data})};
 
                   return code;
@@ -290,6 +290,28 @@ namespace poly
             std::ispanstream stream{ json};
             return parse( stream);
          }
+
+         namespace bom
+         {
+            //! ignores possible UTF8-BOM
+            auto parse( std::istream& stream)
+            {
+               std::array< char, 3> data{};
+
+               const auto count  = stream.read( data.data(), data.size()).gcount();
+
+               if( ! std::ranges::equal( data, std::string_view{ "\xEF\xBB\xBF"}))
+                  stream.clear(), stream.seekg( 0 - count, std::ios::cur);
+               
+               return detail::parser{ stream}();
+            }
+
+            auto parse( std::string_view json)
+            {
+               std::ispanstream stream{ json};
+               return parse( stream);
+            }
+         } // bom
 
          namespace detail
          {
