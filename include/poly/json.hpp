@@ -315,7 +315,9 @@ namespace poly
 
          namespace detail
          {
-            template< std::size_t spaces = 3>
+            constexpr std::size_t spaces = 3;
+
+            template< std::size_t spaces>
             struct writer
             {
                std::ostream& stream;
@@ -457,17 +459,22 @@ namespace poly
          } // detail
 
 
-         auto write( const node& node, std::ostream& stream)
+         inline namespace elegant
          {
-            std::visit( detail::writer{ stream}, node);
-         }
+            template< std::size_t spaces = detail::spaces>
+            auto write( const node& node, std::ostream& stream)
+            {
+               std::visit( detail::writer< spaces>{ stream}, node);
+            }
 
-         auto write( const node& node)
-         {
-            std::ostringstream stream;
-            write( node, stream);
-            return std::move( stream).str();
-         }
+            template< std::size_t spaces = detail::spaces>
+            auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write< spaces>( node, stream);
+               return std::move( stream).str();
+            }
+         } // elegant
 
          namespace compact
          {
