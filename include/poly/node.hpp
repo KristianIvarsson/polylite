@@ -15,7 +15,7 @@
 
 namespace poly
 {
-   inline namespace v1_1_0
+   inline namespace v1_2_0
    {
       struct node;
 
@@ -34,6 +34,7 @@ namespace poly
          using string = std::variant_alternative_t< 4, data>;
          using array = std::variant_alternative_t< 5, data>;
          using table = std::variant_alternative_t< 6, data>;
+         using object = std::variant_alternative_t< 6, data>;
          //! @}
 
          //! @{ access
@@ -46,6 +47,7 @@ namespace poly
          constexpr auto& as_string( this auto&& self) { return self.template as< string>(); }
          constexpr auto& as_array( this auto&& self) { return self.template as< array>(); }
          constexpr auto& as_table( this auto&& self) { return self.template as< table>(); }
+         constexpr auto& as_object( this auto&& self) { return self.template as< object>(); }
 
          auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
          {
@@ -68,6 +70,7 @@ namespace poly
          constexpr auto to_string( this auto&& self) noexcept { return self.template to< string>(); }
          constexpr auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
          constexpr auto to_table( this auto&& self) noexcept { return self.template to< table>(); }
+         constexpr auto to_object( this auto&& self) noexcept { return self.template to< object>(); }
 
          template< typename type>
          struct proxy
@@ -140,21 +143,8 @@ namespace poly
          constexpr bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
          constexpr bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
          //! @]}
-
-         //! helper
-         constexpr auto type() const noexcept -> std::string_view
-         {
-            if( to_boolean()) return "boolean";
-            if( to_integer()) return "integer";
-            if( to_decimal()) return "decimal";
-            if( to_string()) return "string";
-            if( to_array()) return "array";
-            if( to_table()) return "table";
-
-            return "nothing";
-         }
       };
 
-   } // v1_1_0
+   } // v1_2_0
 
 } // poly

@@ -21,9 +21,8 @@
 namespace poly
 {
 
-   inline namespace v1_1_0
+   inline namespace v1_2_0
    {
-
       namespace json
       {
 
@@ -38,7 +37,7 @@ namespace poly
             {
                parser( std::istream& stream) : stream{ stream} {}
 
-               void operator() ( node::table& node)
+               void operator() ( node::object& node)
                {
                   validate( '{', pull());
 
@@ -149,14 +148,14 @@ namespace poly
                   if( lead < 0xD800 || lead > 0xDFFF)
                      return lead;
 
-                  if( lead > 0xDBFF)
+                  if( lead > 0xDBFF) [[unlikely]]
                      throw std::runtime_error{ std::format( "invalid 1st surrogate [0x{:X}]", lead)};
 
                   validate( '\\', pull()); validate( 'u', pull());
 
                   const auto tail = unit();
 
-                  if( tail < 0xDC00 || tail > 0xDFFF)
+                  if( tail < 0xDC00 || tail > 0xDFFF) [[unlikely]]
                      throw std::runtime_error{ std::format( "invalid 2nd surrogate [0x{:X}]", tail)};
 
                   return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
@@ -167,7 +166,7 @@ namespace poly
                   switch( peep())
                   {
                   case '{':
-                     return { node::table{}};
+                     return { node::object{}};
                   case '[':
                      return { node::array{}};
                   case '"':
@@ -236,18 +235,15 @@ namespace poly
                   auto good = []( const auto sign)
                   {
                      switch( sign)
-                     case '.': case '-': case '+': return sign;
-                     return std::isalnum( sign) ? sign : decltype( sign){};
+                     case '.': case '-': case '+': return true;
+                     return std::isalnum( sign) != 0;
                   };
 
-                  for( ; const auto sign = good( pull()); )
-                     data.push_back( sign);
-                  
-                  back();
-
+                  while( good( peek()))
+                     data.push_back( pull());
 
                   if( data == "null")
-                     return node::nothing{};
+                     return nullptr;
 
                   if( data == "true")
                      return true;
@@ -324,7 +320,7 @@ namespace poly
 
                writer( std::ostream& stream) : stream{ stream} {}
 
-               void operator() ( const node::table& node)
+               void operator() ( const node::object& node)
                {
                   start( '{');
 
@@ -493,6 +489,6 @@ namespace poly
 
       } // json
 
-   } // v1_1_0
+   } // v1_2_0
 
 } // poly
