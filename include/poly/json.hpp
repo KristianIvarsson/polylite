@@ -18,6 +18,7 @@
 
 #include <stdexcept>
 
+
 namespace poly
 {
 
@@ -28,115 +29,92 @@ namespace poly
 
          namespace detail
          {
-            void validate( const char wanted, const char picked)
-            {
-               if( wanted != picked) [[unlikely]] throw std::runtime_error{ std::format( "unexpected character (wanted '{}' [0x{:X}] picked '{}' [0x{:X}])", wanted, wanted, picked, picked)};
-            }
-
             struct parser
             {
-               parser( std::istream& stream) : stream{ stream} {}
-
-               void operator() ( node::object& node)
-               {
-                  validate( '{', pull());
-
-                  if( peep() == '}')
-                     return skip();
-
-                  while( true)
-                  {
-                     std::string name;
-
-                     //stream >> std::quoted( name);
-                     std::getline( stream, name, '"');
-                     std::getline( stream, name, '"');
-
-                     validate( ':', pick());
-
-                     std::visit( *this, node.emplace( std::move( name), detect()).first->second);
-
-                     if( const auto sign = pick(); sign != ',')
-                        return validate( '}', sign);
-                  }
-               }
-
-               void operator() ( node::array& node)
-               {
-                  validate( '[', pull());
-
-                  if( peep() == ']')
-                     return skip();
-
-                  while( true)
-                  {
-                     std::visit( *this, node.emplace_back( detect()));
-
-                     if( const auto sign = pick(); sign != ',')
-                        return validate( ']', sign);
-                  }
-               }
-
-               void operator() ( auto& node)
-               {
-                  // scalars are already handled
-               }
+               parser( std::istream& stream) : mark{ stream} {}
 
                auto operator()()
                {
-                  auto result = detect();
-                  std::visit( *this, result);
-                  validate( std::char_traits< decltype( pick())>::eof(), pick());
-                  return result;
+                  auto nrv = detect();
+                  test( std::char_traits< std::istream::char_type>::eof(), peep());
+                  return nrv;
                }
 
             private:
 
-               void leap()
+               auto detect() -> node
                {
-                  while( std::isspace( stream.peek())) stream.get();
+                  switch( peep())
+                  {
+                  case '{':
+                     return object();
+                  case '[':
+                     return array();
+                  case '"':
+                     return string();
+                  case 'n': case 't': case 'f':
+                     return simple();
+                  default:
+                     return number();
+                  }
                }
 
-               void skip()
+               void test( const char want, const char pick) const
                {
-                  stream.get();
+                  if( want != pick) [[unlikely]] error( "unexpected character");
                }
 
-               char peek()
+               bool good() const
                {
-                  return stream.peek();
+                  return mark != decltype( mark){};
                }
 
-               char peep()
+               auto read( auto&& want)
                {
-                  return leap(), peek();
+                  std::string nrv;
+                  while( good() && want( *mark))
+                     nrv.push_back( *mark++);
+                  return nrv;
                }
 
                char pull()
                {
-                  return stream.get();
+                  if( good()) [[likely]]
+                     return *mark++;
+                  [[unlikely]] error( "unexpected end of stream");
                }
 
                char pick()
                {
-                  return leap(), pull();
+                  while( good() && std::isspace( *mark))
+                     ++mark;
+                  return pull();
                }
 
-               void back()
+               char peek()
                {
-                  stream.unget();
+                  if( good()) [[likely]]
+                     return *mark;
+                  return std::char_traits< std::istream::char_type>::eof();
+               }
+
+               char peep()
+               {
+                  while( good() && std::isspace( *mark))
+                     ++mark;
+                  return peek();
                }
 
                auto unit()
                {
-                  std::array< char, 4> data{};
-                  const auto count = stream.read( data.data(), data.size()).gcount();
+                  std::array< char, 4> data;
+                  std::copy_n( mark, data.size(), data.data());
 
                   std::int32_t code;
                   const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
 
-                  if( count != data.size() || result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
-                     throw std::runtime_error{ std::format( "invalid code point [{}]", std::string_view{ data})};
+                  if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
+                     [[unlikely]] error( "invalid code point");
 
                   return code;
                }
@@ -148,108 +126,162 @@ namespace poly
                   if( lead < 0xD800 || lead > 0xDFFF)
                      return lead;
 
-                  if( lead > 0xDBFF) [[unlikely]]
-                     throw std::runtime_error{ std::format( "invalid 1st surrogate [0x{:X}]", lead)};
+                  if( lead > 0xDBFF)
+                     [[unlikely]] error( "invalid 1st surrogate");
 
-                  validate( '\\', pull()); validate( 'u', pull());
+                  test( '\\', pull()); test( 'u', pull());
 
                   const auto tail = unit();
 
-                  if( tail < 0xDC00 || tail > 0xDFFF) [[unlikely]]
-                     throw std::runtime_error{ std::format( "invalid 2nd surrogate [0x{:X}]", tail)};
+                  if( tail < 0xDC00 || tail > 0xDFFF)
+                     [[unlikely]] error( "invalid 2nd surrogate");
 
                   return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
                }
 
-               auto detect() -> node
+               auto decode() -> std::int32_t
                {
-                  switch( peep())
+                  switch( pull())
                   {
-                  case '{':
-                     return { node::object{}};
-                  case '[':
-                     return { node::array{}};
-                  case '"':
-                     return string();
-                  default:
-                     return simple();
+                  break; case '\\':return '\\';
+                  break; case '"': return '\"';
+                  break; case 'b': return '\b';
+                  break; case 'f': return '\f';
+                  break; case 'n': return '\n';
+                  break; case 'r': return '\r';
+                  break; case 't': return '\t';
+                  break; case '/': return '/';
+                  break; case 'u': return code();
+                  break; default: [[unlikely]] error( "invalid escape character");
                   }
                }
 
-               auto string() -> node
+               auto object() -> node::object
                {
-                  validate( '"', pull());
+                  ++mark; // '{'
 
-                  std::string value;
+                  node::object nrv;
+
+                  if( peep() != '}')
+                  {
+                     while( true)
+                     {
+                        test( '"', peep());
+
+                        auto name = string();
+
+                        test( ':', pick());
+
+                        nrv.emplace( std::move( name), detect());
+
+                        if( const auto sign = pick(); sign != ',')
+                        {
+                           test( '}', sign);
+                           break;
+                        }
+                     }
+                  }
+                  else
+                  {
+                     ++mark; // '}'
+                  }
+
+                  return nrv;
+               }
+
+               auto array() -> node::array
+               {
+                  ++mark; // '['
+
+                  node::array nrv;
+
+                  if( peep() != ']')
+                  {
+                     while( true)
+                     {
+                        nrv.emplace_back( detect());
+
+                        if( const auto sign = pick(); sign != ',')
+                        {
+                           test( ']', sign);
+                           break;
+                        }
+                     }
+                  }
+                  else
+                  {
+                     ++mark; // ']'
+                  }
+
+                  return nrv;
+               }
+               
+               auto string() -> node::string
+               {
+                  ++mark; // '"'
+
+                  std::string nrv;
 
                   while( true)
                   {
                      const auto sign = pull();
 
                      if( sign == '"')
-                        return value;
+                        return nrv;
 
-                     if( sign == '\\')
+                     if( sign != '\\') [[likely]]
                      {
-                        switch( const auto sign = pull())
-                        {
-                        break; case '\\': value.push_back( '\\');
-                        break; case '"': value.push_back( '\"');
-                        break; case 'b': value.push_back( '\b');
-                        break; case 'f': value.push_back( '\f');
-                        break; case 'n': value.push_back( '\n');
-                        break; case 'r': value.push_back( '\r');
-                        break; case 't': value.push_back( '\t');
-                        break; case '/': value.push_back( '/');
-                        break; case 'u':
-                        {
-                           using type = std::string::value_type;
-                           const auto cp = code();
-                           if( cp < 0x80)
-                              value.insert( value.end(), { static_cast< type>( cp)});
-                           else if( cp < 0x800)
-                              value.insert( value.end(), { static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
-                           else if( cp < 0x10000)
-                              value.insert( value.end(), { static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
-                           else
-                              value.insert( value.end(), { static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)), static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
-                        }
-                        break; default:
-                           throw std::runtime_error{ std::format( "invalid escape character '{}' [0x{:X}]", sign, sign)};
-                        }
+                        nrv.push_back( sign);
                      }
-                     else [[likely]]
+                     else
                      {
-                        if( sign != std::char_traits< decltype( sign)>::eof()) [[likely]]
-                           value.push_back( sign);
+                        using type = std::string::value_type;
+
+                        if( const auto cp = decode(); cp < 0x80)
+                           nrv.insert( nrv.end(), { static_cast< type>( cp)});
+                        else if( cp < 0x800)
+                           nrv.insert( nrv.end(), { static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
+                        else if( cp < 0x10000)
+                           nrv.insert( nrv.end(), { static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
                         else
-                           throw std::runtime_error{ "unexpected end of stream"};
+                           nrv.insert( nrv.end(), { static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)), static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
                      }
                   }
                }
 
                auto simple() -> node
                {
-                  std::string data;
+                  ++mark; // 'n', 't', 'f
 
-                  auto good = []( const auto sign)
-                  {
-                     switch( sign)
-                     case '.': case '-': case '+': return true;
-                     return std::isalnum( sign) != 0;
-                  };
+                  const auto data = read( []( const auto sign) 
+                     { 
+                        return std::islower( sign); 
+                     });
 
-                  while( good( peek()))
-                     data.push_back( pull());
-
-                  if( data == "null")
+                  if( data == "ull")
                      return nullptr;
 
-                  if( data == "true")
+                  if( data == "rue")
                      return true;
 
-                  if( data == "false")
+                  if( data == "alse")
                      return false;
+
+                  [[unlikely]] error( "unexpected data");
+               }
+
+               auto number() -> node
+               {
+                  const auto data = read( []( const auto sign)
+                     {
+                        // strict parsing
+                        switch( sign)
+                        case '-': case '.': case 'e': case 'E': return true;
+                        return std::isdigit( sign) != 0;
+                        // casual parsing (for NaN, Inf, etc)
+                        //case '.': case '-': case '+': return true;
+                        //return std::isalnum( sign) != 0;
+                     });
 
                   {
                      node::integer value;
@@ -265,12 +297,17 @@ namespace poly
                         return value;
                   }
 
-                  throw std::runtime_error{ std::format( "unexpected data [{}]", data)};
+                  [[unlikely]] error( "unexpected data");
+               }
+
+               [[noreturn]] void error( const std::string_view message) const
+               {
+                  throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, decltype( mark){}))};
                }
 
             private:
 
-               std::istream& stream;
+               std::istreambuf_iterator< std::istream::char_type> mark;
 
             };
 
@@ -292,7 +329,7 @@ namespace poly
             //! ignores possible UTF8-BOM
             auto parse( std::istream& stream)
             {
-               std::array< char, 3> data{};
+               std::array< char, 3> data;
 
                const auto count  = stream.read( data.data(), data.size()).gcount();
 
@@ -324,16 +361,15 @@ namespace poly
                {
                   start( '{');
 
+                  auto comma = node.size();
                   for( const auto& [ name, data] : node)
                   {
                      insert( name);
                      if constexpr( spaces) indent = false;
                      std::visit( *this, data);
                      if constexpr( spaces) indent = true;
-                     stream << ',';
+                     if( --comma) stream << ',';
                   }
-
-                  if( !node.empty()) regret();
 
                   close( '}');
                }
@@ -342,42 +378,46 @@ namespace poly
                {
                   start( '[');
 
+                  auto comma = node.size();
                   for( const auto& data : node)
                   {
-                     insert();
                      std::visit( *this, data);
-                     stream << ',';
+                     if( --comma) stream << ',';
                   }
-
-                  if( !node.empty()) regret();
 
                   close( ']');
                }
 
                void operator() ( const node::nothing& node)
                {
+                  insert();
                   stream << "null";
                }
 
                void operator() ( const node::boolean& node)
                {
+                  insert();
                   stream << ( node ? "true" : "false");
                }
 
                void operator() ( const node::integer& node)
                {
+                  insert();
                   stream << node;
                }
 
                void operator() ( const node::decimal& node)
                {
                   if( std::isnan( node) || std::isinf( node))
-                     throw std::invalid_argument{ std::format( "invalid decimal node [{}]", node)};
+                     [[unlikely]] throw std::invalid_argument{ std::format( "invalid decimal node [{}]", node)};
+
+                  insert();
                   stream << node;
                }
 
                void operator() ( const node::string& node)
                {
+                  insert();
                   stream << '"';
 
                   for( const auto data : node)
@@ -426,11 +466,6 @@ namespace poly
                   stream << '"' << name << '"' << ':';
                   
                   if constexpr( spaces) stream << ' ';
-               }
-
-               void regret()
-               {
-                  stream.seekp( -1, std::ios_base::cur);
                }
 
                void start( const auto sign)

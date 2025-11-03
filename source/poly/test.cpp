@@ -86,6 +86,15 @@ namespace poly
                detail::roundtrip( " \\ hello \n\u0007\t world \\ ");
             }
 
+            void direct()
+            {
+               assert( json::parse( "null").as_nothing() == nullptr);
+               assert( json::parse( "true").as_boolean() == true);
+               assert( json::parse( "false").as_boolean() == false);
+               assert( json::parse( "-42").as_integer() == -42);
+               assert( json::parse( "3.14").as_decimal() == 3.14);
+            }
+
             void string()
             {
                assert( json::parse( R"("\b")").as_string() == "\b");
@@ -111,6 +120,7 @@ namespace poly
          {
             cases::object();
             cases::scalar();
+            cases::direct();
             cases::string();
             cases::bom();
          }
