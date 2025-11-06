@@ -13,6 +13,14 @@ At the moment, only JSON is supported. The implementation may be somewhat naive 
 ### Usage & Reference
 There is currently no formal user documentation. However, some basic unit test-like code is available, which may serve as a useful reference for how to use the library. You can build and run it using:
 
-```
+```bash
 g++ -std=c++23 -I include ./source/poly/test.cpp && ./a.out
+```
+
+### Samples
+
+[show.cpp](source/poly/show.cpp)
+
+```bash
+g++ -std=c++23 -I include ./source/poly/show.cpp && ./a.out
 ```
