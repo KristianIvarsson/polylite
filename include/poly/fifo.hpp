@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "help.hpp"
+
 #include <vector>
 #include <utility>
 #include <format>
@@ -13,8 +15,7 @@
 
 namespace poly
 {
-
-   inline namespace v1_2_0
+   inline namespace version
    {
 
       template< typename Key, typename T>
@@ -103,6 +104,6 @@ namespace poly
 
       };
 
-   } // v1_2_0
+   } // version
 
 } // poly

@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "help.hpp"
+
 #include <variant>
 #include <string>
 #include <vector>
@@ -15,7 +17,7 @@
 
 namespace poly
 {
-   inline namespace v1_2_0
+   inline namespace version
    {
       struct node;
 
@@ -137,14 +139,24 @@ namespace poly
          //! @}
 
          //! @{ lookup
-         constexpr bool is_null() const noexcept { return to_nothing(); }
-         constexpr bool is_true() const noexcept { return to_boolean() && as_boolean(); }
-         constexpr bool is_false() const noexcept { return to_boolean() && not as_boolean(); }
-         constexpr bool is_scalar() const noexcept { return to_boolean() or is_numeric() or to_string(); }
-         constexpr bool is_numeric() const noexcept { return to_integer() or to_decimal(); }
+         constexpr bool is_nothing() const noexcept { return to_nothing(); }
+         constexpr bool is_boolean() const noexcept { return to_boolean(); }
+         constexpr bool is_integer() const noexcept { return to_integer(); }
+         constexpr bool is_decimal() const noexcept { return to_decimal(); }
+         constexpr bool is_string() const noexcept { return to_string(); }
+         constexpr bool is_array() const noexcept { return to_array(); }
+         constexpr bool is_table() const noexcept { return to_table(); }
+         constexpr bool is_object() const noexcept { return to_object(); }
+
+         constexpr bool is_null() const noexcept { return is_nothing(); }
+         constexpr bool is_true() const noexcept { return is_boolean() && as_boolean(); }
+         constexpr bool is_false() const noexcept { return is_boolean() && not as_boolean(); }
+         constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_string(); }
+         constexpr bool is_numeric() const noexcept { return is_integer() or is_decimal(); }
+         constexpr bool is_trivial() const noexcept { return is_null() or is_scalar(); }
          //! @]}
       };
 
-   } // v1_2_0
+   } // version
 
 } // poly

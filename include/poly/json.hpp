@@ -7,6 +7,7 @@
 #pragma once
 
 #include "node.hpp"
+#include "help.hpp"
 
 #include <array>
 #include <charconv>
@@ -22,7 +23,7 @@
 namespace poly
 {
 
-   inline namespace v1_2_0
+   inline namespace version
    {
       namespace json
       {
@@ -524,6 +525,6 @@ namespace poly
 
       } // json
 
-   } // v1_2_0
+   } // version
 
 } // poly
