@@ -144,16 +144,16 @@ namespace poly
                {
                   switch( pull())
                   {
-                  break; case '\\':return '\\';
-                  break; case '"': return '\"';
-                  break; case 'b': return '\b';
-                  break; case 'f': return '\f';
-                  break; case 'n': return '\n';
-                  break; case 'r': return '\r';
-                  break; case 't': return '\t';
-                  break; case '/': return '/';
-                  break; case 'u': return code();
-                  break; default: [[unlikely]] error( "invalid escape character");
+                  case '\\':return '\\';
+                  case '"': return '\"';
+                  case 'b': return '\b';
+                  case 'f': return '\f';
+                  case 'n': return '\n';
+                  case 'r': return '\r';
+                  case 't': return '\t';
+                  case '/': return '/';
+                  case 'u': return code();
+                  default: [[unlikely]] error( "invalid escape character");
                   }
                }
 
