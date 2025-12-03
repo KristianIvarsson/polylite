@@ -10,14 +10,12 @@
 #include "help.hpp"
 
 #include <array>
-#include <charconv>
 #include <cmath>
 #include <format>
-#include <iomanip>
-#include <spanstream>
 #include <sstream>
-
+#include <charconv>
 #include <stdexcept>
+#include <spanstream>
 
 
 namespace poly
@@ -30,20 +28,20 @@ namespace poly
 
          namespace detail
          {
-            struct parser
+            struct parser : help::stream::buffer::iterator::parser
             {
-               parser( std::istream& stream) : mark{ stream} {}
-
+               using help::stream::buffer::iterator::parser::parser;
+               
                auto operator()()
                {
-                  auto nrv = detect();
+                  auto nrv = spot();
                   test( std::char_traits< std::istream::char_type>::eof(), peep());
                   return nrv;
                }
 
             private:
 
-               auto detect() -> node
+               auto spot() -> node
                {
                   switch( peep())
                   {
@@ -60,43 +58,11 @@ namespace poly
                   }
                }
 
-               void test( const char want, const char pick) const
-               {
-                  if( want != pick) [[unlikely]] error( "unexpected character");
-               }
-
-               bool good() const
-               {
-                  return mark != decltype( mark){};
-               }
-
-               auto read( auto&& want)
-               {
-                  std::string nrv;
-                  while( good() && want( *mark))
-                     nrv.push_back( *mark++);
-                  return nrv;
-               }
-
-               char pull()
-               {
-                  if( good()) [[likely]]
-                     return *mark++;
-                  [[unlikely]] error( "unexpected end of stream");
-               }
-
                char pick()
                {
                   while( good() && std::isspace( *mark))
                      ++mark;
                   return pull();
-               }
-
-               char peek()
-               {
-                  if( good()) [[likely]]
-                     return *mark;
-                  return std::char_traits< std::istream::char_type>::eof();
                }
 
                char peep()
@@ -115,7 +81,7 @@ namespace poly
                   const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
 
                   if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
-                     [[unlikely]] error( "invalid code point");
+                     [[unlikely]] halt( "invalid code point");
 
                   return code;
                }
@@ -128,14 +94,14 @@ namespace poly
                      return lead;
 
                   if( lead > 0xDBFF)
-                     [[unlikely]] error( "invalid 1st surrogate");
+                     [[unlikely]] halt( "invalid 1st surrogate");
 
                   test( '\\', pull()); test( 'u', pull());
 
                   const auto tail = unit();
 
                   if( tail < 0xDC00 || tail > 0xDFFF)
-                     [[unlikely]] error( "invalid 2nd surrogate");
+                     [[unlikely]] halt( "invalid 2nd surrogate");
 
                   return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
                }
@@ -153,7 +119,7 @@ namespace poly
                   case 't': return '\t';
                   case '/': return '/';
                   case 'u': return code();
-                  default: [[unlikely]] error( "invalid escape character");
+                  default: [[unlikely]] halt( "invalid escape character");
                   }
                }
 
@@ -173,7 +139,7 @@ namespace poly
 
                         test( ':', pick());
 
-                        nrv.emplace( std::move( name), detect());
+                        nrv.emplace( std::move( name), spot());
 
                         if( const auto sign = pick(); sign != ',')
                         {
@@ -200,7 +166,7 @@ namespace poly
                   {
                      while( true)
                      {
-                        nrv.emplace_back( detect());
+                        nrv.emplace_back( spot());
 
                         if( const auto sign = pick(); sign != ',')
                         {
@@ -268,7 +234,7 @@ namespace poly
                   if( data == "alse")
                      return false;
 
-                  [[unlikely]] error( "unexpected data");
+                  [[unlikely]] halt( "unexpected data");
                }
 
                auto number() -> node
@@ -298,17 +264,8 @@ namespace poly
                         return value;
                   }
 
-                  [[unlikely]] error( "unexpected data");
+                  [[unlikely]] halt( "unexpected data");
                }
-
-               [[noreturn]] void error( const std::string_view message) const
-               {
-                  throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, decltype( mark){}))};
-               }
-
-            private:
-
-               std::istreambuf_iterator< std::istream::char_type> mark;
 
             };
 
@@ -327,17 +284,9 @@ namespace poly
 
          namespace bom
          {
-            //! ignores possible UTF8-BOM
             auto parse( std::istream& stream)
             {
-               std::array< char, 3> data;
-
-               const auto count  = stream.read( data.data(), data.size()).gcount();
-
-               if( ! std::ranges::equal( data, std::string_view{ "\xEF\xBB\xBF"}))
-                  stream.clear(), stream.seekg( 0 - count, std::ios::cur);
-               
-               return detail::parser{ stream}();
+               return detail::parser{ help::stream::ignore::bom( stream)}();
             }
 
             auto parse( std::string_view json)
@@ -352,59 +301,57 @@ namespace poly
             constexpr std::size_t spaces = 3;
 
             template< std::size_t spaces>
-            struct writer
+            struct writer : help::stream::buffer::iterator::writer
             {
-               std::ostream& stream;
-
-               writer( std::ostream& stream) : stream{ stream} {}
-
+               using help::stream::buffer::iterator::writer::writer;
+               
                void operator() ( const node::object& node)
                {
-                  start( '{');
+                  open( '{');
 
                   auto comma = node.size();
                   for( const auto& [ name, data] : node)
                   {
-                     insert( name);
+                     fill( name);
                      if constexpr( spaces) indent = false;
                      std::visit( *this, data);
                      if constexpr( spaces) indent = true;
-                     if( --comma) stream << ',';
+                     if( --comma) push( ',');
                   }
 
-                  close( '}');
+                  seal( '}');
                }
 
                void operator() ( const node::array& node)
                {
-                  start( '[');
+                  open( '[');
 
                   auto comma = node.size();
                   for( const auto& data : node)
                   {
                      std::visit( *this, data);
-                     if( --comma) stream << ',';
+                     if( --comma) push( ',');
                   }
 
-                  close( ']');
+                  seal( ']');
                }
 
                void operator() ( const node::nothing& node)
                {
-                  insert();
-                  stream << "null";
+                  fill();
+                  copy( "null");
                }
 
                void operator() ( const node::boolean& node)
                {
-                  insert();
-                  stream << ( node ? "true" : "false");
+                  fill();
+                  copy( node ? "true" : "false");
                }
 
                void operator() ( const node::integer& node)
                {
-                  insert();
-                  stream << node;
+                  fill();
+                  copy( std::format( "{}", node));
                }
 
                void operator() ( const node::decimal& node)
@@ -412,20 +359,21 @@ namespace poly
                   if( std::isnan( node) || std::isinf( node))
                      [[unlikely]] throw std::invalid_argument{ std::format( "invalid decimal node [{}]", node)};
 
-                  insert();
-                  stream << node;
+                  fill();
+                  copy( std::format( "{}", node));
                }
 
                void operator() ( const node::string& node)
                {
-                  insert();
-                  stream << '"';
+                  fill();
+                  push( '"');
 
                   for( const auto data : node)
                   {
                      if( std::iscntrl( data))
                      {
-                        stream << R"(\u)" << std::format( "{:04x}", data);
+                        push( '\\'); push( 'u');
+                        copy( std::format( "{:04x}", data));
                      }
                      else [[likely]]
                      {
@@ -433,52 +381,54 @@ namespace poly
                         {
                         case '\\':
                         case '\"':
-                           stream << "\\";
+                           push( '\\');
                         }
 
-                        stream << data;
+                        push( data);
                      }
                   }
 
-                  stream << '"';
+                  push( '"');
                }
 
             private:
 
-               void insert()
+               void fill()
                {
                   if constexpr( spaces)
                      if( indent)
-                        stream << '\n' << std::setw( column * spaces) << "";
+                        push( '\n'), std::fill_n( mark, column * spaces, ' ');
                      else
                         indent = true;
                }
 
-               void insert( const std::string::value_type sign)
+               void fill( const std::string::value_type sign)
                {
-                  insert();
-                  stream << sign;
+                  fill();
+                  push( sign);
                }
 
-               void insert( const std::string& name)
+               void fill( const std::string& name)
                {
-                  insert();
-                  //stream << std::quoted( name) << ':';
-                  stream << '"' << name << '"' << ':';
+                  fill();
+                  push( '"'); 
+                  copy( name);
+                  push( '"');
+                  push( ':');
                   
-                  if constexpr( spaces) stream << ' ';
+                  if constexpr( spaces) push( ' ');
                }
 
-               void start( const auto sign)
+               void open( const auto sign)
                {
-                  insert( sign);
+                  fill( sign);
                   if constexpr( spaces) ++column;
                }
 
-               void close( const auto sign)
+               void seal( const auto sign)
                {
                   if constexpr( spaces) --column;
-                  insert( sign);
+                  fill( sign);
                }
 
             private:
