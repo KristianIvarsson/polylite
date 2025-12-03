@@ -1,4 +1,5 @@
 #include "poly/json.hpp"
+#include "poly/toml.hpp"
 
 #include <stdexcept>
 #include <cassert>
@@ -126,6 +127,80 @@ namespace poly
          }
       } // test
    } // json
+
+   namespace toml
+   {
+      namespace test
+      {
+         namespace cases
+         {
+            void parse()
+            {
+               const auto source = R"(
+# this is a TOML document
+key = "value"
+bare."quoted" = 'bare with quoted'
+bare-key = 'bare key 1'
+bare_key = 'bare key 2'
+"quoted key".bare = "quoted with bare"
+"" = "blank"
+[a.b.c] # just a comment 
+# just another comment
+boolean = true
+integer = 42
+decimal = 3.14
+42s = [ 42, 0x2A, 0o52, 0b101010]
+'big integer' = 123_456_789
+"multiline basic" = """
+this is a
+   " multi line"" \
+   
+   basic 
+   """""""
+multiline_literal = '''
+   multi ' line
+   literal
+'''
+[[ numbers ]]
+small.decimal = -3.14
+small.integer = -42
+[[ numbers ]]
+small.decimal = 3.14
+small.integer = 42
+[inline]
+table = { a = 1, b = 2, c = 3, d.f.g = true }
+
+)";
+
+               const poly::node table = toml::parse( source);
+
+               assert( table.at( "key").as_string() == "value");
+               assert( table.at( "bare").at( "quoted").as_string() == "bare with quoted");
+               assert( table.at( "bare-key").as_string() == "bare key 1");
+               assert( table.at( "bare_key").as_string() == "bare key 2");
+               assert( table.at( "quoted key").at( "bare").as_string() == "quoted with bare");
+               assert( table.at( "").as_string() == "blank");
+               const auto c = table( "a")("b")("c");
+               assert( c("boolean")->as_boolean() == true);
+               assert( c("integer")->as_integer() == 42);
+               assert( c("decimal")->as_decimal() == 3.14);
+               assert( c("42s")->as_array().back().as_integer() == 42);
+               assert( c("multiline basic")->as_string() == "this is a\n   \" multi line\"\" basic \n   \"\"\"\"");
+               assert( c("multiline_literal")->as_string() == "multi ' line\n   literal\n");
+               assert( table( "numbers")( 0)( "small")( "decimal")->as_decimal() == -3.14);
+               assert( table( "numbers")( 0)( "small")( "integer")->as_integer() == -42);
+               assert( table( "numbers")( 1)( "small")( "decimal")->as_decimal() == 3.14);
+               assert( table( "numbers")( 1)( "small")( "integer")->as_integer() == 42);
+               assert( table( "inline")( "table")( "d")( "f")( "g")->as_boolean() == true);
+            }
+         } // cases
+
+         void all()
+         {
+            cases::parse();
+         }
+      } // test
+   } // toml
 } // poly
 
 
@@ -146,13 +221,14 @@ int main( const int argc, const char* const argv[])
       else
       {
          poly::json::test::all();
+         poly::toml::test::all();
       }
 
       return 0;
    }
    catch( const std::exception& e)
    {
-      std::println( "{}", e.what());
+      std::println( stderr, "{}", e.what());
       return 1;
    }
 }
