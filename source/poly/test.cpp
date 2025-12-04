@@ -169,6 +169,10 @@ small.decimal = 3.14
 small.integer = 42
 [inline]
 table = { a = 1, b = 2, c = 3, d.f.g = true }
+[unicode]
+arrow = "\u2192"
+smile = "\uD83D\uDE00"
+earth = "\U0001F30D"
 
 )";
 
@@ -192,6 +196,9 @@ table = { a = 1, b = 2, c = 3, d.f.g = true }
                assert( table( "numbers")( 1)( "small")( "decimal")->as_decimal() == 3.14);
                assert( table( "numbers")( 1)( "small")( "integer")->as_integer() == 42);
                assert( table( "inline")( "table")( "d")( "f")( "g")->as_boolean() == true);
+               assert( table( "unicode")( "arrow")->as_string() == reinterpret_cast<const char*>( u8"→"));
+               assert( table( "unicode")( "smile")->as_string() == reinterpret_cast<const char*>( u8"😀"));
+               assert( table( "unicode")( "earth")->as_string() == reinterpret_cast<const char*>( u8"🌍"));
             }
          } // cases
 

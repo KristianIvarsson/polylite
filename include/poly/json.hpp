@@ -58,69 +58,21 @@ namespace poly
                   }
                }
 
+               void skip()
+               {
+                  leap( [] ( const auto sign) { return std::isspace( sign); });
+               }
+
                char pick()
                {
-                  while( good() && std::isspace( *mark))
-                     ++mark;
+                  while( good() && std::isspace( *mark)) ++mark;
                   return pull();
                }
 
                char peep()
                {
-                  while( good() && std::isspace( *mark))
-                     ++mark;
+                  while( good() && std::isspace( *mark)) ++mark;
                   return peek();
-               }
-
-               auto unit()
-               {
-                  std::array< char, 4> data;
-                  std::copy_n( mark, data.size(), data.data());
-
-                  std::int32_t code;
-                  const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
-
-                  if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
-                     [[unlikely]] halt( "invalid code point");
-
-                  return code;
-               }
-
-               auto code()
-               {
-                  const auto lead = unit();
-
-                  if( lead < 0xD800 || lead > 0xDFFF)
-                     return lead;
-
-                  if( lead > 0xDBFF)
-                     [[unlikely]] halt( "invalid 1st surrogate");
-
-                  test( '\\', pull()); test( 'u', pull());
-
-                  const auto tail = unit();
-
-                  if( tail < 0xDC00 || tail > 0xDFFF)
-                     [[unlikely]] halt( "invalid 2nd surrogate");
-
-                  return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
-               }
-
-               auto decode() -> std::int32_t
-               {
-                  switch( pull())
-                  {
-                  case '\\':return '\\';
-                  case '"': return '\"';
-                  case 'b': return '\b';
-                  case 'f': return '\f';
-                  case 'n': return '\n';
-                  case 'r': return '\r';
-                  case 't': return '\t';
-                  case '/': return '/';
-                  case 'u': return code();
-                  default: [[unlikely]] halt( "invalid escape character");
-                  }
                }
 
                auto object() -> node::object
@@ -204,14 +156,28 @@ namespace poly
                      {
                         using type = std::string::value_type;
 
-                        if( const auto cp = decode(); cp < 0x80)
-                           nrv.insert( nrv.end(), { static_cast< type>( cp)});
+                        if( const auto cp = code( pull()); cp < 0x80)
+                        {
+                           nrv.push_back( static_cast< type>( cp));
+                        }
                         else if( cp < 0x800)
-                           nrv.insert( nrv.end(), { static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
+                        {
+                           nrv.push_back( static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)));
+                           nrv.push_back( static_cast< type>( 0x80 | ( cp & 0x3F)));
+                        }
                         else if( cp < 0x10000)
-                           nrv.insert( nrv.end(), { static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
+                        {
+                           nrv.push_back( static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)));
+                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
+                           nrv.push_back( static_cast< type>( 0x80 | ( cp & 0x3F)));
+                        }
                         else
-                           nrv.insert( nrv.end(), { static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)), static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)), static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)), static_cast< type>( 0x80 | ( cp & 0x3F))});
+                        {
+                           nrv.push_back( static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)));
+                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)));
+                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
+                           nrv.push_back( static_cast< type>( 0x80 | ( cp & 0x3F)));
+                        }
                      }
                   }
                }

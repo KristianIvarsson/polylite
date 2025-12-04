@@ -9,8 +9,8 @@
 #include "help.hpp"
 
 #include <vector>
-#include <utility>
 #include <format>
+#include <utility>
 #include <stdexcept>
 
 namespace poly
@@ -53,7 +53,7 @@ namespace poly
             if(auto result = self.find( key); result != self.end())
                return result->second;
             else
-               throw std::out_of_range{ std::format( "{}", key)};
+               throw std::out_of_range{ std::format( "{} '{}'", __func__, key)};
          }
 
          auto& operator []( auto&& key)
