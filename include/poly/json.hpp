@@ -237,12 +237,12 @@ namespace poly
 
          } // detail
 
-         auto parse( std::istream& stream)
+         inline auto parse( std::istream& stream)
          {
             return detail::parser{ stream}();
          }
 
-         auto parse( std::string_view json)
+         inline auto parse( std::string_view json)
          {
             std::ispanstream stream{ json};
             return parse( stream);
@@ -250,12 +250,12 @@ namespace poly
 
          namespace bom
          {
-            auto parse( std::istream& stream)
+            inline auto parse( std::istream& stream)
             {
                return detail::parser{ help::stream::ignore::bom( stream)}();
             }
 
-            auto parse( std::string_view json)
+            inline auto parse( std::string_view json)
             {
                std::ispanstream stream{ json};
                return parse( stream);
@@ -426,12 +426,12 @@ namespace poly
 
          namespace compact
          {
-            auto write( const node& node, std::ostream& stream)
+            inline auto write( const node& node, std::ostream& stream)
             {
                std::visit( detail::writer< 0>{ stream}, node);
             }
 
-            auto write( const node& node)
+            inline auto write( const node& node)
             {
                std::ostringstream stream;
                write( node, stream);

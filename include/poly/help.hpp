@@ -25,7 +25,7 @@ namespace poly::help
          namespace ignore
          {
             //! ignores possible UTF8-BOM
-            std::istream& bom( std::istream& stream)
+            inline std::istream& bom( std::istream& stream)
             {
                std::array< char, 3> data{};
 

@@ -24,18 +24,18 @@ namespace poly
          {
             namespace current
             {
-               auto date_time()
+               inline auto date_time()
                {
                   return std::chrono::current_zone()->to_local( std::chrono::system_clock::now());
                }
 
-               auto date()
+               inline auto date()
                {
                   const auto now = date_time();
                   return std::chrono::floor< std::chrono::days>( now);
                }
 
-               auto time()
+               inline auto time()
                {
                   const auto now = date_time();
                   return std::chrono::hh_mm_ss{ now - std::chrono::floor< std::chrono::days>( now)};
@@ -43,7 +43,7 @@ namespace poly
 
             } // current
 
-            auto date_time( std::string_view value)
+            inline auto date_time( std::string_view value)
             {
                std::chrono::local_time<std::chrono::system_clock::duration> result;
                if( ( std::ispanstream{ value} >> std::chrono::parse( "%F %T", result)).fail())
@@ -51,31 +51,31 @@ namespace poly
                return result;
             }
 
-            auto date( std::string_view value)
+            inline auto date( std::string_view value)
             {
                std::chrono::local_time<std::chrono::system_clock::duration> result;
                std::ispanstream{ value} >> std::chrono::parse( "%F", result);
                return std::chrono::floor< std::chrono::days>( result);
             }
 
-            auto time( std::string_view value)
+            inline auto time( std::string_view value)
             {
                std::chrono::system_clock::duration result;
                std::ispanstream{ value} >> std::chrono::parse( "%T", result);
                return std::chrono::hh_mm_ss{ result};
             }
 
-            auto date_time( std::chrono::local_time< std::chrono::system_clock::duration> value)
+            inline auto date_time( std::chrono::local_time< std::chrono::system_clock::duration> value)
             {
                return std::format( "{:%F %T}", value);
             }
-
-            auto date( std::chrono::local_time< std::chrono::days> value)
+            
+            inline auto date( std::chrono::local_time< std::chrono::days> value)
             {
                return std::format( "{:%F}", value);
             }
 
-            auto time( std::chrono::hh_mm_ss< std::chrono::system_clock::duration> value)
+            inline auto time( std::chrono::hh_mm_ss< std::chrono::system_clock::duration> value)
             {
                return std::format( "{:%T}", value);
             }
@@ -86,18 +86,18 @@ namespace poly
          {
             namespace current
             {
-               auto date_time()
+               inline auto date_time()
                {
                   return std::chrono::system_clock::now();
                }
             } // current
 
-            auto date_time( std::chrono::sys_time< std::chrono::system_clock::duration> value)
+            inline auto date_time( std::chrono::sys_time< std::chrono::system_clock::duration> value)
             {
                return std::format( "{:%F %T%z}", std::chrono::zoned_time{ std::chrono::current_zone(), value});
             }
 
-            auto date_time( std::string_view value)
+            inline auto date_time( std::string_view value)
             {
                std::chrono::sys_time< std::chrono::system_clock::duration> result;
                if( ( std::ispanstream{ value} >> std::chrono::parse( "%F %T%z", result)).fail())
