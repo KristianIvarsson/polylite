@@ -95,6 +95,7 @@ namespace poly::help
                      return code;
                   }
 
+                  // c-style escape sequences
                   auto code()
                   {
                      const auto lead = unit< 4>();
@@ -115,23 +116,6 @@ namespace poly::help
                      return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
                   }
 
-                  auto code( const auto sign) -> std::int32_t
-                  {
-                     switch( sign)
-                     {
-                     case '\\':return '\\';
-                     case '"': return '\"';
-                     case 'b': return '\b';
-                     case 'f': return '\f';
-                     case 'n': return '\n';
-                     case 'r': return '\r';
-                     case 't': return '\t';
-                     case '/': return '/';
-                     case 'u': return code();
-                     default: [[unlikely]] halt( "invalid escape character");
-                     }
-                  }
-                  
                   void test( const char want, const char pick) const
                   {
                      if( want != pick) [[unlikely]] halt( "unexpected character");
