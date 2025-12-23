@@ -154,7 +154,7 @@ namespace poly
          constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_string(); }
          constexpr bool is_numeric() const noexcept { return is_integer() or is_decimal(); }
          constexpr bool is_trivial() const noexcept { return is_null() or is_scalar(); }
-         //! @]}
+         //! @}
       };
 
    } // version

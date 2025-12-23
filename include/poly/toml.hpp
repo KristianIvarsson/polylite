@@ -27,7 +27,7 @@ namespace poly
          {
             auto bare = [] ( const auto sign)
             {
-               return std::isalnum( sign) || sign == '_' || sign == '-';
+               return help::is::alnum( sign) || sign == '_' || sign == '-';
             };
 
             struct parser : help::stream::buffer::iterator::parser
@@ -144,7 +144,7 @@ namespace poly
 
                void skip() 
                {
-                  leap( [] ( const auto sign) { return std::isspace( sign); });
+                  leap( [] ( const auto sign) { return help::is::space( sign); });
 
                   if( good() && *mark == '#')
                   {
@@ -224,26 +224,6 @@ namespace poly
                   return nrv;
                }
 
-               // c-style escape sequences
-               auto cast() -> std::int32_t
-               {
-                  switch( pull())
-                  {
-                  case '\\':return '\\';
-                  case '"': return '\"';
-                  case 'b': return '\b';
-                  case 'f': return '\f';
-                  case 'n': return '\n';
-                  case 'r': return '\r';
-                  case 't': return '\t';
-                  case '/': return '/';
-                  case 'u': return code();
-                  case 'U': return unit< 8>();
-                  default: [[unlikely]] halt( "invalid escape character");
-                  }
-               }
-
-
                auto basic() -> node::string
                {
                   if( ++mark, peek() == '"')
@@ -263,42 +243,12 @@ namespace poly
                            return nrv;
 
                      if( sign != '\\') [[likely]]
-                     {
                         nrv.push_back( sign);
-                     }
                      else  
-                     {
                         if( peek() != '\n' && same)
-                        {
-                           using type = std::string::value_type;
-                           if( const auto cp = cast(); cp < 0x80)
-                           {
-                              nrv.push_back( static_cast< type>( cp));
-                           }
-                           else if( cp < 0x800)
-                           {
-                              nrv.push_back( static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                           }
-                           else if( cp < 0x10000)
-                           {
-                              nrv.push_back( static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                           }
-                           else
-                           {
-                              nrv.push_back( static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                              nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                           }
-                        }
+                           cast< true>( nrv);
                         else
-                        {
                            skip();
-                        }
-                     }
                   }
                }
 
@@ -330,7 +280,7 @@ namespace poly
 
                   const auto data = read( []( const auto sign) 
                      { 
-                        return std::islower( sign); 
+                        return help::is::lower( sign); 
                      });
 
                   if( data == "rue")
@@ -352,7 +302,7 @@ namespace poly
                         case '.': case 'e': case 'E': return decimal = true;
                         case '+': case '-': case '_':
                         case 'x': case 'o': case 'b': return true;
-                        default: return std::isxdigit( sign) != 0;
+                        default: return help::is::xdigit( sign);
                         }
                      });
 
@@ -434,7 +384,7 @@ namespace poly
                   if( node.is_table())
                      (*this)( node.as_table());
                   else
-                     (*this)( node::table{ { "", node}});
+                     (*this)( node::table{ { {}, node}});
                }
 
                void operator()( const node::table& node)
@@ -483,7 +433,9 @@ namespace poly
                      {
                         array();
 
-                        for( const auto& [ name, data] : data.as_table())
+                        const auto& table = data.as_table();
+
+                        for( const auto& [ name, data] : table)
                         {
                            if( trivial(data))
                            {
@@ -494,7 +446,7 @@ namespace poly
                            }
                         }
 
-                        for( const auto& [ name, data] : data.as_table())
+                        for( const auto& [ name, data] : table)
                         {
                            if( complex( data))
                            {
@@ -531,25 +483,7 @@ namespace poly
                {
                   push( '"');
 
-                  for(const auto data : node)
-                  {
-                     switch(data)
-                     {
-                     case '"':  copy( R"(\")"); break;
-                     case '\\': copy( R"(\\)"); break;
-                     case '\b': copy( R"(\b)"); break;
-                     case '\t': copy( R"(\t)"); break;
-                     case '\n': copy( R"(\n)"); break;
-                     case '\f': copy( R"(\f)"); break;
-                     case '\r': copy( R"(\r)"); break;
-                     default:
-                        if( std::iscntrl( data))
-                           copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( data)));
-                        else
-                           push( data);
-                        break;
-                     }
-                  }
+                  cast( node);
 
                   push( '"');
                }

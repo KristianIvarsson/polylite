@@ -11,7 +11,6 @@
 
 #include <array>
 #include <cmath>
-#include <cuchar>
 #include <format>
 #include <sstream>
 #include <charconv>
@@ -60,18 +59,18 @@ namespace poly
 
                void skip()
                {
-                  leap( [] ( const auto sign) { return std::isspace( sign); });
+                  while( good() && help::is::space( *mark)) ++mark;
                }
 
                char pick()
                {
-                  while( good() && std::isspace( *mark)) ++mark;
+                  while( good() && help::is::space( *mark)) ++mark;
                   return pull();
                }
 
                char peep()
                {
-                  while( good() && std::isspace( *mark)) ++mark;
+                  while( good() && help::is::space( *mark)) ++mark;
                   return peek();
                }
 
@@ -135,24 +134,6 @@ namespace poly
                   return nrv;
                }
 
-               // c-style escape sequences
-               auto cast() -> std::int32_t
-               {
-                  switch( pull())
-                  {
-                  case '\\':return '\\';
-                  case '"': return '\"';
-                  case 'b': return '\b';
-                  case 'f': return '\f';
-                  case 'n': return '\n';
-                  case 'r': return '\r';
-                  case 't': return '\t';
-                  case '/': return '/';
-                  case 'u': return code();
-                  default: [[unlikely]] halt( "invalid escape character");
-                  }
-               }
-
                auto string() -> node::string
                {
                   ++mark; // '"'
@@ -167,45 +148,19 @@ namespace poly
                         return nrv;
 
                      if( sign != '\\') [[likely]]
-                     {
                         nrv.push_back( sign);
-                     }
                      else
-                     {
-                        using type = std::string::value_type;
-                        if( const auto cp = cast(); cp < 0x80) [[likely]]
-                        {
-                           nrv.push_back( static_cast< type>( cp));
-                        }
-                        else if( cp < 0x800)
-                        {
-                           nrv.push_back( static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                        }
-                        else if( cp < 0x10000)
-                        {
-                           nrv.push_back( static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                        }
-                        else
-                        {
-                           nrv.push_back( static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                           nrv.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                        }
-                     }
+                        cast< false>( nrv);
                   }
                }
 
                auto simple() -> node
                {
-                  ++mark; // 'n'+, 't', 'f
+                  ++mark; // 'n', 't', 'f
 
                   const auto data = read( []( const auto sign) 
                      { 
-                        return std::islower( sign); 
+                        return help::is::lower( sign); 
                      });
 
                   if( data == "rue")
@@ -227,7 +182,7 @@ namespace poly
                      {
                         switch( sign)
                         case '.': case 'e': case 'E': return decimal = true;
-                        return std::isdigit( sign) != 0 || sign == '-';
+                        return help::is::digit( sign) || sign == '-';
                      });
 
                   if( decimal)
@@ -348,19 +303,7 @@ namespace poly
                   fill();
                   push( '"');
 
-                  for( const auto data : node)
-                  {
-                     if( std::iscntrl( data))
-                     {
-                        copy( std::format( R"(\u{:04x})", data));
-                     }
-                     else [[likely]]
-                     {
-                        switch( data)
-                        case '\\': case '\"': push( '\\');
-                        push( data);
-                     }
-                  }
+                  cast( node);
 
                   push( '"');
                }

@@ -71,7 +71,7 @@ int main()
       return result;
    };
 
-   // add child created whereever
+   // add child created wherever
    root[ "data"] = create();
 
    std::println();
