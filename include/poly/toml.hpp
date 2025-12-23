@@ -36,9 +36,9 @@ namespace poly
 
                auto operator()() -> node
                {
-                  node root = node::table{};
+                  node nrv = node::table{};
 
-                  auto where = &root;
+                  auto where = &nrv;
 
                   while( true)
                   {
@@ -47,7 +47,7 @@ namespace poly
                      if( keys.empty())
                      {
                         test( std::char_traits< std::istream::char_type>::eof(), peep());
-                        return root.as_table();
+                        return nrv;
                      }
                      
                      if( const auto next = pick(); next == '=')
@@ -65,7 +65,7 @@ namespace poly
                      {
                         test(']', next);
 
-                        where = &root;
+                        where = &nrv;
 
                         for( auto&& name : std::move( keys))
                            where = &(*where)[ std::move( name)];
@@ -421,6 +421,213 @@ namespace poly
                return parse( stream);
             }
          } // bom
+
+
+         namespace detail
+         {
+            struct writer : help::stream::buffer::iterator::writer
+            {
+               using help::stream::buffer::iterator::writer::writer;
+
+               void operator()( const node& node)
+               {
+                  if( node.is_table())
+                     (*this)( node.as_table());
+                  else
+                     (*this)( node::table{ { "", node}});
+               }
+
+               void operator()( const node::table& node)
+               {
+                  if( node.empty() || std::ranges::any_of( node, []( const auto& pair){ return pair.second.is_trivial(); }))
+                     table();
+
+                  for( const auto& [ name, data] : node)
+                  {
+                     if( trivial( data))
+                     {
+                        key( name);
+                        copy( " = ");
+                        std::visit( *this, data);
+                        push( '\n');
+                     }
+                  }
+
+                  for( const auto& [ name, data] : node)
+                  {
+                     if( complex( data))
+                     {
+                        stack.emplace_back( name);
+                        std::visit( *this, data);
+                        stack.pop_back();
+                     }
+                  }
+               }
+
+               void operator()( const node::array& node)
+               {
+                  if( node.empty() || trivial( node))
+                  {
+                     push( '[');
+                     auto commas = node.size();
+                     for(const auto& data : node)
+                     {
+                        std::visit( *this, data);
+                        if( --commas) copy( ", ");
+                     }
+                     push( ']');
+                  }
+                  else
+                  {
+                     for( const auto& data : node)
+                     {
+                        array();
+
+                        for( const auto& [ name, data] : data.as_table())
+                        {
+                           if( trivial(data))
+                           {
+                              key(name);
+                              copy( " = ");
+                              std::visit( *this, data);
+                              push( '\n');
+                           }
+                        }
+
+                        for( const auto& [ name, data] : data.as_table())
+                        {
+                           if( complex( data))
+                           {
+                              stack.emplace_back( name);
+                              std::visit( *this, data);
+                              stack.pop_back();
+                           }
+                        }
+                     }
+                  }
+               }
+
+               void operator()( const node::nothing& node)
+               {
+                  [[unlikely]] throw std::invalid_argument{ "invalid null node"};
+               }
+
+               void operator()( const node::boolean& node)
+               {
+                  copy( node ? "true" : "false");
+               }
+
+               void operator()( const node::integer& node)
+               {
+                  copy( std::format( "{}", node));
+               }
+
+               void operator()( const node::decimal& node)
+               {
+                  copy( std::format( "{}", node));
+               }
+
+               void operator()( const node::string& node)
+               {
+                  push( '"');
+
+                  for(const auto data : node)
+                  {
+                     switch(data)
+                     {
+                     case '"':  copy( R"(\")"); break;
+                     case '\\': copy( R"(\\)"); break;
+                     case '\b': copy( R"(\b)"); break;
+                     case '\t': copy( R"(\t)"); break;
+                     case '\n': copy( R"(\n)"); break;
+                     case '\f': copy( R"(\f)"); break;
+                     case '\r': copy( R"(\r)"); break;
+                     default:
+                        if( std::iscntrl( data))
+                           copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( data)));
+                        else
+                           push( data);
+                        break;
+                     }
+                  }
+
+                  push( '"');
+               }
+
+            private:
+
+               void key( const auto& name)
+               {
+                  if( ! name.empty() && std::ranges::all_of( name, bare))
+                     copy( name); // bare key
+                  else
+                     (*this)( node::string{ name}); // quoted key
+               }
+
+               void glean()
+               {
+                  auto point = stack.size();
+                  for( const auto& name : stack)
+                  {
+                     key( name);
+                     if( --point) push( '.');
+                  }
+               }
+
+               void table()
+               {
+                  if( !stack.empty())
+                  {
+                     copy( "\n[");
+                     glean();
+                     copy( "]\n");
+                  }
+               }
+
+               void array()
+               {
+                  if( !stack.empty())
+                  {
+                     copy( "\n[[");
+                     glean();
+                     copy( "]]\n");
+                  }
+               }
+
+               static bool trivial( const node& node) noexcept
+               {
+                  if( node.is_trivial()) return true;
+                  if( node.is_table()) return false;
+                  return std::ranges::any_of( node.as_array(), trivial);
+               }
+
+               static bool complex( const node& node) noexcept
+               {
+                     if( node.is_trivial()) return false;
+                     if( node.is_table()) return true;
+                     return std::ranges::any_of( node.as_array(), complex);
+               }
+
+            private:
+
+               std::vector< std::string_view> stack;
+            };
+         } // detail
+
+         inline namespace elegant
+         {
+            inline auto write( const node& node, std::ostream& stream)
+            {
+               detail::writer{ stream}( node);
+            }
+
+            inline auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write( node, stream);
+               return std::move( stream).str();
+            }
+         } // elegant         
 
       } // toml
 
