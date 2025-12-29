@@ -6,7 +6,7 @@
 
 #pragma once
 
-#define version v1_4_0
+#define version v1_4_1
 
 #include <array>
 #include <format>
