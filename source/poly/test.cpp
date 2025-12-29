@@ -149,7 +149,9 @@ bare_key = 'bare key 2'
 boolean = true
 integer = 42
 decimal = 3.14
-42s = [ 42, 0x2A, 0o52, 0b101010]
+42s = [ -42, +0x2A, -0o52, +0b101010]
+not_a_number = NaN
+infinite = Inf
 'big integer' = 123_456_789
 "multiline basic" = """
 this is a
@@ -189,6 +191,8 @@ earth = "\U0001F30D"
                assert( c("integer")->as_integer() == 42);
                assert( c("decimal")->as_decimal() == 3.14);
                assert( c("42s")->as_array().back().as_integer() == 42);
+               assert( std::isnan( c("not_a_number")->as_decimal()));
+               assert( std::isinf( c("infinite")->as_decimal()));
                assert( c("multiline basic")->as_string() == "this is a\n   \" multi line\"\" basic \n   \"\"\"\"");
                assert( c("multiline_literal")->as_string() == "multi ' line\n   literal\n");
                assert( table( "numbers")( 0)( "small")( "decimal")->as_decimal() == -3.14);

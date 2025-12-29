@@ -294,48 +294,49 @@ namespace poly
 
                auto number() -> node
                {
-                  bool decimal = false;
-                  auto data = read( [ &decimal]( const auto sign)
+                  if( peek() == '+')
+                     ++mark;
+
+                  auto data = read( []( const auto sign)
                      {
                         switch( sign)
-                        {
-                        case '.': case 'e': case 'E': return decimal = true;
-                        case '+': case '-': case '_':
-                        case 'x': case 'o': case 'b': return true;
-                        default: return help::is::xdigit( sign);
-                        }
+                        case '.': case '+': case '-': case '_': return true;
+                        return help::is::alnum( sign);
                      });
 
                   std::erase( data, '_');
 
-                  if( decimal)
+                  // integer
                   {
-                     node::decimal value;
-                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value);
-                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
-                        return value;
-                  }
-                  else
-                  {
-                     const auto base = []( const auto& data)
+                     const auto base = [&data]
                      {
-                        if( data.size() > 2 && data[0] == '0')
+                        auto sign = data.begin();
+
+                        if( sign != data.end() && *sign == '-')
+                           ++sign;
+
+                        if( sign != data.end() && *sign == '0' && ++sign != data.end())
                         {
-                           switch( data[1])
+                           switch( *sign)
                            {
-                           break; case 'x': return 16;
-                           break; case 'o': return 8;
-                           break; case 'b': return 2;
+                           case 'x': return data.erase( sign - 1, sign + 1), 16;
+                           case 'o': return data.erase( sign - 1, sign + 1), 8;
+                           case 'b': return data.erase( sign - 1, sign + 1), 2;
                            }
                         }
                         return 10;
-                     }( data);
-
-                     if( base != 10)
-                        data.erase( 0, 2);
+                     }();
 
                      node::integer value;
                      const auto result = std::from_chars( data.data(), data.data() + data.size(), value, base);
+                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
+                        return value;
+                  }
+
+                  // decimal
+                  {
+                     node::decimal value;
+                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value);
                      if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
                         return value;
                   }
