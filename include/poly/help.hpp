@@ -6,7 +6,7 @@
 
 #pragma once
 
-#define version v1_4_1
+#define version v1_5_0
 
 #include <array>
 #include <format>
@@ -115,14 +115,14 @@ namespace poly::help
                auto leap( auto&& till)
                {
                   mark = 
-                     std::ranges::begin(std::ranges::subrange( mark, decltype( mark){}) | 
+                     std::ranges::begin( std::ranges::subrange( mark, decltype( mark){}) | 
                      std::views::drop_while( till));
                }
 
                char pull()
                {
                   if( good()) [[likely]] return *mark++;
-                  [[unlikely]] halt( "unexpected end of stream");
+                  halt( "unexpected end of stream");
                }
 
                char peek() const

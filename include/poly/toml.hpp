@@ -146,7 +146,7 @@ namespace poly
                {
                   leap( [] ( const auto sign) { return help::is::space( sign); });
 
-                  if( good() && *mark == '#')
+                  if( peek() == '#')
                   {
                      leap( [] ( const auto sign) { return sign != '\n';});
                      skip();
@@ -310,18 +310,14 @@ namespace poly
                   {
                      const auto base = [&data]
                      {
-                        auto sign = data.begin();
-
-                        if( sign != data.end() && *sign == '-')
-                           ++sign;
-
-                        if( sign != data.end() && *sign == '0' && ++sign != data.end())
+                        const auto idx = 1 * data.starts_with('-');
+                        if( data.size() > idx + 1 && data[ idx] == '0')
                         {
-                           switch( *sign)
+                           switch( data[ idx + 1])
                            {
-                           case 'x': return data.erase( sign - 1, sign + 1), 16;
-                           case 'o': return data.erase( sign - 1, sign + 1), 8;
-                           case 'b': return data.erase( sign - 1, sign + 1), 2;
+                           case 'b': data.erase( idx, 2); return 2;
+                           case 'o': data.erase( idx, 2); return 8;
+                           case 'x': data.erase( idx, 2); return 16;
                            }
                         }
                         return 10;
@@ -549,20 +545,17 @@ namespace poly
             };
          } // detail
 
-         inline namespace elegant
+         inline auto write( const node& node, std::ostream& stream)
          {
-            inline auto write( const node& node, std::ostream& stream)
-            {
-               detail::writer{ stream}( node);
-            }
+            detail::writer{ stream}( node);
+         }
 
-            inline auto write( const node& node)
-            {
-               std::ostringstream stream;
-               write( node, stream);
-               return std::move( stream).str();
-            }
-         } // elegant         
+         inline auto write( const node& node)
+         {
+            std::ostringstream stream;
+            write( node, stream);
+            return std::move( stream).str();
+         }
 
       } // toml
 
