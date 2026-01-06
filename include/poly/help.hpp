@@ -6,7 +6,7 @@
 
 #pragma once
 
-#define version v1_4_1
+#define version v1_4_2
 
 #include <array>
 #include <format>
@@ -34,7 +34,7 @@ namespace poly::help
 
          inline bool space( const auto sign)
          {
-            return in::range<'\t', '\r'>( sign) || sign == ' ';
+            return in::range<'\n', '\r'>( sign) || sign == ' ';
          }
 
          inline bool digit( const auto sign)
