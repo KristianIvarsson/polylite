@@ -14,6 +14,7 @@
 #include <string>
 #include <istream>
 #include <iterator>
+#include <algorithm>
 #include <stdexcept>
 
 namespace poly::help 
@@ -106,10 +107,9 @@ namespace poly::help
 
                auto read( auto&& till)
                {
-                  return 
-                     std::ranges::subrange( mark, decltype( mark){}) | 
-                     std::views::take_while( till) | 
-                     std::ranges::to< std::string>();
+                  std::string nrv;
+                  while( good() && till( *mark)) nrv.push_back( *mark++);
+                  return nrv;
                }
 
                auto leap( auto&& till)
@@ -135,7 +135,8 @@ namespace poly::help
                auto unit()
                {
                   std::array< char, size> data;
-                  std::copy_n( mark, data.size(), data.data());
+
+                  for( auto& sign : data) sign = pull();
 
                   std::int32_t code;
                   const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
