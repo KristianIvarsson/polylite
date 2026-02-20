@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "node.hpp"
 #include "help.hpp"
 
 #include <array>
@@ -185,18 +184,21 @@ namespace poly
                         return help::is::digit( sign) || sign == '-';
                      });
 
+                  const auto start = data.data();
+                  const auto cease = data.data() + data.size();
+
                   if( decimal)
                   {
                      node::decimal value;
-                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value);
-                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
+                     const auto result = std::from_chars( start, cease, value);
+                     if( result.ec == std::errc{} && result.ptr == cease)
                         return value;
                   }
                   else
                   {
                      node::integer value;
-                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value);
-                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
+                     const auto result = std::from_chars( start, cease, value);
+                     if( result.ec == std::errc{} && result.ptr == cease)
                         return value;
                   }
 

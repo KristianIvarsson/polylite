@@ -6,7 +6,6 @@
 
 #pragma once
 
-#include "node.hpp"
 #include "help.hpp"
 
 #include <ranges>
@@ -274,7 +273,7 @@ namespace poly
                   }
                }
 
-               auto simple() -> node
+               node simple()
                {
                   ++mark; // 't', 'f
 
@@ -282,7 +281,7 @@ namespace poly
                      { 
                         return help::is::lower( sign); 
                      });
-
+               
                   if( data == "rue")
                      return true;
 
@@ -292,11 +291,8 @@ namespace poly
                   [[unlikely]] halt( "unexpected data");
                }
 
-               auto number() -> node
+               node number()
                {
-                  if( peek() == '+')
-                     ++mark;
-
                   auto data = read( []( const auto sign)
                      {
                         switch( sign)
@@ -306,40 +302,11 @@ namespace poly
 
                   std::erase( data, '_');
 
-                  // integer
-                  {
-                     const auto base = [&data]
-                     {
-                        const auto idx = 1 * data.starts_with('-');
-                        if( data.size() > idx + 1 && data[ idx] == '0')
-                        {
-                           switch( data[ idx + 1])
-                           {
-                           case 'b': data.erase( idx, 2); return 2;
-                           case 'o': data.erase( idx, 2); return 8;
-                           case 'x': data.erase( idx, 2); return 16;
-                           }
-                        }
-                        return 10;
-                     }();
+                  if( auto result = help::transform::number( data))
+                     return std::move( *result);
 
-                     node::integer value;
-                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value, base);
-                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
-                        return value;
-                  }
-
-                  // decimal
-                  {
-                     node::decimal value;
-                     const auto result = std::from_chars( data.data(), data.data() + data.size(), value);
-                     if( result.ec == std::errc{} && result.ptr == ( data.data() + data.size()))
-                        return value;
-                  }
-
-                  [[unlikely]] halt( "unexpected data");
+                  [[unlikely]] this->halt( "unexpected data");
                }
-
             };
 
          } // detail
