@@ -42,22 +42,22 @@ namespace poly
 
             inline bool space( const auto sign)
             {
-               return in::range<'\n', '\r'>( sign) || sign == ' ';
+               return in::range< '\n', '\r'>( sign) || sign == ' ';
             }
 
             inline bool digit( const auto sign)
             {
-               return in::range<'0', '9'>( sign);
+               return in::range< '0', '9'>( sign);
             }
 
             inline bool lower( const auto sign)
             {
-               return in::range<'a', 'z'>( sign);
+               return in::range< 'a', 'z'>( sign);
             }
 
             inline bool upper( const auto sign)
             {
-               return in::range<'A', 'Z'>( sign);
+               return in::range< 'A', 'Z'>( sign);
             }
 
             inline bool alpha( const auto sign)
@@ -72,14 +72,27 @@ namespace poly
 
             inline bool xdigit( const auto sign)
             {
-               return digit( sign) || in::range<'a', 'f'>( sign) || in::range<'A', 'F'>( sign);
+               return digit( sign) || in::range< 'a', 'f'>( sign) || in::range< 'A', 'F'>( sign);
             }
 
             inline bool cntrl( const auto sign)
             {
-               return in::range<0x0, 0x1F>( sign) || sign == 0x7F;
+               return in::range< 0x0, 0x1F>( sign) || sign == 0x7F;
             }
          } // is
+
+         namespace to
+         {
+            inline auto lower( const auto sign)
+            {
+               return is::upper( sign) ? sign + ( 'a' - 'A') : sign;
+            }
+
+            inline auto upper( const auto sign)
+            {
+               return is::lower( sign) ? sign - ( 'a' - 'A') : sign;
+            }
+         } // to         
 
          auto trim( auto data)
          {
@@ -134,11 +147,16 @@ namespace poly
 
             auto simple( const auto& data) -> std::optional< node>
             {
-               if( data == "null")
+               auto compare = [&data] ( const auto& what)
+               {
+                  return std::ranges::equal( data, what, [] ( const auto lhs, const auto rhs) { return to::lower( lhs) == rhs; });
+               };
+
+               if( compare( std::string_view{ "null"}))
                   return nullptr;
-               if( data == "true")
+               if( compare( std::string_view{ "true"}))
                   return true;
-               if( data == "false")
+               if( compare( std::string_view{ "false"}))
                   return false;
                
                return {};
@@ -148,22 +166,7 @@ namespace poly
 
          namespace stream
          {
-            namespace ignore
-            {
-               //! ignores possible UTF8-BOM
-               inline std::istream& bom( std::istream& stream)
-               {
-                  std::array< char, 3> data{};
-
-                  const auto count  = stream.read( data.data(), data.size()).gcount();
-
-                  if( ! std::ranges::equal( data, std::string_view{ "\xEF\xBB\xBF"}))
-                     stream.clear(), stream.seekg( 0 - count, std::ios::cur);
-                  
-                  return stream;
-               }
-            } // ignore
-            
+           
             namespace buffer::iterator
             {
                struct parser
@@ -181,16 +184,23 @@ namespace poly
 
                   auto read( auto&& till)
                   {
+#if defined(_MSC_VER) // https://github.com/microsoft/STL/issues/5066
                      std::string nrv;
-                     while( good() && till( *mark)) nrv.push_back( *mark++);
+                     while(good() && till(*mark)) nrv.push_back(*mark++);
                      return nrv;
+#else
+                     return std::ranges::subrange( mark, decltype( mark){}) |
+                        std::views::take_while( till) |
+                        std::ranges::to< std::string>();
+#endif
                   }
 
                   auto leap( auto&& till)
                   {
-                     mark = 
-                        std::ranges::begin( std::ranges::subrange( mark, last) | 
-                        std::views::drop_while( till));
+                     mark =
+                        std::ranges::begin(
+                           std::ranges::subrange( mark, last) | 
+                           std::views::drop_while( till));
                   }
 
                   char pull()
@@ -209,7 +219,12 @@ namespace poly
                   auto unit()
                   {
                      std::array< char, size> data;
+
+#if defined(_MSC_VER) // https://github.com/microsoft/STL/issues/5066
                      for( auto& sign : data) sign = pull();
+#else
+                     std::copy_n(mark, data.size(), data.data());
+#endif
 
                      std::int32_t code;
                      const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);

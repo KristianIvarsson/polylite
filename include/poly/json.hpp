@@ -219,19 +219,6 @@ namespace poly
             return parse( stream);
          }
 
-         namespace bom
-         {
-            inline auto parse( std::istream& stream)
-            {
-               return detail::parser{ help::stream::ignore::bom( stream)}();
-            }
-
-            inline auto parse( std::string_view json)
-            {
-               std::ispanstream stream{ json};
-               return parse( stream);
-            }
-         } // bom
 
          namespace detail
          {

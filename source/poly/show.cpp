@@ -1,4 +1,5 @@
 #include <poly/json.hpp>
+#include <poly/tool.hpp>
 #include <print>
 
 namespace local
@@ -33,7 +34,7 @@ namespace local
 
 int main()
 {
-   auto root = poly::json::parse( local::json);
+   auto root = poly::json::parse( poly::tool::bom::ignore( local::json));
 
    // access with bounds checking
    const auto& user_name = root.at( "user").at( "name").as_string();

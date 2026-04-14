@@ -11,6 +11,7 @@
 #include <ranges>
 #include <string>
 #include <vector>
+#include <sstream>
 #include <algorithm>
 #include <stdexcept>
 #include <spanstream>
@@ -275,20 +276,15 @@ namespace poly
 
                node simple()
                {
-                  ++mark; // 't', 'f
-
                   const auto data = read( []( const auto sign) 
                      { 
                         return help::is::lower( sign); 
                      });
                
-                  if( data == "rue")
-                     return true;
+                  if( auto result = help::transform::simple( data))
+                     return std::move( *result);
 
-                  if( data == "alse")
-                     return false;
-
-                  [[unlikely]] halt( "unexpected data");
+                  [[unlikely]] this->halt( "unexpected data");
                }
 
                node number()
@@ -321,21 +317,6 @@ namespace poly
             std::ispanstream stream{ json};
             return parse( stream);
          }
-
-         namespace bom
-         {
-            inline auto parse( std::istream& stream)
-            {
-               return detail::parser{ help::stream::ignore::bom( stream)}();
-            }
-
-            inline auto parse( std::string_view json)
-            {
-               std::ispanstream stream{ json};
-               return parse( stream);
-            }
-         } // bom
-
 
          namespace detail
          {
@@ -501,9 +482,9 @@ namespace poly
 
                static bool complex( const node& node) noexcept
                {
-                     if( node.is_trivial()) return false;
-                     if( node.is_table()) return true;
-                     return std::ranges::any_of( node.as_array(), complex);
+                  if( node.is_trivial()) return false;
+                  if( node.is_table()) return true;
+                  return std::ranges::any_of( node.as_array(), complex);
                }
 
             private:
