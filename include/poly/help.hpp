@@ -147,19 +147,51 @@ namespace poly
 
             auto simple( const auto& data) -> std::optional< node>
             {
-               auto compare = [&data] ( const auto& what)
+               auto compare = [&data] ( std::string_view what)
                {
                   return std::ranges::equal( data, what, [] ( const auto lhs, const auto rhs) { return to::lower( lhs) == rhs; });
                };
 
-               if( compare( std::string_view{ "null"}))
+               if( compare( "null"))
                   return nullptr;
-               if( compare( std::string_view{ "true"}))
+               if( compare( "true"))
                   return true;
-               if( compare( std::string_view{ "false"}))
+               if( compare( "false"))
                   return false;
                
                return {};
+            }
+
+            auto point( const std::int32_t code)
+            {
+               std::string nrv;
+
+               using type = std::string::value_type;
+
+               if( code < 0x80)
+               {
+                  nrv.push_back( static_cast< type>( code));
+               }
+               else if( code < 0x800)
+               {
+                  nrv.push_back( static_cast< type>( 0xC0 | (( code >> 6) & 0x1F)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               }
+               else if( code < 0x10000)
+               {
+                  nrv.push_back( static_cast< type>( 0xE0 | (( code >> 12) & 0x0F)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code >> 6) & 0x3F)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               }
+               else
+               {
+                  nrv.push_back( static_cast< type>( 0xF0 | (( code >> 18) & 0x07)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code >> 12) & 0x3F)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code >> 6) & 0x3F)));
+                  nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               }
+
+               return nrv;
             }
 
          } // transform
@@ -171,10 +203,12 @@ namespace poly
             {
                struct parser
                {
-                  static constexpr const auto last = std::istreambuf_iterator< std::istream::char_type>{};
+                  using base = parser;
 
                   std::istreambuf_iterator< std::istream::char_type> mark;
+                  static constexpr const auto last = decltype( mark){};
 
+                  parser( decltype( mark) mark) : mark{ mark} {}
                   parser( std::istream& stream) : mark{ stream} {}
 
                   bool good() const
@@ -257,10 +291,9 @@ namespace poly
                   }
 
                   // c-style escape sequences
-                  template< bool U>
-                  auto cast() -> std::int32_t
+                  auto cast( const auto sign) -> std::int32_t
                   {
-                     switch( pull())
+                     switch( sign)
                      {
                      case '\\':return '\\';
                      case '"': return '\"';
@@ -271,36 +304,7 @@ namespace poly
                      case 't': return '\t';
                      case '/': return '/';
                      case 'u': return code();
-                     case 'U': if constexpr( U) return unit< 8>(); else [[fallthrough]];
                      default: [[unlikely]] halt( "invalid escape character");
-                     }
-                  }
-
-                  template< bool U>
-                  auto cast( std::string& data)
-                  {
-                     using type = std::string::value_type;
-                     if( const auto cp = cast< U>(); cp < 0x80)
-                     {
-                        data.push_back( static_cast< type>( cp));
-                     }
-                     else if( cp < 0x800)
-                     {
-                        data.push_back( static_cast< type>( 0xC0 | (( cp >> 6) & 0x1F)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                     }
-                     else if( cp < 0x10000)
-                     {
-                        data.push_back( static_cast< type>( 0xE0 | (( cp >> 12) & 0x0F)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
-                     }
-                     else
-                     {
-                        data.push_back( static_cast< type>( 0xF0 | (( cp >> 18) & 0x07)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp >> 12) & 0x3F)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp >> 6) & 0x3F)));
-                        data.push_back( static_cast< type>( 0x80 | (( cp & 0x3F))));
                      }
                   }
 
@@ -317,8 +321,11 @@ namespace poly
 
                struct writer
                {
+                  using base = writer;
+
                   std::ostreambuf_iterator< std::istream::char_type> mark;
 
+                  writer( decltype( mark) mark) : mark{ mark} {}
                   writer( std::ostream& stream) : mark{ stream} {}
 
                   void push( const auto sign)

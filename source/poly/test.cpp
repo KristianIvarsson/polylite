@@ -1,6 +1,7 @@
 #include "poly/json.hpp"
 #include "poly/toml.hpp"
 #include "poly/tool.hpp"
+#include "poly/yaml.hpp"
 
 #include <stdexcept>
 #include <cassert>
@@ -135,6 +136,11 @@ namespace poly
                assert( json::parse( R"("\u00A3")").as_string() == "\xC2\xA3");
                assert( json::parse( R"("\u20AC")").as_string() == "\xE2\x82\xAC");
                assert( json::parse( R"("\uD83D\uDE00")").as_string() == "\xF0\x9F\x98\x80");
+
+               assert( json::parse( R"("\f")").as_string() == "\f");
+               assert( json::parse( R"("\r")").as_string() == "\r");
+               assert( json::parse( R"("\t")").as_string() == "\t");
+               assert( json::parse( R"("\/")").as_string() == "/");
             }
 
          } // cases
@@ -221,14 +227,448 @@ earth = "\U0001F30D"
                assert( table( "unicode")( "smile")->as_string().size() == 4);
                assert( table( "unicode")( "earth")->as_string().size() == 4);
             }
+
+            void write()
+            {
+               // flat table roundtrip
+               {
+                  node source;
+                  source[ "a"] = true;
+                  source[ "b"] = -42;
+                  source[ "c"] = 3.14;
+                  source[ "d"] = "hello";
+
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "a").as_boolean() == true);
+                  assert( target.at( "b").as_integer() == -42);
+                  assert( target.at( "c").as_decimal() == 3.14);
+                  assert( target.at( "d").as_string() == "hello");
+               }
+
+               // nested table roundtrip
+               {
+                  node source;
+                  source[ "outer"][ "inner"] = 42;
+                  source[ "outer"][ "flag"] = false;
+
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "outer").at( "inner").as_integer() == 42);
+                  assert( target.at( "outer").at( "flag").as_boolean() == false);
+               }
+
+               // array of tables roundtrip
+               {
+                  node source;
+                  source[ "items"][ 0][ "x"] = 1;
+                  source[ "items"][ 1][ "x"] = 2;
+
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "items").as_array().size() == 2);
+                  assert( target.at( "items").at( 0).at( "x").as_integer() == 1);
+                  assert( target.at( "items").at( 1).at( "x").as_integer() == 2);
+               }
+
+               // quoted key roundtrip
+               {
+                  node source;
+                  source[ "my key"] = 99;
+
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "my key").as_integer() == 99);
+               }
+            }
+
          } // cases
 
          void all()
          {
             cases::parse();
+            cases::write();
          }
       } // toml::test
 
+
+      namespace yaml::test 
+      {
+         namespace cases
+         {
+            void parse()
+            {
+               // nested map with directives, comments, blank lines, null, sequences, quoted strings
+               {
+                  const auto source = R"(#this is a YAML document
+%YAML 1.2
+a: 123
+# this is a comment
+ 
+b:
+  ba:  22
+  bb:  
+    ca: 333
+  bc: 3.14
+c: 24
+d: null
+e:
+  - 1
+  - 2
+  - 3
+f: 'hello world'
+g: "hello\nworld")";
+
+                  const auto document = yaml::parse( source);
+
+                  assert( document.is_table());
+                  assert( document.at( "a").as_integer() == 123);
+                  assert( document.at( "b").at( "ba").as_integer() == 22);
+                  assert( document.at( "b").at( "bb").at( "ca").as_integer() == 333);
+                  assert( document.at( "b").at( "bc").as_decimal() == 3.14);
+                  assert( document.at( "c").as_integer() == 24);
+                  assert( document.at( "d").is_null());
+                  assert( document.at( "e").is_array());
+                  assert( document.at( "e").as_array().size() == 3);
+                  assert( document.at( "e").at( 1).as_integer() == 2);
+                  assert( document.at( "f").as_string() == "hello world");
+                  assert( document.at( "g").as_string() == "hello\nworld");
+               }
+
+               // document boundary: stop at ... and ---
+               {
+                  const auto d1 = yaml::parse( "a: 1\n...\nb: 2\n");
+                  assert( d1.at( "a").as_integer() == 1);
+                  assert( ! d1.as_table().contains( "b"));
+
+                  const auto d2 = yaml::parse( "a: 1\n---\nb: 2\n");
+                  assert( d2.at( "a").as_integer() == 1);
+                  assert( ! d2.as_table().contains( "b"));
+               }
+
+               // null documents
+               {
+                  assert( yaml::parse( "...\n").is_null());
+                  assert( yaml::parse( "---\n...\n").is_null());
+                  assert( yaml::parse( "---\nnull\n").is_null());
+               }
+
+               // empty stream yields 0 documents
+               {
+                  assert( yaml::all::parse( "").size() == 0);
+                  assert( yaml::all::parse( "# just a comment\n").size() == 0);
+               }
+
+               // all::parse multi-document stream
+               {
+                  const auto docs = yaml::all::parse( "a: 1\n---\nb: 2\n");
+                  assert( docs.size() == 2);
+                  assert( docs.at( 0).at( "a").as_integer() == 1);
+                  assert( docs.at( 1).at( "b").as_integer() == 2);
+               }
+
+               // ~ as null
+               { const auto t = yaml::parse( "a: ~\n"); assert( t.at( "a").is_null()); }
+
+               // boolean variants
+               { const auto t = yaml::parse( "a: True\n");  assert( t.at( "a").as_boolean() == true); }
+               { const auto t = yaml::parse( "a: TRUE\n");  assert( t.at( "a").as_boolean() == true); }
+               { const auto t = yaml::parse( "a: False\n"); assert( t.at( "a").as_boolean() == false); }
+               { const auto t = yaml::parse( "a: FALSE\n"); assert( t.at( "a").as_boolean() == false); }
+
+               // hex and octal integers
+               { const auto t = yaml::parse( "a: 0x1F\n"); assert( t.at( "a").as_integer() == 31); }
+               { const auto t = yaml::parse( "a: 0o17\n"); assert( t.at( "a").as_integer() == 15); }
+
+               // special float values
+               { const auto t = yaml::parse( "a: .inf\n");  assert( std::isinf( t.at( "a").as_decimal()) && t.at( "a").as_decimal() > 0); }
+               { const auto t = yaml::parse( "a: +.inf\n"); assert( std::isinf( t.at( "a").as_decimal()) && t.at( "a").as_decimal() > 0); }
+               { const auto t = yaml::parse( "a: -.inf\n"); assert( std::isinf( t.at( "a").as_decimal()) && t.at( "a").as_decimal() < 0); }
+               { const auto t = yaml::parse( "a: .nan\n");  assert( std::isnan( t.at( "a").as_decimal())); }
+
+            }
+
+            void flow()
+            {
+               // inline mapping
+               {
+                  const auto target = yaml::parse( "point: {\"x\": 1, \"y\": 2}\n");
+                  assert( target.at( "point").at( "x").as_integer() == 1);
+                  assert( target.at( "point").at( "y").as_integer() == 2);
+               }
+
+               // inline sequence
+               {
+                  const auto target = yaml::parse( "tags: [\"web\", \"api\", \"v2\"]\n");
+                  assert( target.at( "tags").as_array().size() == 3);
+                  assert( target.at( "tags").at( 0).as_string() == "web");
+                  assert( target.at( "tags").at( 2).as_string() == "v2");
+               }
+
+               // nested flow
+               {
+                  const auto target = yaml::parse( "server: {\"host\": \"localhost\", \"port\": 8080, \"tags\": [\"web\", \"api\"]}\n");
+                  assert( target.at( "server").at( "host").as_string() == "localhost");
+                  assert( target.at( "server").at( "port").as_integer() == 8080);
+                  assert( target.at( "server").at( "tags").at( 1).as_string() == "api");
+               }
+
+               // mixed block and flow
+               {
+                  const auto source = R"(
+name: example
+config: {"debug": true, "timeout": 30}
+items: [1, 2, 3]
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "name").as_string() == "example");
+                  assert( target.at( "config").at( "debug").as_boolean() == true);
+                  assert( target.at( "config").at( "timeout").as_integer() == 30);
+                  assert( target.at( "items").as_array().size() == 3);
+                  assert( target.at( "items").at( 1).as_integer() == 2);
+               }
+
+               // flow::write object roundtrip
+               {
+                  node source;
+                  source[ "x"] = 1;
+                  source[ "y"] = 2;
+
+                  const auto text = yaml::compact::write( source);
+                  const auto target = json::parse( text);
+                  assert( target.at( "x").as_integer() == 1);
+                  assert( target.at( "y").as_integer() == 2);
+               }
+
+               // flow::write array roundtrip
+               {
+                  node source;
+                  source[ 0] = "web";
+                  source[ 1] = "api";
+                  source[ 2] = "v2";
+
+                  const auto text = yaml::compact::write( source);
+                  const auto target = json::parse( text);
+                  assert( target.as_array().size() == 3);
+                  assert( target.at( 0).as_string() == "web");
+                  assert( target.at( 2).as_string() == "v2");
+               }
+
+               // flow::write nested roundtrip
+               {
+                  node source;
+                  source[ "host"] = "localhost";
+                  source[ "port"] = 8080;
+                  source[ "tags"][ 0] = "web";
+                  source[ "tags"][ 1] = "api";
+
+                  const auto text = yaml::compact::write( source);
+                  const auto target = json::parse( text);
+                  assert( target.at( "host").as_string() == "localhost");
+                  assert( target.at( "port").as_integer() == 8080);
+                  assert( target.at( "tags").at( 1).as_string() == "api");
+               }
+            }
+
+            void write()
+            {
+               // flat map
+               {
+                  node source;
+                  source[ "a"] = nullptr;
+                  source[ "b"] = true;
+                  source[ "c"] = -42;
+                  source[ "d"] = 3.14;
+                  source[ "e"] = "hello";
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( target.at( "a").is_null());
+                  assert( target.at( "b").as_boolean() == true);
+                  assert( target.at( "c").as_integer() == -42);
+                  assert( target.at( "d").as_decimal() == 3.14);
+                  assert( target.at( "e").as_string() == "hello");
+               }
+
+               // nested map
+               {
+                  node source;
+                  source[ "outer"][ "inner"] = 42;
+                  source[ "outer"][ "flag"] = false;
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( target.at( "outer").at( "inner").as_integer() == 42);
+                  assert( target.at( "outer").at( "flag").as_boolean() == false);
+               }
+
+               // array of scalars
+               {
+                  node source;
+                  source[ "items"][ 0] = 1;
+                  source[ "items"][ 1] = 2;
+                  source[ "items"][ 2] = 3;
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( target.at( "items").as_array().size() == 3);
+                  assert( target.at( "items").at( 0).as_integer() == 1);
+                  assert( target.at( "items").at( 2).as_integer() == 3);
+               }
+
+               // array of maps
+               {
+                  node source;
+                  source[ "servers"][ 0][ "host"] = "db1";
+                  source[ "servers"][ 0][ "port"] = 5432;
+                  source[ "servers"][ 1][ "host"] = "db2";
+                  source[ "servers"][ 1][ "port"] = 5433;
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( target.at( "servers").as_array().size() == 2);
+                  assert( target.at( "servers").at( 0).at( "host").as_string() == "db1");
+                  assert( target.at( "servers").at( 1).at( "port").as_integer() == 5433);
+               }
+
+               // inf/nan roundtrip
+               {
+                  node source;
+                  source[ "a"] = std::numeric_limits< node::decimal>::infinity();
+                  source[ "b"] = -std::numeric_limits< node::decimal>::infinity();
+                  source[ "c"] = std::numeric_limits< node::decimal>::quiet_NaN();
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( std::isinf( target.at( "a").as_decimal()) && target.at( "a").as_decimal() > 0);
+                  assert( std::isinf( target.at( "b").as_decimal()) && target.at( "b").as_decimal() < 0);
+                  assert( std::isnan( target.at( "c").as_decimal()));
+               }
+
+               // key that needs quoting
+               {
+                  node source;
+                  source[ "my key"] = 42;
+
+                  const auto target = yaml::parse( yaml::write( source));
+                  assert( target.at( "my key").as_integer() == 42);
+               }
+            }
+
+            void block()
+            {
+               // literal: preserves newlines, clip (default)
+               {
+                  const auto target = yaml::parse( "key: |\n  hello\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello\nworld\n");
+                  assert( target.at( "next").as_integer() == 1);
+               }
+
+               // literal: strip chomping
+               {
+                  const auto target = yaml::parse( "key: |-\n  hello\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello\nworld");
+               }
+
+               // literal: keep chomping
+               {
+                  const auto target = yaml::parse( "key: |+\n  hello\n  world\n\n\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello\nworld\n\n\n");
+               }
+
+               // folded: newlines become spaces, clip
+               {
+                  const auto target = yaml::parse( "key: >\n  hello\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello world\n");
+               }
+
+               // folded: blank line becomes newline
+               {
+                  const auto target = yaml::parse( "key: >\n  hello\n\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello\nworld\n");
+               }
+
+               // literal with leading blank lines
+               {
+                  const auto target = yaml::parse( "key: |\n\n  hello\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "\nhello\n");
+               }
+
+               // literal with # inside (not a comment)
+               {
+                  const auto target = yaml::parse( "key: |\n  hello\n  # not a comment\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello\n# not a comment\nworld\n");
+               }
+
+               // nested block scalar
+               {
+                  const auto target = yaml::parse( "a:\n  b: |\n    hello\n    world\n  c: 42\n");
+                  assert( target.at( "a").at( "b").as_string() == "hello\nworld\n");
+                  assert( target.at( "a").at( "c").as_integer() == 42);
+               }
+
+               // folded: strip chomping
+               {
+                  const auto target = yaml::parse( "key: >-\n  hello\n  world\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello world");
+               }
+
+               // folded: keep chomping
+               {
+                  const auto target = yaml::parse( "key: >+\n  hello\n  world\n\n\nnext: 1\n");
+                  assert( target.at( "key").as_string() == "hello world\n\n\n");
+               }
+            }
+
+            void tagged()
+            {
+               // !!str plain — coerces non-string types to string
+               { const auto t = yaml::parse( "key: !!str 123\n");   assert( t.at( "key").as_string() == "123"); }
+               { const auto t = yaml::parse( "key: !!str true\n");  assert( t.at( "key").as_string() == "true"); }
+               { const auto t = yaml::parse( "key: !!str hello\n"); assert( t.at( "key").as_string() == "hello"); }
+
+               // !!str quoted
+               { const auto t = yaml::parse( "key: !!str \"hello\"\n"); assert( t.at( "key").as_string() == "hello"); }
+               { const auto t = yaml::parse( "key: !!str 'hello'\n");   assert( t.at( "key").as_string() == "hello"); }
+
+               // !!null — all valid representations
+               { const auto t = yaml::parse( "key: !!null\n");       assert( t.at( "key").is_null()); }
+               { const auto t = yaml::parse( "key: !!null ~\n");     assert( t.at( "key").is_null()); }
+               { const auto t = yaml::parse( "key: !!null null\n");  assert( t.at( "key").is_null()); }
+               { const auto t = yaml::parse( "key: !!null Null\n");  assert( t.at( "key").is_null()); }
+               { const auto t = yaml::parse( "key: !!null NULL\n");  assert( t.at( "key").is_null()); }
+
+               // !!bool — all core schema variants
+               { const auto t = yaml::parse( "key: !!bool true\n");  assert( t.at( "key").as_boolean() == true); }
+               { const auto t = yaml::parse( "key: !!bool True\n");  assert( t.at( "key").as_boolean() == true); }
+               { const auto t = yaml::parse( "key: !!bool TRUE\n");  assert( t.at( "key").as_boolean() == true); }
+               { const auto t = yaml::parse( "key: !!bool false\n"); assert( t.at( "key").as_boolean() == false); }
+               { const auto t = yaml::parse( "key: !!bool False\n"); assert( t.at( "key").as_boolean() == false); }
+               { const auto t = yaml::parse( "key: !!bool FALSE\n"); assert( t.at( "key").as_boolean() == false); }
+
+               // !!int — decimal, negative, hex, octal
+               { const auto t = yaml::parse( "key: !!int 42\n");    assert( t.at( "key").as_integer() == 42); }
+               { const auto t = yaml::parse( "key: !!int -7\n");    assert( t.at( "key").as_integer() == -7); }
+               { const auto t = yaml::parse( "key: !!int 0x1F\n");  assert( t.at( "key").as_integer() == 31); }
+               { const auto t = yaml::parse( "key: !!int 0o17\n");  assert( t.at( "key").as_integer() == 15); }
+
+               // !!float — decimal, integer coerced, special values
+               { const auto t = yaml::parse( "key: !!float 3.14\n");  assert( t.at( "key").as_decimal() == 3.14); }
+               { const auto t = yaml::parse( "key: !!float 123\n");   assert( t.at( "key").as_decimal() == 123.0); }
+               { const auto t = yaml::parse( "key: !!float .inf\n");  assert( std::isinf( t.at( "key").as_decimal()) && t.at( "key").as_decimal() > 0); }
+               { const auto t = yaml::parse( "key: !!float -.inf\n"); assert( std::isinf( t.at( "key").as_decimal()) && t.at( "key").as_decimal() < 0); }
+               { const auto t = yaml::parse( "key: !!float .nan\n");  assert( std::isnan( t.at( "key").as_decimal())); }
+
+               // error cases
+               { auto ok = false; try { yaml::parse( "key: !!bool 1\n"); }       catch( const std::exception&) { ok = true; } assert( ok); }
+               { auto ok = false; try { yaml::parse( "key: !!int 3.14\n"); }     catch( const std::exception&) { ok = true; } assert( ok); }
+               { auto ok = false; try { yaml::parse( "key: !!null banana\n"); }  catch( const std::exception&) { ok = true; } assert( ok); }
+               { auto ok = false; try { yaml::parse( "key: !!foo bar\n"); }      catch( const std::exception&) { ok = true; } assert( ok); }
+            }
+
+         } // cases
+
+         void all()
+         {
+            cases::parse();
+            cases::flow();
+            cases::write();
+            cases::block();
+            cases::tagged();
+         }
+
+      } // yaml::test
    } // version
 } // poly
 
@@ -253,6 +693,7 @@ int main( const int argc, const char* const argv[])
          poly::tool::test::all();
          poly::json::test::all();
          poly::toml::test::all();
+         poly::yaml::test::all();
       }
 
       return 0;

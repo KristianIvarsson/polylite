@@ -23,6 +23,7 @@ namespace poly
             constexpr std::string_view utf8 = "\xEF\xBB\xBF";
 
             //! ignores possible UTF8-BOM
+            //! @{
             inline auto ignore( std::istream& value) -> std::istream&
             {
                std::array< char, 3> data{};
@@ -42,6 +43,7 @@ namespace poly
 
                return value;
             }
+            //! @}
 
          } // bom
       } // tool

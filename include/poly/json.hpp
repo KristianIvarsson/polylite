@@ -28,16 +28,14 @@ namespace poly
          {
             struct parser : help::stream::buffer::iterator::parser
             {
-               using help::stream::buffer::iterator::parser::parser;
-               
+               using base::base;
+
                auto operator()()
                {
                   auto nrv = spot();
                   test( std::char_traits< std::istream::char_type>::eof(), peep());
                   return nrv;
                }
-
-            private:
 
                auto spot() -> node
                {
@@ -55,6 +53,8 @@ namespace poly
                      return number();
                   }
                }
+
+            private:
 
                void skip()
                {
@@ -149,7 +149,7 @@ namespace poly
                      if( sign != '\\') [[likely]]
                         nrv.push_back( sign);
                      else
-                        cast< false>( nrv);
+                        nrv.append( help::transform::point( cast( pull())));
                   }
                }
 
@@ -227,7 +227,7 @@ namespace poly
             template< std::size_t spaces>
             struct writer : help::stream::buffer::iterator::writer
             {
-               using help::stream::buffer::iterator::writer::writer;
+               using base::base;
                
                void operator() ( const node::object& node)
                {

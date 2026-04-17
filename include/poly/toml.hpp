@@ -25,14 +25,14 @@ namespace poly
       {
          namespace detail
          {
-            auto bare = [] ( const auto sign)
+            constexpr auto bare = [] ( const auto sign)
             {
                return help::is::alnum( sign) || sign == '_' || sign == '-';
             };
 
             struct parser : help::stream::buffer::iterator::parser
             {
-               using help::stream::buffer::iterator::parser::parser;
+               using base::base;
 
                auto operator()() -> node
                {
@@ -163,6 +163,15 @@ namespace poly
                   return skip(), peek();
                }
 
+               auto cast( const auto sign) -> std::int32_t
+               {
+                  switch( sign)
+                  {
+                  case 'U': return unit< 8>();
+                  default:  return base::cast( sign);
+                  }
+               }
+
                auto table() -> node::table
                {
                   ++mark; // '{'
@@ -246,7 +255,7 @@ namespace poly
                         nrv.push_back( sign);
                      else  
                         if( peek() != '\n' && same)
-                           cast< true>( nrv);
+                           nrv.append( help::transform::point( cast( pull())));
                         else
                            skip();
                   }
@@ -322,7 +331,7 @@ namespace poly
          {
             struct writer : help::stream::buffer::iterator::writer
             {
-               using help::stream::buffer::iterator::writer::writer;
+               using base::base;
 
                void operator()( const node& node)
                {
@@ -427,9 +436,7 @@ namespace poly
                void operator()( const node::string& node)
                {
                   push( '"');
-
                   cast( node);
-
                   push( '"');
                }
 
