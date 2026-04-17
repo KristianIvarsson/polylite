@@ -36,7 +36,7 @@ namespace poly
 
                auto operator()() -> node
                {
-                  node nrv = node::table{};
+                  node nrv = node::object{};
 
                   auto where = &nrv;
 
@@ -77,12 +77,12 @@ namespace poly
                            if( ! where->is_array())
                               *where = node::array{};
                            
-                           where = &where->as_array().emplace_back( node::table{});
+                           where = &where->as_array().emplace_back( node::object{});
                         }
                         else
                         {
-                           if( ! where->is_table())
-                              *where = node::table{};
+                           if( ! where->is_object())
+                              *where = node::object{};
                         }
                      }
                   }
@@ -122,7 +122,7 @@ namespace poly
                   }
                }
 
-               auto keys() -> std::vector< node::table::key_type>
+               auto keys() -> std::vector< node::object::key_type>
                {
                   if( peep() == '[') ++mark; // '['
                   if( peek() == '[') ++mark; // '['
@@ -172,7 +172,7 @@ namespace poly
                   }
                }
 
-               auto table() -> node::table
+               auto table() -> node::object
                {
                   ++mark; // '{'
 
@@ -203,7 +203,7 @@ namespace poly
                      ++mark; // '}'
                   }
 
-                  return std::move( nrv).as_table();
+                  return std::move( nrv).as_object();
                }
 
                auto array() -> node::array
@@ -335,13 +335,13 @@ namespace poly
 
                void operator()( const node& node)
                {
-                  if( node.is_table())
-                     (*this)( node.as_table());
+                  if( node.is_object())
+                     (*this)( node.as_object());
                   else
-                     (*this)( node::table{ { {}, node}});
+                     (*this)( node::object{ { {}, node}});
                }
 
-               void operator()( const node::table& node)
+               void operator()( const node::object& node)
                {
                   if( node.empty() || std::ranges::any_of( node, []( const auto& pair){ return pair.second.is_trivial(); }))
                      table();
@@ -387,7 +387,7 @@ namespace poly
                      {
                         array();
 
-                        const auto& table = data.as_table();
+                        const auto& table = data.as_object();
 
                         for( const auto& [ name, data] : table)
                         {
@@ -483,14 +483,14 @@ namespace poly
                static bool trivial( const node& node) noexcept
                {
                   if( node.is_trivial()) return true;
-                  if( node.is_table()) return false;
+                  if( node.is_object()) return false;
                   return std::ranges::any_of( node.as_array(), trivial);
                }
 
                static bool complex( const node& node) noexcept
                {
                   if( node.is_trivial()) return false;
-                  if( node.is_table()) return true;
+                  if( node.is_object()) return true;
                   return std::ranges::any_of( node.as_array(), complex);
                }
 

@@ -35,7 +35,6 @@ namespace poly
          using decimal = std::variant_alternative_t< 3, data>;
          using string = std::variant_alternative_t< 4, data>;
          using array = std::variant_alternative_t< 5, data>;
-         using table = std::variant_alternative_t< 6, data>;
          using object = std::variant_alternative_t< 6, data>;
          //! @}
 
@@ -48,7 +47,6 @@ namespace poly
          constexpr auto& as_decimal( this auto&& self) { return self.template as< decimal>(); }
          constexpr auto& as_string( this auto&& self) { return self.template as< string>(); }
          constexpr auto& as_array( this auto&& self) { return self.template as< array>(); }
-         constexpr auto& as_table( this auto&& self) { return self.template as< table>(); }
          constexpr auto& as_object( this auto&& self) { return self.template as< object>(); }
 
          auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
@@ -56,9 +54,9 @@ namespace poly
             return self.as_array().at( lookup);
          }
 
-         auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), table::key_type>
+         auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), object::key_type>
          {
-            return self.as_table().at( lookup);
+            return self.as_object().at( lookup);
          }
          //! @}
 
@@ -71,7 +69,6 @@ namespace poly
          constexpr auto to_decimal( this auto&& self) noexcept { return self.template to< decimal>(); }
          constexpr auto to_string( this auto&& self) noexcept { return self.template to< string>(); }
          constexpr auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
-         constexpr auto to_table( this auto&& self) noexcept { return self.template to< table>(); }
          constexpr auto to_object( this auto&& self) noexcept { return self.template to< object>(); }
 
          template< typename type>
@@ -89,10 +86,10 @@ namespace poly
                return proxy{ nullptr};
             }
 
-            auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), table::key_type>
+            auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), object::key_type>
             {
-               if( pointer and pointer->to_table() and pointer->as_table().contains( lookup))
-                  return proxy{ &pointer->as_table().at( lookup)};
+               if( pointer and pointer->to_object() and pointer->as_object().contains( lookup))
+                  return proxy{ &pointer->as_object().at( lookup)};
 
                return proxy{ nullptr};
             }
@@ -129,12 +126,12 @@ namespace poly
             return as_array()[ lookup];
          }
 
-         auto& operator []( const auto& lookup) requires std::is_convertible_v< decltype( lookup), table::key_type>
+         auto& operator []( const auto& lookup) requires std::is_convertible_v< decltype( lookup), object::key_type>
          {
-            if( not to_table())
-               *this = node::table{};
+            if( not to_object())
+               *this = node::object{};
 
-            return as_table()[ lookup];
+            return as_object()[ lookup];
          }
          //! @}
 
@@ -145,7 +142,6 @@ namespace poly
          constexpr bool is_decimal() const noexcept { return to_decimal(); }
          constexpr bool is_string() const noexcept { return to_string(); }
          constexpr bool is_array() const noexcept { return to_array(); }
-         constexpr bool is_table() const noexcept { return to_table(); }
          constexpr bool is_object() const noexcept { return to_object(); }
 
          constexpr bool is_null() const noexcept { return is_nothing(); }

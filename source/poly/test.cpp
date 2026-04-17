@@ -36,7 +36,7 @@ namespace poly
                assert( source[ "ddd"].as_decimal() == 3.14);
                assert( source[ "eee"].as_string() == "qwerty");
                assert( ! source[ "fff"].as_array().empty());
-               assert( ! source[ "ggg"].as_table().empty());
+               assert( ! source[ "ggg"].as_object().empty());
 
                assert( source[ "ggg"][ "xxx"].is_numeric());
                assert( source[ "ggg"][ "yyy"].is_numeric());
@@ -317,7 +317,7 @@ g: "hello\nworld")";
 
                   const auto document = yaml::parse( source);
 
-                  assert( document.is_table());
+                  assert( document.is_object());
                   assert( document.at( "a").as_integer() == 123);
                   assert( document.at( "b").at( "ba").as_integer() == 22);
                   assert( document.at( "b").at( "bb").at( "ca").as_integer() == 333);
@@ -335,11 +335,11 @@ g: "hello\nworld")";
                {
                   const auto d1 = yaml::parse( "a: 1\n...\nb: 2\n");
                   assert( d1.at( "a").as_integer() == 1);
-                  assert( ! d1.as_table().contains( "b"));
+                  assert( ! d1.as_object().contains( "b"));
 
                   const auto d2 = yaml::parse( "a: 1\n---\nb: 2\n");
                   assert( d2.at( "a").as_integer() == 1);
-                  assert( ! d2.as_table().contains( "b"));
+                  assert( ! d2.as_object().contains( "b"));
                }
 
                // null documents
