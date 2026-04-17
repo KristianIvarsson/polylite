@@ -7,6 +7,10 @@
 ### Objective
 PolyLite is a multiprotocol lightweight, header-only C++ library designed for ease of use and maintainability. Its primary goal is to parse and write various data formats, with support for access and mutation, using standard C++ features as much as possible.
 
+#### Disclaimer
+
+Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
+
 ### Current Status
 At the moment, JSON, TOML and YAML is supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
 
@@ -20,6 +24,17 @@ At the moment, JSON, TOML and YAML is supported. The implementation may be somew
 - Anchors and aliases (`&anchor`, `*alias`) are not supported
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
 - The `%TAG` directive is accepted but ignored
+
+### Roadmap
+
+#### TOML
+- elegant writer
+- timestamp (instant)
+
+#### YAML
+- anchors and aliases
+- !!timestamp (instant)
+- !!binary
 
 ### Usage & Reference
 There is currently no formal user documentation. However, some basic unit test-like code is available, which may serve as a useful reference for how to use the library. You can build and run it using:
