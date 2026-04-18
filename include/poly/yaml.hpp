@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <functional>
 #include <spanstream>
+#include <unordered_map>
 
 
 namespace poly
@@ -44,6 +45,7 @@ namespace poly
                auto operator()() -> std::optional<node>
                {
                   directives();
+                  anchors.clear();
                   return spot( 0);
                }
 
@@ -135,10 +137,14 @@ namespace poly
                {
                   switch( peek())
                   {
-                  case '!':
-                     return tagged();
                   case '{': case '[':
                      return flow();
+                  case '*':
+                     return alias();
+                  case '&':
+                     return anchor();
+                  case '!':
+                     return tagged();
                   case '|': case '>':
                      return block_scalar();
                   case '\"': 
@@ -279,6 +285,32 @@ namespace poly
                info flow()
                {
                   return json::detail::parser{ mark}.spot();
+               }
+
+               info alias()
+               {
+                  ++mark; // '*'
+
+                  const auto name = read( bare);
+
+                  if( anchors.contains( name))
+                     return anchors.at( name);
+
+                  [[unlikely]] halt( "invalid alias");
+               }
+
+               info anchor()
+               {
+                  ++mark; // '&'
+                  
+                  auto name = read( bare);
+                  skip();
+                  auto data = scan();
+
+                  if( std::holds_alternative< node>( data))
+                     return anchors[ std::move( name)] = std::get< node>( std::move( data));
+
+                  [[unlikely]] halt( "invalid anchor");                  
                }
 
                auto scalar()
@@ -502,6 +534,7 @@ namespace poly
             private:
 
                int dent{};
+               std::unordered_map< std::string, node> anchors;
 
             };
 

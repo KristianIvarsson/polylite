@@ -17,13 +17,13 @@ At the moment, JSON, TOML and YAML is supported. The implementation may be somew
 #### Known Limitations
 
 ##### TOML
-- Datetime types (`1979-05-27`, `07:32:00`, etc.) are not supported — parsed as strings
+- Datetime types (`1970-05-02`, `19:32:00`, etc.) are not supported — parsed as strings
 
 ##### YAML
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
-- Anchors and aliases (`&anchor`, `*alias`) are not supported
+- Merge keys (for anchors and aliases) are not implemented
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
-- The `%TAG` directive is accepted but ignored
+- The `%YAML` and `%TAG` directives are accepted but ignored
 
 ### Roadmap
 
@@ -32,7 +32,6 @@ At the moment, JSON, TOML and YAML is supported. The implementation may be somew
 - timestamp (instant)
 
 #### YAML
-- anchors and aliases
 - !!timestamp (instant)
 - !!binary
 

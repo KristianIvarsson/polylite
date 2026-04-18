@@ -657,6 +657,64 @@ items: [1, 2, 3]
                { auto ok = false; try { yaml::parse( "key: !!foo bar\n"); }      catch( const std::exception&) { ok = true; } assert( ok); }
             }
 
+            void anchor()
+            {
+               // scalar anchor and alias
+               {
+                  const auto t = yaml::parse( "a: &x 42\nb: *x\n");
+                  assert( t.at( "a").as_integer() == 42);
+                  assert( t.at( "b").as_integer() == 42);
+               }
+
+               // string anchor
+               {
+                  const auto t = yaml::parse( "a: &x hello\nb: *x\n");
+                  assert( t.at( "a").as_string() == "hello");
+                  assert( t.at( "b").as_string() == "hello");
+               }
+
+               // alias is independent copy
+               {
+                  const auto t = yaml::parse( "a: &x 1\nb: *x\nc: *x\n");
+                  assert( t.at( "a").as_integer() == 1);
+                  assert( t.at( "b").as_integer() == 1);
+                  assert( t.at( "c").as_integer() == 1);
+               }
+
+               // anchor on flow sequence
+               {
+                  const auto t = yaml::parse( "a: &x [1, 2, 3]\nb: *x\n");
+                  assert( t.at( "a").as_array().size() == 3);
+                  assert( t.at( "b").as_array().size() == 3);
+                  assert( t.at( "b").at( 1).as_integer() == 2);
+               }
+
+               // anchor on flow mapping
+               {
+                  const auto t = yaml::parse( "a: &x {\"p\": 1, \"q\": 2}\nb: *x\n");
+                  assert( t.at( "a").at( "p").as_integer() == 1);
+                  assert( t.at( "b").at( "q").as_integer() == 2);
+               }
+
+               // anchor overwrite: last definition wins
+               {
+                  const auto t = yaml::parse( "a: &x 1\nb: &x 2\nc: *x\n");
+                  assert( t.at( "c").as_integer() == 2);
+               }
+
+               // alias before anchor is undefined
+               { auto ok = false; try { yaml::parse( "a: *x\nb: &x 1\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+
+               // anchors cleared between documents
+               { auto ok = false; try { yaml::all::parse( "a: &x 1\n---\nb: *x\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+
+               // block mapping anchor not supported
+               { auto ok = false; try { yaml::parse( "a: &x\n  p: 1\nb: *x\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+
+               // unknown alias error
+               { auto ok = false; try { yaml::parse( "a: *unknown\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+            }
+
          } // cases
 
          void all()
@@ -666,6 +724,7 @@ items: [1, 2, 3]
             cases::write();
             cases::block();
             cases::tagged();
+            cases::anchor();
          }
 
       } // yaml::test
