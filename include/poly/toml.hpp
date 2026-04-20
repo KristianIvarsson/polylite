@@ -329,6 +329,16 @@ namespace poly
 
          namespace detail
          {
+            template< typename type>
+            concept number = std::same_as< type, node::integer> || std::same_as< type, node::decimal>;
+
+            struct numeric : std::numpunct< char>
+            {
+               char do_thousands_sep()   const override { return '_'; }
+               std::string do_grouping() const override { return "\3"; }
+            };
+
+            template< bool posh>
             struct writer : help::stream::buffer::iterator::writer
             {
                using base::base;
@@ -343,71 +353,102 @@ namespace poly
 
                void operator()( const node::object& node)
                {
-                  if( node.empty() || std::ranges::any_of( node, []( const auto& pair){ return pair.second.is_trivial(); }))
+                  if( node.empty() || std::ranges::any_of( node, []( const auto& pair)
+                     { return pair.second.is_trivial() || ( !posh && pair.second.is_array() && shallow( pair.second.as_array())); }))
                      table();
 
                   for( const auto& [ name, data] : node)
-                  {
-                     if( trivial( data))
+                     if( trivial( data) || ( !posh && data.is_array() && shallow( data.as_array())))
                      {
                         key( name);
                         copy( " = ");
                         std::visit( *this, data);
                         push( '\n');
                      }
-                  }
 
                   for( const auto& [ name, data] : node)
-                  {
-                     if( complex( data))
+                     if( complex( data) && !( !posh && data.is_array() && shallow( data.as_array())))
                      {
                         stack.emplace_back( name);
                         std::visit( *this, data);
                         stack.pop_back();
                      }
-                  }
                }
 
                void operator()( const node::array& node)
                {
+                  auto comma = [this] ( auto& tail)
+                  {
+                     if( --tail) copy( ", ");
+                  };
+
+
                   if( node.empty() || trivial( node))
                   {
                      push( '[');
                      auto commas = node.size();
-                     for(const auto& data : node)
+                     for( const auto& data : node)
                      {
                         std::visit( *this, data);
-                        if( --commas) copy( ", ");
+                        comma( commas);
                      }
                      push( ']');
                   }
                   else
                   {
-                     for( const auto& data : node)
+                     auto section = [&]
                      {
-                        array();
-
-                        const auto& table = data.as_object();
-
-                        for( const auto& [ name, data] : table)
+                        for( const auto& data : node)
                         {
-                           if( trivial(data))
-                           {
-                              key(name);
-                              copy( " = ");
-                              std::visit( *this, data);
-                              push( '\n');
-                           }
+                           array();
+                           const auto& table = data.as_object();
+                           for( const auto& [ name, data] : table)
+                              if( trivial( data))
+                              {
+                                 key( name);
+                                 copy( " = ");
+                                 std::visit( *this, data);
+                                 push( '\n');
+                              }
+                           for( const auto& [ name, data] : table)
+                              if( complex( data))
+                              {
+                                 stack.emplace_back( name);
+                                 std::visit( *this, data);
+                                 stack.pop_back();
+                              }
                         }
+                     };
 
-                        for( const auto& [ name, data] : table)
+                     if constexpr( posh)
+                     {
+                        section();
+                     }
+                     else
+                     {
+                        if( shallow( node))
                         {
-                           if( complex( data))
+                           push( '[');
+                           auto tail = node.size();
+                           for( const auto& data : node)
                            {
-                              stack.emplace_back( name);
-                              std::visit( *this, data);
-                              stack.pop_back();
+                              copy( "{ ");
+                              auto commas = data.as_object().size();
+                              for( const auto& [ name, val] : data.as_object())
+                              {
+                                 key( name);
+                                 copy( " = ");
+                                 std::visit( *this, val);
+                                 comma( commas);
+                              }
+                              copy( " }");
+                              comma( tail);
                            }
+                           push( ']');
+                        }
+                        else
+                        {
+                           section();
                         }
                      }
                   }
@@ -423,21 +464,26 @@ namespace poly
                   copy( node ? "true" : "false");
                }
 
-               void operator()( const node::integer& node)
+               void operator()( const number auto& node)
                {
-                  copy( std::format( "{}", node));
-               }
-
-               void operator()( const node::decimal& node)
-               {
-                  copy( std::format( "{}", node));
+                  if constexpr( posh)
+                  {
+                     static const std::locale locale{ std::locale::classic(), new numeric{}};
+                     copy( std::format( locale, "{:L}", node));
+                  }
+                  else
+                  {
+                     copy( std::format( "{}", node));
+                  }
                }
 
                void operator()( const node::string& node)
                {
-                  push( '"');
-                  cast( node);
-                  push( '"');
+                  if constexpr( posh)
+                     if( ! node.contains( '\'') && std::ranges::none_of( node, []( const auto sign){ return help::is::cntrl( sign); }))
+                        return push( '\''), copy( node), push( '\'');
+
+                  push( '"'), cast( node), push( '"');
                }
 
             private:
@@ -480,18 +526,24 @@ namespace poly
                   }
                }
 
-               static bool trivial( const node& node) noexcept
+               static bool complex( const node& item) noexcept
                {
-                  if( node.is_trivial()) return true;
-                  if( node.is_object()) return false;
-                  return std::ranges::any_of( node.as_array(), trivial);
+                  if( item.is_trivial()) return false;
+                  if( item.is_object()) return true;
+                  return std::ranges::any_of( item.as_array(), complex);
                }
 
-               static bool complex( const node& node) noexcept
+               static bool trivial( const node& item) noexcept
                {
-                  if( node.is_trivial()) return false;
-                  if( node.is_object()) return true;
-                  return std::ranges::any_of( node.as_array(), complex);
+                  if( item.is_trivial()) return true;
+                  if( item.is_object()) return false;
+                  return std::ranges::any_of( item.as_array(), trivial);
+               }
+
+               static bool shallow( const node::array& array) noexcept
+               {
+                  return std::ranges::all_of( array, []( const auto& item)
+                     { return item.is_object() && std::ranges::all_of( item.as_object(), []( const auto& pair){ return trivial( pair.second); }); });
                }
 
             private:
@@ -500,17 +552,35 @@ namespace poly
             };
          } // detail
 
-         inline auto write( const node& node, std::ostream& stream)
+         inline namespace elegant
          {
-            detail::writer{ stream}( node);
-         }
+            inline auto write( const node& node, std::ostream& stream)
+            {
+               detail::writer< true>{ stream}( node);
+            }
 
-         inline auto write( const node& node)
+            inline auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write( node, stream);
+               return std::move( stream).str();
+            }
+         } // elegant
+
+         namespace compact
          {
-            std::ostringstream stream;
-            write( node, stream);
-            return std::move( stream).str();
-         }
+            inline auto write( const node& node, std::ostream& stream)
+            {
+               detail::writer< false>{ stream}( node);
+            }
+
+            inline auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write( node, stream);
+               return std::move( stream).str();
+            }
+         } // compact
 
       } // toml
 

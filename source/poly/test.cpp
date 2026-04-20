@@ -1,3 +1,4 @@
+#include "poly/help.hpp"
 #include "poly/json.hpp"
 #include "poly/toml.hpp"
 #include "poly/tool.hpp"
@@ -12,6 +13,69 @@ namespace poly
 {
    inline namespace version
    {
+      namespace help::test
+      {
+         namespace cases
+         {
+            void space()
+            {
+               // all std::isspace characters
+               assert( help::is::space( ' '));
+               assert( help::is::space( '\t'));
+               assert( help::is::space( '\n'));
+               assert( help::is::space( '\v'));
+               assert( help::is::space( '\f'));
+               assert( help::is::space( '\r'));
+
+               // non-space characters
+               assert( ! help::is::space( 'a'));
+               assert( ! help::is::space( '0'));
+               assert( ! help::is::space( '\0'));
+               assert( ! help::is::space( '!'));
+            }
+
+            void classify()
+            {
+               assert( help::is::digit( '0'));
+               assert( help::is::digit( '9'));
+               assert( ! help::is::digit( 'a'));
+
+               assert( help::is::lower( 'a'));
+               assert( help::is::lower( 'z'));
+               assert( ! help::is::lower( 'A'));
+
+               assert( help::is::upper( 'A'));
+               assert( help::is::upper( 'Z'));
+               assert( ! help::is::upper( 'a'));
+
+               assert( help::is::alpha( 'a'));
+               assert( help::is::alpha( 'Z'));
+               assert( ! help::is::alpha( '0'));
+
+               assert( help::is::alnum( 'a'));
+               assert( help::is::alnum( '9'));
+               assert( ! help::is::alnum( '_'));
+
+               assert( help::is::xdigit( '0'));
+               assert( help::is::xdigit( 'f'));
+               assert( help::is::xdigit( 'F'));
+               assert( ! help::is::xdigit( 'g'));
+
+               assert( help::is::cntrl( '\0'));
+               assert( help::is::cntrl( '\n'));
+               assert( help::is::cntrl( 0x7F));
+               assert( ! help::is::cntrl( ' '));
+               assert( ! help::is::cntrl( 'a'));
+            }
+         } // cases
+
+         void all()
+         {
+            cases::space();
+            cases::classify();
+         }
+      } // help::test
+
       namespace base::test
       {
          namespace cases
@@ -228,6 +292,60 @@ earth = "\U0001F30D"
                assert( table( "unicode")( "earth")->as_string().size() == 4);
             }
 
+            void elegant()
+            {
+               // underscore grouping for large integers
+               {
+                  node source;
+                  source[ "n"] = 1234567890L;
+                  assert( toml::write( source) == "n = 1_234_567_890\n");
+               }
+
+               // single-quote strings when no single-quote or control chars
+               {
+                  node source;
+                  source[ "a"] = "hello world";
+                  source[ "b"] = "say \"hi\"";
+                  source[ "c"] = "line\none";
+                  const auto text = toml::write( source);
+                  assert( text.contains( "a = 'hello world'"));
+                  assert( text.contains( "b = 'say \"hi\"'"));
+                  assert( text.contains( "c = \"line\\none\""));
+               }
+
+               // inline tables for shallow array of objects — compact only
+               {
+                  node source;
+                  source[ "points"][ 0][ "x"] = 1L;
+                  source[ "points"][ 0][ "y"] = 2L;
+                  source[ "points"][ 1][ "x"] = 3L;
+                  source[ "points"][ 1][ "y"] = 4L;
+
+                  const auto compact = toml::compact::write( source);
+                  assert( compact.contains( "points = [{ x = 1, y = 2 }, { x = 3, y = 4 }]"));
+
+                  const auto elegant = toml::write( source);
+                  assert( ! elegant.contains( "[{"));
+                  assert( elegant.contains( "[[points]]"));
+
+                  const auto target = toml::parse( compact);
+                  assert( target.at( "points").as_array().size() == 2);
+                  assert( target.at( "points").at( 0).at( "x").as_integer() == 1);
+                  assert( target.at( "points").at( 1).at( "y").as_integer() == 4);
+               }
+
+               // compact writer does NOT produce single quotes
+               {
+                  node source;
+                  source[ "s"] = "hello";
+                  source[ "points"][ 0][ "x"] = 1L;
+                  source[ "points"][ 1][ "x"] = 2L;
+
+                  const auto text = toml::compact::write( source);
+                  assert( ! text.contains( '\''));
+               }
+            }
+
             void write()
             {
                // flat table roundtrip
@@ -283,6 +401,7 @@ earth = "\U0001F30D"
          void all()
          {
             cases::parse();
+            cases::elegant();
             cases::write();
          }
       } // toml::test
@@ -748,6 +867,7 @@ int main( const int argc, const char* const argv[])
       }
       else
       {
+         poly::help::test::all();
          poly::base::test::all();
          poly::tool::test::all();
          poly::json::test::all();
