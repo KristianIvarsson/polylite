@@ -7,11 +7,11 @@
 #pragma once
 
 #include "tale.hpp"
+#include "fifo.hpp"
 
-#include <variant>
 #include <string>
 #include <vector>
-#include "fifo.hpp"
+#include <variant>
 
 #include <cassert>
 
@@ -145,8 +145,8 @@ namespace poly
          constexpr bool is_object() const noexcept { return to_object(); }
 
          constexpr bool is_null() const noexcept { return is_nothing(); }
-         constexpr bool is_true() const noexcept { return is_boolean() && as_boolean(); }
-         constexpr bool is_false() const noexcept { return is_boolean() && not as_boolean(); }
+         constexpr bool is_true() const noexcept { return is_boolean() and as_boolean(); }
+         constexpr bool is_false() const noexcept { return is_boolean() and not as_boolean(); }
          constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_string(); }
          constexpr bool is_numeric() const noexcept { return is_integer() or is_decimal(); }
          constexpr bool is_trivial() const noexcept { return is_null() or is_scalar(); }
