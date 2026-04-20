@@ -42,7 +42,7 @@ namespace poly
 
             inline bool space( const auto sign)
             {
-               return in::range< '\n', '\r'>( sign) || sign == ' ';
+               return in::range< '\t', '\r'>( sign) || sign == ' ';
             }
 
             inline bool digit( const auto sign)
