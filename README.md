@@ -20,6 +20,7 @@ At the moment, JSON, TOML and YAML is supported. The implementation may be somew
 - Datetime types (`1970-05-02`, `19:32:00`, etc.) are not supported — parsed as strings
 
 ##### YAML
+- Flow style (`{...}` and `[...]`) only supports strict JSON
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
 - Merge keys (for anchors and aliases) are not implemented
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
