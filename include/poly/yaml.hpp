@@ -15,7 +15,6 @@
 #include <optional>
 #include <stdexcept>
 #include <algorithm>
-#include <functional>
 #include <spanstream>
 #include <unordered_map>
 
@@ -547,9 +546,9 @@ namespace poly
                return detail::parser{ stream}().value();
             }
 
-            inline auto parse( std::string_view json)
+            inline auto parse( std::string_view data)
             {
-               std::ispanstream stream{ json};
+               std::ispanstream stream{ data};
                return parse( stream);
             }
          } // one
@@ -568,9 +567,9 @@ namespace poly
                return nrv;
             }
 
-            inline auto parse( std::string_view json)
+            inline auto parse( std::string_view data)
             {
-               std::ispanstream stream{ json};
+               std::ispanstream stream{ data};
                return parse( stream);
             }
          } // all

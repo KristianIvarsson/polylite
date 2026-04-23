@@ -321,9 +321,9 @@ namespace poly
             return detail::parser{ stream}();
          }
 
-         inline auto parse( std::string_view json)
+         inline auto parse( std::string_view data)
          {
-            std::ispanstream stream{ json};
+            std::ispanstream stream{ data};
             return parse( stream);
          }
 

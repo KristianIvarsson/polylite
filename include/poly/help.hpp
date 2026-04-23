@@ -15,7 +15,7 @@
 #include <ranges>
 #include <string>
 #include <istream>
-#include <variant>
+#include <charconv>
 #include <iterator>
 #include <optional>
 #include <algorithm>
@@ -40,42 +40,42 @@ namespace poly
                }
             } // in
 
-            inline bool space( const auto sign)
+            bool space( const auto sign)
             {
                return in::range< '\t', '\r'>( sign) || sign == ' ';
             }
 
-            inline bool digit( const auto sign)
+            bool digit( const auto sign)
             {
                return in::range< '0', '9'>( sign);
             }
 
-            inline bool lower( const auto sign)
+            bool lower( const auto sign)
             {
                return in::range< 'a', 'z'>( sign);
             }
 
-            inline bool upper( const auto sign)
+            bool upper( const auto sign)
             {
                return in::range< 'A', 'Z'>( sign);
             }
 
-            inline bool alpha( const auto sign)
+            bool alpha( const auto sign)
             {
                return lower( sign) || upper( sign);
             }
 
-            inline bool alnum( const auto sign)
+            bool alnum( const auto sign)
             {
                return alpha( sign) || digit( sign);
             }
 
-            inline bool xdigit( const auto sign)
+            bool xdigit( const auto sign)
             {
                return digit( sign) || in::range< 'a', 'f'>( sign) || in::range< 'A', 'F'>( sign);
             }
 
-            inline bool cntrl( const auto sign)
+            bool cntrl( const auto sign)
             {
                return in::range< 0x0, 0x1F>( sign) || sign == 0x7F;
             }
@@ -83,12 +83,12 @@ namespace poly
 
          namespace to
          {
-            inline auto lower( const auto sign)
+            auto lower( const auto sign)
             {
                return is::upper( sign) ? sign + ( 'a' - 'A') : sign;
             }
 
-            inline auto upper( const auto sign)
+            auto upper( const auto sign)
             {
                return is::lower( sign) ? sign - ( 'a' - 'A') : sign;
             }
@@ -162,7 +162,7 @@ namespace poly
                return {};
             }
 
-            auto point( const std::int32_t code)
+            auto point( const std::same_as< std::int32_t> auto code)
             {
                std::string nrv;
 
