@@ -17,7 +17,8 @@ At the moment, JSON, TOML and YAML are supported. The implementation may be some
 #### Known Limitations
 
 ##### TOML
-- Datetime types (`1970-05-02`, `19:32:00`, etc.) are not supported — parsed as strings
+- Types for date and time (`1970-05-02`, `19:32:00`, etc.) are not supported — parsed as strings
+- Type nothing (`null`) is not a native TOML type - throws on write
 
 ##### YAML
 - Flow style (`{...}` and `[...]`) only supports strict JSON
