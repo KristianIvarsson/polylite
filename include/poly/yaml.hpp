@@ -9,14 +9,15 @@
 #include "help.hpp"
 #include "json.hpp"
 
+#include <format>
 #include <ranges>
 #include <string>
 #include <sstream>
 #include <optional>
 #include <stdexcept>
 #include <algorithm>
-#include <functional>
 #include <spanstream>
+#include <string_view>
 #include <unordered_map>
 
 
@@ -365,6 +366,10 @@ namespace poly
 
                      if( data->is_integer() && tag == "float")
                         return node{ static_cast< node::decimal>( data->as_integer())};
+                       
+                     if( data->is_string() && tag == "timestamp")
+                        if( auto result = help::transform::instant( help::trim( data->as_string())))
+                           return *result;
                   }
 
                   [[unlikely]] halt( std::format( "invalid !!{} construct", tag));
@@ -547,9 +552,9 @@ namespace poly
                return detail::parser{ stream}().value();
             }
 
-            inline auto parse( std::string_view json)
+            inline auto parse( std::string_view data)
             {
-               std::ispanstream stream{ json};
+               std::ispanstream stream{ data};
                return parse( stream);
             }
          } // one
@@ -568,9 +573,9 @@ namespace poly
                return nrv;
             }
 
-            inline auto parse( std::string_view json)
+            inline auto parse( std::string_view yaml)
             {
-               std::ispanstream stream{ json};
+               std::ispanstream stream{ yaml};
                return parse( stream);
             }
          } // all
@@ -668,6 +673,15 @@ namespace poly
                      [[unlikely]] return copy( std::signbit( node) ? "-.inf" : "+.inf");
 
                   copy( std::format( "{}", node));
+               }
+
+               void operator() ( const node::instant& node)
+               {
+                  if( std::holds_alternative< node::local_time>( node))
+                     halt( "node::local_time");
+
+                  copy( "!!timestamp ");
+                  std::visit( [ this]( const auto& data) { time( data); }, node);
                }
 
                void operator() ( const node::string& node)

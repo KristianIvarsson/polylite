@@ -8,13 +8,14 @@
 
 #include "help.hpp"
 
-#include <array>
 #include <cmath>
+#include <string>
 #include <format>
 #include <sstream>
 #include <charconv>
 #include <stdexcept>
 #include <spanstream>
+#include <string_view>
 
 
 namespace poly
@@ -213,9 +214,9 @@ namespace poly
             return detail::parser{ stream}();
          }
 
-         inline auto parse( std::string_view json)
+         inline auto parse( std::string_view data)
          {
-            std::ispanstream stream{ json};
+            std::ispanstream stream{ data};
             return parse( stream);
          }
 
@@ -287,13 +288,16 @@ namespace poly
                   copy( std::format( "{}", node));
                }
 
+               void operator() ( const node::instant& node)
+               {
+                  halt( "node::instant");
+               }
+
                void operator() ( const node::string& node)
                {
                   fill();
                   push( '"');
-
                   cast( node);
-
                   push( '"');
                }
 

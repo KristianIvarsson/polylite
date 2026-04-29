@@ -396,12 +396,115 @@ earth = "\U0001F30D"
                }
             }
 
+            void timestamp()
+            {
+               using namespace std::chrono_literals;
+
+               // local date
+               {
+                  const auto table = toml::parse( "d = 2024-03-15\n");
+                  assert( table.at( "d").is_local_date());
+                  assert( table.at( "d").as_local_date() == std::chrono::local_days{ std::chrono::year{2024}/std::chrono::March/15});
+               }
+
+               // local datetime
+               {
+                  const auto table = toml::parse( "dt = 2024-03-15T12:30:00\n");
+                  assert( table.at( "dt").is_local_datetime());
+               }
+
+               // world datetime (with offset)
+               {
+                  const auto table = toml::parse( "dt = 2024-03-15T12:30:00+02:00\n");
+                  assert( table.at( "dt").is_zoned_datetime());
+               }
+
+               // local time
+               {
+                  const auto table = toml::parse( "t = 12:30:00\n");
+                  assert( table.at( "t").is_local_time());
+               }
+
+               // roundtrip local date
+               {
+                  const auto source = toml::parse( "d = 2024-03-15\n");
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "d").is_local_date());
+                  assert( source.at( "d").as_local_date() == target.at( "d").as_local_date());
+               }
+
+               // roundtrip world datetime
+               {
+                  const auto source = toml::parse( "dt = 2024-03-15T12:30:00+00:00\n");
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "dt").is_zoned_datetime());
+                  assert( source.at( "dt").as_zoned_datetime() == target.at( "dt").as_zoned_datetime());
+               }
+
+               // local time with fractional seconds
+               {
+                  const auto table = toml::parse( "t = 12:30:00.123456789\n");
+                  assert( table.at( "t").is_local_time());
+               }
+
+               // local datetime with fractional seconds
+               {
+                  const auto table = toml::parse( "dt = 2024-03-15T12:30:00.123456789\n");
+                  assert( table.at( "dt").is_local_datetime());
+               }
+
+               // zoned datetime with fractional seconds
+               {
+                  const auto table = toml::parse( "dt = 2024-03-15T12:30:00.123456789+00:00\n");
+                  assert( table.at( "dt").is_zoned_datetime());
+               }
+
+               // roundtrip local time with millisecond granularity
+               {
+                  node source;
+                  source[ "t"] = node::local_time( std::chrono::milliseconds( 45296123));
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "t").is_local_time());
+                  assert( source.at( "t").as_local_time().to_duration() == target.at( "t").as_local_time().to_duration());
+               }
+
+               // roundtrip local datetime with millisecond granularity
+               {
+                  using namespace std::chrono_literals;
+                  node source;
+                  source[ "dt"] = node::local_datetime{ std::chrono::local_days{ 2024y/std::chrono::March/15} + 12h + 30min + std::chrono::milliseconds( 123)};
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "dt").is_local_datetime());
+                  assert( source.at( "dt").as_local_datetime() == target.at( "dt").as_local_datetime());
+               }
+
+               // roundtrip world datetime with millisecond granularity
+               {
+                  using namespace std::chrono_literals;
+                  node source;
+                  source[ "dt"] = node::zoned_datetime{ std::chrono::sys_days{ 2024y/std::chrono::March/15} + 12h + 30min + std::chrono::milliseconds( 123)};
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "dt").is_zoned_datetime());
+                  assert( source.at( "dt").as_zoned_datetime() == target.at( "dt").as_zoned_datetime());
+               }
+
+               // roundtrip world datetime from system_clock::now()
+               {
+                  node source;
+                  source[ "now"] = node::instant( std::chrono::system_clock::now());
+                  const auto target = toml::parse( toml::write( source));
+                  assert( target.at( "now").is_zoned_datetime());
+                  assert( source.at( "now").as_zoned_datetime() == target.at( "now").as_zoned_datetime());
+               }
+            }
+
          } // cases
 
          void all()
          {
             cases::parse();
             cases::elegant();
+            cases::timestamp();
             cases::write();
          }
       } // toml::test
@@ -834,6 +937,30 @@ items: [1, 2, 3]
                { auto ok = false; try { yaml::parse( "a: *unknown\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
             }
 
+            void timestamp()
+            {
+               using namespace std::chrono_literals;
+
+               // write local date via elegant yaml
+               {
+                  node source;
+                  source[ "d"] = node::instant( std::chrono::local_days{ 1970y/std::chrono::May/2});
+                  const auto text = yaml::write( source);
+                  assert( text.contains( "!!timestamp"));
+                  assert( text.contains( "1970-05-02"));
+               }
+
+               // write world datetime via elegant yaml
+               {
+                  node source;
+                  source[ "dt"] = node::instant( node::zoned_datetime{ std::chrono::sys_days{ 1970y/std::chrono::May/2} + 18h + 30min});
+                  const auto text = yaml::write( source);
+                  assert( text.contains( "!!timestamp"));
+                  assert( text.contains( "1970-05-02T18:30:00"));
+               }
+
+            }
+
          } // cases
 
          void all()
@@ -844,6 +971,7 @@ items: [1, 2, 3]
             cases::block();
             cases::tagged();
             cases::anchor();
+            cases::timestamp();
          }
 
       } // yaml::test

@@ -11,15 +11,17 @@
 #include "node.hpp"
 
 #include <array>
+#include <chrono>
 #include <format>
 #include <ranges>
 #include <string>
 #include <istream>
-#include <variant>
+#include <charconv>
 #include <iterator>
 #include <optional>
 #include <algorithm>
 #include <stdexcept>
+#include <spanstream>
 
 namespace poly
 {
@@ -40,42 +42,42 @@ namespace poly
                }
             } // in
 
-            inline bool space( const auto sign)
+            bool space( const auto sign)
             {
                return in::range< '\t', '\r'>( sign) || sign == ' ';
             }
 
-            inline bool digit( const auto sign)
+            bool digit( const auto sign)
             {
                return in::range< '0', '9'>( sign);
             }
 
-            inline bool lower( const auto sign)
+            bool lower( const auto sign)
             {
                return in::range< 'a', 'z'>( sign);
             }
 
-            inline bool upper( const auto sign)
+            bool upper( const auto sign)
             {
                return in::range< 'A', 'Z'>( sign);
             }
 
-            inline bool alpha( const auto sign)
+            bool alpha( const auto sign)
             {
                return lower( sign) || upper( sign);
             }
 
-            inline bool alnum( const auto sign)
+            bool alnum( const auto sign)
             {
                return alpha( sign) || digit( sign);
             }
 
-            inline bool xdigit( const auto sign)
+            bool xdigit( const auto sign)
             {
                return digit( sign) || in::range< 'a', 'f'>( sign) || in::range< 'A', 'F'>( sign);
             }
 
-            inline bool cntrl( const auto sign)
+            bool cntrl( const auto sign)
             {
                return in::range< 0x0, 0x1F>( sign) || sign == 0x7F;
             }
@@ -83,12 +85,12 @@ namespace poly
 
          namespace to
          {
-            inline auto lower( const auto sign)
+            auto lower( const auto sign)
             {
                return is::upper( sign) ? sign + ( 'a' - 'A') : sign;
             }
 
-            inline auto upper( const auto sign)
+            auto upper( const auto sign)
             {
                return is::lower( sign) ? sign - ( 'a' - 'A') : sign;
             }
@@ -104,6 +106,23 @@ namespace poly
 
          namespace transform
          {
+            auto simple( const auto& data) -> std::optional< node>
+            {
+               auto compare = [&data] ( std::string_view what)
+               {
+                  return std::ranges::equal( data, what, [] ( const auto lhs, const auto rhs) { return to::lower( lhs) == rhs; });
+               };
+
+               if( compare( "null"))
+                  return nullptr;
+               if( compare( "true"))
+                  return true;
+               if( compare( "false"))
+                  return false;
+               
+               return {};
+            }
+
             auto number( const auto& data) -> std::optional< node>
             {
                const auto positive = data.starts_with( '+');
@@ -145,24 +164,34 @@ namespace poly
                return {};
             }
 
-            auto simple( const auto& data) -> std::optional< node>
+            auto instant( const auto& data) -> std::optional< node::instant>
             {
-               auto compare = [&data] ( std::string_view what)
+               auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
                {
-                  return std::ranges::equal( data, what, [] ( const auto lhs, const auto rhs) { return to::lower( lhs) == rhs; });
+                  type result;
+                  std::ispanstream stream{ data};
+                  if( stream >> std::chrono::parse( format, result) && stream.peek() == std::char_traits< char>::eof())
+                     return result;
+
+                  return {};
                };
 
-               if( compare( "null"))
-                  return nullptr;
-               if( compare( "true"))
-                  return true;
-               if( compare( "false"))
-                  return false;
-               
+               if( auto result = parse.template operator()< node::local_date>( "%F"))
+                  return *result;
+
+               if( auto result = parse.template operator()< node::local_time::precision>( "%T"))
+                  return node::local_time( *result);
+
+               if( auto result = parse.template operator()< node::local_datetime>( "%FT%T"))
+                  return *result;
+
+               if( auto result = parse.template operator()< std::chrono::system_clock::time_point>( "%FT%T%Ez"))
+                  return *result;
+
                return {};
             }
 
-            auto point( const std::int32_t code)
+            auto point( const std::same_as< std::int32_t> auto code)
             {
                std::string nrv;
 
@@ -366,6 +395,46 @@ namespace poly
                            push( sign);
                         }
                      }
+                  }
+
+                  void time( const node::local_time data)
+                  {
+                     const auto duration = data.to_duration();
+
+                     auto sink = [&] ( const auto floored)
+                     {
+                        if( duration != floored) return false;
+                        copy( std::format( "{:%T}", floored));
+                        return true;
+                     };
+
+                     sink( std::chrono::floor< std::chrono::seconds>( duration)) ||
+                     sink( std::chrono::floor< std::chrono::milliseconds>( duration)) ||
+                     sink( std::chrono::floor< std::chrono::microseconds>( duration)) ||
+                     sink( duration);
+                  }
+
+                  void time( const node::local_date data)
+                  {
+                     copy( std::format( "{:%F}", data));
+                  }
+
+                  void time( const node::local_datetime data)
+                  {
+                     time( std::chrono::floor< std::chrono::days>( data));
+                     push( 'T');
+                     time( std::chrono::hh_mm_ss{ data - std::chrono::floor< std::chrono::days>( data)});
+                  }
+
+                  void time( const node::zoned_datetime data)
+                  {
+                     time( data.get_local_time());
+                     copy( std::format( "{:%Ez}", data));
+                  }
+
+                  [[noreturn]] static void halt( const auto& type) 
+                  {
+                     throw std::invalid_argument{ std::format( "{} is not supported", type)};
                   }
                };
 

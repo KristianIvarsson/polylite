@@ -12,35 +12,43 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ### Current Status
-At the moment, JSON, TOML and YAML is supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+At the moment, JSON, TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+
+#### Note
+
+`poly::node` is a superset of what any single format can represent. Writing a node containing an unsupported type will throw.
+
+##### JSON
+- `instant` is not a native type
+
+##### TOML
+- `nothing` is not a native type
+
+##### YAML
+- `local_time` inside `instant` is not a native type
 
 #### Known Limitations
 
-##### TOML
-- Datetime types (`1970-05-02`, `19:32:00`, etc.) are not supported — parsed as strings
-
 ##### YAML
+- The `%YAML` and `%TAG` directives are accepted but ignored
 - Flow style (`{...}` and `[...]`) only supports strict JSON
+- Compact writing uses flow style JSON and thus have the same limitations as JSON
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
 - Merge keys (for anchors and aliases) are not implemented
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
-- The `%YAML` and `%TAG` directives are accepted but ignored
-
 ### Roadmap
 
-#### TOML
-- elegant writer
-- timestamp (instant)
-
 #### YAML
-- !!timestamp (instant)
 - !!binary
+
+#### General
+- Remove compiler specific code
 
 ### Usage & Reference
 There is currently no formal user documentation. However, some basic unit test-like code is available, which may serve as a useful reference for how to use the library. You can build and run it using:
 
 ```bash
-g++ -std=c++23 -I include ./source/poly/test.cpp && ./a.out
+g++ -std=c++23 -I include -o build/test ./source/poly/test.cpp && ./build/test
 ```
 
 ### Samples

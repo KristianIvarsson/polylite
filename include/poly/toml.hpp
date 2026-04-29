@@ -8,12 +8,12 @@
 
 #include "help.hpp"
 
+#include <format>
 #include <ranges>
 #include <string>
 #include <vector>
 #include <sstream>
 #include <algorithm>
-#include <stdexcept>
 #include <spanstream>
 
 
@@ -105,7 +105,7 @@ namespace poly
                   case 't': case 'f':
                      return simple();
                   default:
-                     return number();
+                     return scalar();
                   }
                }
 
@@ -296,14 +296,17 @@ namespace poly
                   [[unlikely]] this->halt( "unexpected data");
                }
 
-               node number()
+               node scalar()
                {
                   auto data = read( []( const auto sign)
                      {
                         switch( sign)
-                        case '.': case '+': case '-': case '_': return true;
+                        case '.': case '+': case '-': case '_': case ':': return true;
                         return help::is::alnum( sign);
                      });
+
+                  if( auto result = help::transform::instant( data))
+                     return std::move( *result);
 
                   std::erase( data, '_');
 
@@ -321,9 +324,9 @@ namespace poly
             return detail::parser{ stream}();
          }
 
-         inline auto parse( std::string_view json)
+         inline auto parse( std::string_view data)
          {
-            std::ispanstream stream{ json};
+            std::ispanstream stream{ data};
             return parse( stream);
          }
 
@@ -456,7 +459,7 @@ namespace poly
 
                void operator()( const node::nothing& node)
                {
-                  [[unlikely]] throw std::invalid_argument{ "invalid null node"};
+                  halt( "node::nothing");
                }
 
                void operator()( const node::boolean& node)
@@ -475,6 +478,11 @@ namespace poly
                   {
                      copy( std::format( "{}", node));
                   }
+               }
+
+               void operator()( const node::instant& node)
+               {
+                  std::visit( [ this]( const auto& data) { time( data); }, node);
                }
 
                void operator()( const node::string& node)

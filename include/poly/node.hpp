@@ -9,6 +9,7 @@
 #include "tale.hpp"
 #include "fifo.hpp"
 
+#include <chrono>
 #include <string>
 #include <vector>
 #include <variant>
@@ -21,7 +22,21 @@ namespace poly
    {
       struct node;
 
-      using data = std::variant< std::nullptr_t, bool, long, double, std::string, std::vector< node>, fifo< std::string, node>>;
+      using data = std::variant< 
+         std::nullptr_t, 
+         bool, 
+         long, 
+         double, 
+         std::variant
+         < 
+            std::chrono::local_time< std::chrono::days>, 
+            std::chrono::hh_mm_ss< std::chrono::system_clock::duration>, 
+            std::chrono::local_time< std::chrono::system_clock::duration>, 
+            std::chrono::zoned_time< std::chrono::system_clock::duration>
+         >,
+         std::string, 
+         std::vector< node>, 
+         fifo< std::string, node>>;
 
       struct node : data
       {
@@ -33,21 +48,31 @@ namespace poly
          using boolean = std::variant_alternative_t< 1, data>;
          using integer = std::variant_alternative_t< 2, data>;
          using decimal = std::variant_alternative_t< 3, data>;
-         using string = std::variant_alternative_t< 4, data>;
-         using array = std::variant_alternative_t< 5, data>;
-         using object = std::variant_alternative_t< 6, data>;
+         using instant = std::variant_alternative_t< 4, data>;
+         using string = std::variant_alternative_t< 5, data>;
+         using array = std::variant_alternative_t< 6, data>;
+         using object = std::variant_alternative_t< 7, data>;
+
+         using local_date = std::variant_alternative_t< 0, instant>;
+         using local_time = std::variant_alternative_t< 1, instant>;
+         using local_datetime = std::variant_alternative_t< 2, instant>;
+         using zoned_datetime = std::variant_alternative_t< 3, instant>;
          //! @}
 
          //! @{ access
-         template< typename type> constexpr auto& as( this auto&& self) { return std::get< type>( self); }
+         constexpr auto& as_nothing( this auto&& self) { return std::get< nothing>( self); }
+         constexpr auto& as_boolean( this auto&& self) { return std::get< boolean>( self); }
+         constexpr auto& as_integer( this auto&& self) { return std::get< integer>( self); }
+         constexpr auto& as_decimal( this auto&& self) { return std::get< decimal>( self); }
+         constexpr auto& as_instant( this auto&& self) { return std::get< instant>( self); }
+         constexpr auto& as_string( this auto&& self) { return std::get< string>( self); }
+         constexpr auto& as_array( this auto&& self) { return std::get< array>( self); }
+         constexpr auto& as_object( this auto&& self) { return std::get< object>( self); }
 
-         constexpr auto& as_nothing( this auto&& self) { return self.template as< nothing>(); }
-         constexpr auto& as_boolean( this auto&& self) { return self.template as< boolean>(); }
-         constexpr auto& as_integer( this auto&& self) { return self.template as< integer>(); }
-         constexpr auto& as_decimal( this auto&& self) { return self.template as< decimal>(); }
-         constexpr auto& as_string( this auto&& self) { return self.template as< string>(); }
-         constexpr auto& as_array( this auto&& self) { return self.template as< array>(); }
-         constexpr auto& as_object( this auto&& self) { return self.template as< object>(); }
+         constexpr auto& as_local_date( this auto&& self) { return std::get< local_date>( self.as_instant()); }
+         constexpr auto& as_local_time( this auto&& self) { return std::get< local_time>( self.as_instant()); }
+         constexpr auto& as_local_datetime( this auto&& self) { return std::get< local_datetime>( self.as_instant()); }
+         constexpr auto& as_zoned_datetime( this auto&& self) { return std::get< zoned_datetime>( self.as_instant()); }
 
          auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
          {
@@ -61,15 +86,19 @@ namespace poly
          //! @}
 
          //! @{ lookup (and access)
-         template< typename type> constexpr auto to( this auto&& self) noexcept { return std::get_if< type>( &self); }
+         constexpr auto to_nothing( this auto&& self) noexcept { return std::get_if< nothing>( &self); }
+         constexpr auto to_boolean( this auto&& self) noexcept { return std::get_if< boolean>( &self); }
+         constexpr auto to_integer( this auto&& self) noexcept { return std::get_if< integer>( &self); }
+         constexpr auto to_decimal( this auto&& self) noexcept { return std::get_if< decimal>( &self); }
+         constexpr auto to_instant( this auto&& self) noexcept { return std::get_if< instant>( &self); }
+         constexpr auto to_string( this auto&& self) noexcept { return std::get_if< string>( &self); }
+         constexpr auto to_array( this auto&& self) noexcept { return std::get_if< array>( &self); }
+         constexpr auto to_object( this auto&& self) noexcept { return std::get_if< object>( &self); }
 
-         constexpr auto to_nothing( this auto&& self) noexcept { return self.template to< nothing>(); }
-         constexpr auto to_boolean( this auto&& self) noexcept { return self.template to< boolean>(); }
-         constexpr auto to_integer( this auto&& self) noexcept { return self.template to< integer>(); }
-         constexpr auto to_decimal( this auto&& self) noexcept { return self.template to< decimal>(); }
-         constexpr auto to_string( this auto&& self) noexcept { return self.template to< string>(); }
-         constexpr auto to_array( this auto&& self) noexcept { return self.template to< array>(); }
-         constexpr auto to_object( this auto&& self) noexcept { return self.template to< object>(); }
+         constexpr auto to_local_date( this auto&& self) { return std::get_if< local_date>( self.to_instant()); }
+         constexpr auto to_local_time( this auto&& self) { return std::get_if< local_time>( self.to_instant()); }
+         constexpr auto to_local_datetime( this auto&& self) { return std::get_if< local_datetime>( self.to_instant()); }
+         constexpr auto to_zoned_datetime( this auto&& self) { return std::get_if< zoned_datetime>( self.to_instant()); }
 
          template< typename type>
          struct proxy
@@ -140,14 +169,20 @@ namespace poly
          constexpr bool is_boolean() const noexcept { return to_boolean(); }
          constexpr bool is_integer() const noexcept { return to_integer(); }
          constexpr bool is_decimal() const noexcept { return to_decimal(); }
+         constexpr bool is_instant() const noexcept { return to_instant(); }
          constexpr bool is_string() const noexcept { return to_string(); }
          constexpr bool is_array() const noexcept { return to_array(); }
          constexpr bool is_object() const noexcept { return to_object(); }
 
+         constexpr bool is_local_time() const noexcept { return to_local_time(); }
+         constexpr bool is_local_date() const noexcept { return to_local_date(); }
+         constexpr bool is_local_datetime() const noexcept { return to_local_datetime(); }
+         constexpr bool is_zoned_datetime() const noexcept { return to_zoned_datetime(); }
+
          constexpr bool is_null() const noexcept { return is_nothing(); }
          constexpr bool is_true() const noexcept { return is_boolean() and as_boolean(); }
          constexpr bool is_false() const noexcept { return is_boolean() and not as_boolean(); }
-         constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_string(); }
+         constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_instant() or is_string(); }
          constexpr bool is_numeric() const noexcept { return is_integer() or is_decimal(); }
          constexpr bool is_trivial() const noexcept { return is_null() or is_scalar(); }
          //! @}
