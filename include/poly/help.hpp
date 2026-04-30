@@ -106,7 +106,7 @@ namespace poly
 
          namespace transform
          {
-            auto simple( const auto& data) -> std::optional< node>
+            inline auto simple( std::string_view data) -> std::optional< node>
             {
                auto compare = [&data] ( std::string_view what)
                {
@@ -123,7 +123,7 @@ namespace poly
                return {};
             }
 
-            auto number( const auto& data) -> std::optional< node>
+            inline auto number( std::string_view data) -> std::optional< node>
             {
                const auto positive = data.starts_with( '+');
                const auto negative = data.starts_with( '-');
@@ -164,7 +164,7 @@ namespace poly
                return {};
             }
 
-            auto instant( const auto& data) -> std::optional< node::instant>
+            inline auto instant( std::string_view data) -> std::optional< node::instant>
             {
                auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
                {
@@ -434,7 +434,7 @@ namespace poly
 
                   [[noreturn]] static void halt( const auto& type) 
                   {
-                     throw std::invalid_argument{ std::format( "{} is not supported", type)};
+                     throw std::invalid_argument{ std::format( "{} is not valid", type)};
                   }
                };
 

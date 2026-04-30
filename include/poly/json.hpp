@@ -225,7 +225,7 @@ namespace poly
          {
             constexpr std::size_t spaces = 3;
 
-            template< std::size_t spaces>
+            template< std::size_t spaces, bool strict>
             struct writer : help::stream::buffer::iterator::writer
             {
                using base::base;
@@ -290,7 +290,17 @@ namespace poly
 
                void operator() ( const node::instant& node)
                {
-                  halt( "node::instant");
+                  if constexpr( strict)
+                  {
+                     halt( "node::instant");
+                  }
+                  else
+                  {
+                     fill();
+                     push( '"');
+                     std::visit( [ this]( const auto& data) { time( data); }, node);
+                     push( '"');
+                  }
                }
 
                void operator() ( const node::string& node)
@@ -348,39 +358,61 @@ namespace poly
 
             };
 
+            template< std::size_t spaces, bool strict>
+            auto write( const node& node, std::ostream& stream)
+            {
+               std::visit( writer< spaces, strict>{ stream}, node);
+            }
+
+            template< std::size_t spaces, bool strict>
+            auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write< spaces, strict>( node, stream);
+               return std::move( stream).str();
+            }
+
          } // detail
 
 
          inline namespace elegant
          {
-            template< std::size_t spaces = detail::spaces>
-            auto write( const node& node, std::ostream& stream)
+            inline namespace strict
             {
-               std::visit( detail::writer< spaces>{ stream}, node);
-            }
+               template< std::size_t spaces = detail::spaces>
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< spaces, true>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // strict
 
-            template< std::size_t spaces = detail::spaces>
-            auto write( const node& node)
+            namespace gentle
             {
-               std::ostringstream stream;
-               write< spaces>( node, stream);
-               return std::move( stream).str();
-            }
+               template< std::size_t spaces = detail::spaces>
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< spaces, false>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // gentle
          } // elegant
 
          namespace compact
          {
-            inline auto write( const node& node, std::ostream& stream)
+            inline namespace strict
             {
-               std::visit( detail::writer< 0>{ stream}, node);
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< 0, true>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // strict
 
-            inline auto write( const node& node)
+            namespace gentle
             {
-               std::ostringstream stream;
-               write( node, stream);
-               return std::move( stream).str();
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< 0, false>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // gentle
          } // compact
 
       } // json

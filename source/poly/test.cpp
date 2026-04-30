@@ -207,6 +207,21 @@ namespace poly
                assert( json::parse( R"("\/")").as_string() == "/");
             }
 
+            void strict_gentle()
+            {
+               node source;
+               source[ "t"] = help::transform::instant( "2025-01-01").value();
+
+               // strict: throws on instant
+               try { json::write( source); assert( false); }
+               catch( const std::invalid_argument&) {}
+
+               // gentle: writes instant as quoted string
+               const auto text = json::elegant::gentle::write( source);
+               auto parsed = json::parse( text);
+               assert( parsed.at( "t").is_string());
+            }
+
          } // cases
 
          void all()
@@ -214,6 +229,7 @@ namespace poly
             cases::roundtrip();
             cases::direct();
             cases::string();
+            cases::strict_gentle();
          }
       } // json::test
 
@@ -498,6 +514,21 @@ earth = "\U0001F30D"
                }
             }
 
+            void strict_gentle()
+            {
+               node source;
+               source[ "n"] = nullptr;
+
+               // strict: throws on nothing
+               try { toml::write( source); assert( false); }
+               catch( const std::invalid_argument&) {}
+
+               // gentle: writes nothing as "null" string
+               const auto text = toml::elegant::gentle::write( source);
+               auto parsed = toml::parse( text);
+               assert( parsed.at( "n").is_string());
+            }
+
          } // cases
 
          void all()
@@ -506,6 +537,7 @@ earth = "\U0001F30D"
             cases::elegant();
             cases::timestamp();
             cases::write();
+            cases::strict_gentle();
          }
       } // toml::test
 
@@ -943,22 +975,31 @@ items: [1, 2, 3]
 
                // write local date via elegant yaml
                {
-                  node source;
-                  source[ "d"] = node::instant( std::chrono::local_days{ 1970y/std::chrono::May/2});
-                  const auto text = yaml::write( source);
+                  const auto text = yaml::write( node::instant( std::chrono::local_days{ 1970y/std::chrono::May/2}));
                   assert( text.contains( "!!timestamp"));
                   assert( text.contains( "1970-05-02"));
                }
 
                // write world datetime via elegant yaml
                {
-                  node source;
-                  source[ "dt"] = node::instant( node::zoned_datetime{ std::chrono::sys_days{ 1970y/std::chrono::May/2} + 18h + 30min});
-                  const auto text = yaml::write( source);
+                  const auto text = yaml::write( node::instant( node::zoned_datetime{ std::chrono::sys_days{ 1970y/std::chrono::May/2} + 18h + 30min}));
                   assert( text.contains( "!!timestamp"));
                   assert( text.contains( "1970-05-02T18:30:00"));
                }
 
+            }
+
+            void strict_gentle()
+            {
+               const node source = help::transform::instant( "12:30:00").value();
+
+               // strict: throws on local_time
+               try { yaml::write( source); assert( false); }
+               catch( const std::invalid_argument&) {}
+
+               // gentle: writes local_time as bare value (parses back as string)
+               const auto text = yaml::elegant::gentle::write( source);
+               assert( yaml::parse( text).is_string());
             }
 
          } // cases
@@ -972,6 +1013,7 @@ items: [1, 2, 3]
             cases::tagged();
             cases::anchor();
             cases::timestamp();
+            cases::strict_gentle();
          }
 
       } // yaml::test

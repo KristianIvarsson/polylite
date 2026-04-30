@@ -341,7 +341,7 @@ namespace poly
                std::string do_grouping() const override { return "\3"; }
             };
 
-            template< bool posh>
+            template< bool posh, bool firm>
             struct writer : help::stream::buffer::iterator::writer
             {
                using base::base;
@@ -351,7 +351,10 @@ namespace poly
                   if( node.is_object())
                      (*this)( node.as_object());
                   else
-                     (*this)( node::object{ { {}, node}});
+                     if constexpr( firm)
+                        halt( "not node::object");
+                     else
+                        (*this)( node::object{ { {}, node}});
                }
 
                void operator()( const node::object& node)
@@ -459,7 +462,10 @@ namespace poly
 
                void operator()( const node::nothing& node)
                {
-                  halt( "node::nothing");
+                  if constexpr( firm)
+                     halt( "node::nothing");
+                  else
+                     copy( R"("null")");
                }
 
                void operator()( const node::boolean& node)
@@ -558,36 +564,60 @@ namespace poly
 
                std::vector< std::string_view> stack;
             };
+
+
+            template< bool posh, bool firm>
+            auto write( const node& node, std::ostream& stream)
+            {
+               writer< posh, firm>{ stream}( node);
+            }
+
+            template< bool posh, bool firm>
+            auto write( const node& node)
+            {
+               std::ostringstream stream;
+               write< posh, firm>( node, stream);
+               return std::move( stream).str();
+            }
+
          } // detail
 
          inline namespace elegant
          {
-            inline auto write( const node& node, std::ostream& stream)
+            inline namespace strict
             {
-               detail::writer< true>{ stream}( node);
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< true, true>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // strict
 
-            inline auto write( const node& node)
+            namespace gentle
             {
-               std::ostringstream stream;
-               write( node, stream);
-               return std::move( stream).str();
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< true, false>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // gentle
          } // elegant
 
          namespace compact
          {
-            inline auto write( const node& node, std::ostream& stream)
+            inline namespace strict
             {
-               detail::writer< false>{ stream}( node);
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< false, true>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // strict
 
-            inline auto write( const node& node)
+            namespace gentle
             {
-               std::ostringstream stream;
-               write( node, stream);
-               return std::move( stream).str();
-            }
+               auto write( auto&&... parameters)
+               {
+                  return detail::write< false, false>( std::forward< decltype( parameters)>( parameters)...);
+               }
+            } // gentle
          } // compact
 
       } // toml
