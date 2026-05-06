@@ -370,6 +370,10 @@ namespace poly
                      if( data->is_string() && tag == "timestamp")
                         if( auto result = help::transform::instant( help::trim( data->as_string())))
                            return *result;
+                     
+                     if( data->is_string() && tag == "binary")
+                        if( auto result = help::transform::binary( help::trim( data->as_string())))
+                           return *result;
                   }
 
                   [[unlikely]] halt( std::format( "invalid !!{} construct", tag));
@@ -691,6 +695,16 @@ namespace poly
                   push( '"');
                   cast( node);
                   push( '"');
+               }
+
+               void operator() ( const node::binary& node)
+               {
+                  copy( "!!binary ");
+
+                  if constexpr( spaces)
+                     copy( "|\n"), data( node);
+                  else
+                     data< 0>( node);
                }
 
             private:

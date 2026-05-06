@@ -19,9 +19,11 @@ At the moment, JSON, TOML and YAML are supported. The implementation may be some
 
 ##### JSON
 - `instant` (_time_) is not a native type
+- `binary` is not a native type
 
 ##### TOML
 - `nothing` (_null_) is not a native type
+- `binary` is not a native type
 
 ##### YAML
 - `local_time` inside `instant` is not a native type
@@ -38,11 +40,9 @@ At the moment, JSON, TOML and YAML are supported. The implementation may be some
 
 ### Roadmap
 
-#### YAML
-- !!binary
-
 #### General
 - Remove compiler specific code
+- Perhaps have a node_view for writing to avoid copying expensive stuff
 
 ### Usage & Reference
 There is currently no formal user documentation. However, some basic unit test-like code is available, which may serve as a useful reference for how to use the library. You can build and run it using:
@@ -65,6 +65,11 @@ g++ -std=c++23 -I include ./source/poly/show.cpp && ./a.out
 ```cpp
 // parse either a string or an input stream
 auto node = poly::json::parse( input);
+```
+
+```cpp
+// parse some stream or string and ignore potential utf8-bom
+auto node = poly::json::parse( poly::tool::bom::ignore( input));
 ```
 
 ```cpp

@@ -191,6 +191,45 @@ namespace poly
                return {};
             }
 
+            inline auto binary( std::string_view data) -> std::optional< node::binary>
+            {
+               node::binary result;
+               result.reserve( data.size() * 3 / 4);
+
+               std::uint32_t pack{};
+               int bits{};
+
+               for( const auto sign : data)
+               {
+                  if( ! is::space( sign) && sign != '=')
+                  {
+                     const auto spot = []( const auto sign) -> std::optional< std::uint32_t>
+                     {
+                        if( is::upper( sign)) return sign - 'A';
+                        if( is::lower( sign)) return sign - 'a' + 26;
+                        if( is::digit( sign)) return sign - '0' + 52;
+                        if( sign == '+') return 62;
+                        if( sign == '/') return 63;
+                        return {};
+                     }( sign);
+
+                     if( ! spot)
+                        return {};
+
+                     pack = ( pack << 6) | *spot;
+                     bits += 6;
+
+                     if( bits >= 8)
+                     {
+                        bits -= 8;
+                        result.push_back( static_cast< std::byte>( (pack >> bits) & 0xFF));
+                     }
+                  }
+               }
+
+               return result;
+            }            
+
             auto point( const std::same_as< std::int32_t> auto code)
             {
                std::string nrv;
@@ -227,7 +266,6 @@ namespace poly
 
          namespace stream
          {
-           
             namespace buffer::iterator
             {
                struct parser
@@ -348,6 +386,7 @@ namespace poly
                   }
                };
 
+
                struct writer
                {
                   using base = writer;
@@ -435,6 +474,49 @@ namespace poly
                   [[noreturn]] static void halt( const auto& type) 
                   {
                      throw std::invalid_argument{ std::format( "{} is not valid", type)};
+                  }
+
+                  template< std::size_t wrap = 76>
+                  auto data( const auto& data)
+                  {
+                     constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
+
+                     auto chunks = data | std::views::chunk( 3);
+                     std::size_t list = 0;
+
+                     auto emit = [&]( const char sign)
+                     {
+                        *mark++ = sign;
+                        if constexpr( wrap)
+                           if( ++list == wrap) { *mark++ = '\n'; list = 0; }
+                     };
+
+                     for( auto chunk : chunks) 
+                     {
+                        if( chunk.size() == 3) 
+                        {
+                           const auto b1 = std::to_integer< std::uint32_t>( chunk[0]);
+                           const auto b2 = std::to_integer< std::uint32_t>( chunk[1]);
+                           const auto b3 = std::to_integer< std::uint32_t>( chunk[2]);
+
+                           const uint32_t triple = ( b1 << 16) | ( b2 << 8) | b3;
+
+                           emit( alphabet[ (triple >> 18) & 0x3F]);
+                           emit( alphabet[ (triple >> 12) & 0x3F]);
+                           emit( alphabet[ (triple >> 6) & 0x3F]);
+                           emit( alphabet[ triple & 0x3F]);
+                        } 
+                        else 
+                        {
+                           std::uint32_t triple = std::to_integer< std::uint32_t>( chunk[0]) << 16;
+                           if( chunk.size() == 2) triple |= std::to_integer< std::uint32_t>( chunk[1]) << 8;
+
+                           emit( alphabet[ (triple >> 18) & 0x3F]);
+                           emit( alphabet[ (triple >> 12) & 0x3F]);
+                           emit( ( chunk.size() == 2) ? alphabet[ (triple >> 6) & 0x3F] : '=');
+                           emit( '=');
+                        }
+                     }
                   }
                };
 

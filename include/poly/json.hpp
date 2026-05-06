@@ -311,6 +311,20 @@ namespace poly
                   push( '"');
                }
 
+               void operator() ( const node::binary& node)
+               {
+                  if constexpr( strict)
+                     halt( "node::binary");
+
+                  fill();
+                  push( '"');
+                  if constexpr( spaces)
+                     data( node);
+                  else
+                     data< 0>( node);
+                  push( '"');
+               }
+
             private:
 
                void fill()

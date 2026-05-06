@@ -119,11 +119,29 @@ namespace poly
                assert( source( "fff")( 0)->to_integer() != nullptr);
                assert( source( "ggg")( "yyy")->to_integer() != nullptr);
             }
+            void binary()
+            {
+               // basic decode
+               const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
+               const node::binary man{ std::byte{0x4D}, std::byte{0x61}, std::byte{0x6E}};
+
+               assert( help::transform::binary( "SGVsbG8=") == hello);
+               assert( help::transform::binary( "TWFu") == man);
+               assert( help::transform::binary( "") == node::binary{});
+
+               // whitespace tolerance
+               assert( help::transform::binary( "SGVs\nbG8=") == hello);
+               assert( help::transform::binary( "SGVs bG8=") == hello);
+
+               // invalid character
+               assert( ! help::transform::binary( "SGVs!G8="));
+            }
          } // cases
 
          void all()
          {
             cases::access();
+            cases::binary();
          }
       } // base::test
 
@@ -222,6 +240,25 @@ namespace poly
                assert( parsed.at( "t").is_string());
             }
 
+            void binary()
+            {
+               const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
+
+               // strict: throws on binary
+               { node source; source[ "b"] = hello;
+                 auto ok = false; try { json::write( source); } catch( const std::invalid_argument&) { ok = true; } assert( ok); }
+
+               // gentle write contains base64
+               { node source; source[ "b"] = hello;
+                 const auto text = json::elegant::gentle::write( source);
+                 assert( text.contains( "SGVsbG8="));
+
+                 // round-trip via manual decode
+                 auto parsed = json::parse( text);
+                 const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+                 assert( decoded && *decoded == hello); }
+            }
+
          } // cases
 
          void all()
@@ -230,6 +267,7 @@ namespace poly
             cases::direct();
             cases::string();
             cases::strict_gentle();
+            cases::binary();
          }
       } // json::test
 
@@ -529,6 +567,34 @@ earth = "\U0001F30D"
                assert( parsed.at( "n").is_string());
             }
 
+            void binary()
+            {
+               const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
+
+               // strict: throws on binary
+               { node source; source[ "b"] = hello;
+                 auto ok = false; try { toml::write( source); } catch( const std::invalid_argument&) { ok = true; } assert( ok); }
+
+               // gentle elegant write contains base64
+               { node source; source[ "b"] = hello;
+                 const auto text = toml::elegant::gentle::write( source);
+                 assert( text.contains( "SGVsbG8="));
+
+                 // round-trip via manual decode
+                 auto parsed = toml::parse( text);
+                 const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+                 assert( decoded && *decoded == hello); }
+
+               // gentle compact write contains base64
+               { node source; source[ "b"] = hello;
+                 const auto text = toml::compact::gentle::write( source);
+                 assert( text.contains( "SGVsbG8="));
+
+                 auto parsed = toml::parse( text);
+                 const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+                 assert( decoded && *decoded == hello); }
+            }
+
          } // cases
 
          void all()
@@ -538,6 +604,7 @@ earth = "\U0001F30D"
             cases::timestamp();
             cases::write();
             cases::strict_gentle();
+            cases::binary();
          }
       } // toml::test
 
@@ -1002,6 +1069,27 @@ items: [1, 2, 3]
                assert( yaml::parse( text).is_string());
             }
 
+            void binary()
+            {
+               const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
+
+               // elegant write emits !!binary literal block
+               { 
+                  node source = hello;
+                  const auto text = yaml::write( source);
+                  assert( text.contains( "!!binary"));
+                  assert( text.contains( "SGVsbG8=")); 
+               }
+
+               // compact write emits !!binary when node is binary directly (object delegates to json writer)
+               { 
+                  node source = hello;
+                  const auto text = yaml::compact::gentle::write( source);
+                  assert( text.contains( "!!binary"));
+                  assert( text.contains( "SGVsbG8=")); 
+               }
+            }
+
          } // cases
 
          void all()
@@ -1014,6 +1102,7 @@ items: [1, 2, 3]
             cases::anchor();
             cases::timestamp();
             cases::strict_gentle();
+            cases::binary();
          }
 
       } // yaml::test

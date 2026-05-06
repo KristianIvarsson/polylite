@@ -12,6 +12,7 @@
 #include <chrono>
 #include <string>
 #include <vector>
+#include <cstddef>
 #include <variant>
 
 #include <cassert>
@@ -35,6 +36,7 @@ namespace poly
             std::chrono::zoned_time< std::chrono::system_clock::duration>
          >,
          std::string, 
+         std::vector< std::byte>, 
          std::vector< node>, 
          fifo< std::string, node>>;
 
@@ -50,8 +52,9 @@ namespace poly
          using decimal = std::variant_alternative_t< 3, data>;
          using instant = std::variant_alternative_t< 4, data>;
          using string = std::variant_alternative_t< 5, data>;
-         using array = std::variant_alternative_t< 6, data>;
-         using object = std::variant_alternative_t< 7, data>;
+         using binary = std::variant_alternative_t< 6, data>;
+         using array = std::variant_alternative_t< 7, data>;
+         using object = std::variant_alternative_t< 8, data>;
 
          using local_date = std::variant_alternative_t< 0, instant>;
          using local_time = std::variant_alternative_t< 1, instant>;
@@ -66,6 +69,7 @@ namespace poly
          constexpr auto& as_decimal( this auto&& self) { return std::get< decimal>( self); }
          constexpr auto& as_instant( this auto&& self) { return std::get< instant>( self); }
          constexpr auto& as_string( this auto&& self) { return std::get< string>( self); }
+         constexpr auto& as_binary( this auto&& self) { return std::get< binary>( self); }
          constexpr auto& as_array( this auto&& self) { return std::get< array>( self); }
          constexpr auto& as_object( this auto&& self) { return std::get< object>( self); }
 
@@ -92,6 +96,7 @@ namespace poly
          constexpr auto to_decimal( this auto&& self) noexcept { return std::get_if< decimal>( &self); }
          constexpr auto to_instant( this auto&& self) noexcept { return std::get_if< instant>( &self); }
          constexpr auto to_string( this auto&& self) noexcept { return std::get_if< string>( &self); }
+         constexpr auto to_binary( this auto&& self) noexcept { return std::get_if< binary>( &self); }
          constexpr auto to_array( this auto&& self) noexcept { return std::get_if< array>( &self); }
          constexpr auto to_object( this auto&& self) noexcept { return std::get_if< object>( &self); }
 
@@ -171,6 +176,7 @@ namespace poly
          constexpr bool is_decimal() const noexcept { return to_decimal(); }
          constexpr bool is_instant() const noexcept { return to_instant(); }
          constexpr bool is_string() const noexcept { return to_string(); }
+         constexpr bool is_binary() const noexcept { return to_binary(); }
          constexpr bool is_array() const noexcept { return to_array(); }
          constexpr bool is_object() const noexcept { return to_object(); }
 
@@ -182,7 +188,7 @@ namespace poly
          constexpr bool is_null() const noexcept { return is_nothing(); }
          constexpr bool is_true() const noexcept { return is_boolean() and as_boolean(); }
          constexpr bool is_false() const noexcept { return is_boolean() and not as_boolean(); }
-         constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_instant() or is_string(); }
+         constexpr bool is_scalar() const noexcept { return is_boolean() or is_numeric() or is_instant() or is_string() or is_binary(); }
          constexpr bool is_numeric() const noexcept { return is_integer() or is_decimal(); }
          constexpr bool is_trivial() const noexcept { return is_null() or is_scalar(); }
          //! @}

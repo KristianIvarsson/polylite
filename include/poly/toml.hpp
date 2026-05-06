@@ -500,6 +500,25 @@ namespace poly
                   push( '"'), cast( node), push( '"');
                }
 
+               void operator()( const node::binary& node)
+               {
+                  if constexpr( firm)
+                     halt( "node::binary");
+
+                  if constexpr( posh)
+                  {
+                     copy( "'''");
+                     data( node);
+                     copy( "'''");
+                  }
+                  else
+                  {
+                     push( '"');
+                     data< 0>( node);
+                     push( '"');
+                  }
+               }
+
             private:
 
                void key( const auto& name)
