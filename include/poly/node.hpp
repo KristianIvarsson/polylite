@@ -137,14 +137,14 @@ namespace poly
             type pointer = nullptr;
          };
 
-         auto operator ()( const auto& lookup) const & noexcept
+         auto operator ()( this auto& self, const auto& lookup) noexcept
          {
-            return proxy{ this}( lookup);
+            return proxy{ &self}( lookup);
          }
 
-         auto operator ()() const & noexcept
+         auto operator ()( this auto& self) noexcept
          {
-            return proxy{ this};
+            return proxy{ &self};
          }
          //! @}
 
