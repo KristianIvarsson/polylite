@@ -168,7 +168,7 @@ namespace poly
             {
                auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
                {
-                  type result;
+                  type result{};
                   std::ispanstream stream{ data};
                   if( stream >> std::chrono::parse( format, result) && stream.peek() == std::char_traits< char>::eof())
                      return result;
