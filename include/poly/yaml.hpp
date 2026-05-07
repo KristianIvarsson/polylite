@@ -271,8 +271,8 @@ namespace poly
                   {
                   case '0': return '\0';
                   case 'a': return '\a';
+                  case 'e': return 0x1B; // \e
                   case 'v': return '\v';
-                  case 'e': return '\e';
                   case 'x': return unit< 2>();
                   case 'U': return unit< 8>();
                   case 'N': return 0x85;
@@ -319,7 +319,7 @@ namespace poly
                   std::string nrv;
 
                   while( good())
-                     if( *mark == '\n' || *mark == '#' && nrv.ends_with( ' '))
+                     if( *mark == '\n' || ( *mark == '#' && nrv.ends_with( ' ')))
                         break;
                      else
                         nrv.push_back( *mark++);
@@ -385,7 +385,7 @@ namespace poly
 
                   while( good())
                   {
-                     if( *mark == '\n' || *mark == '#' && data.ends_with( ' '))
+                     if( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')))
                         break;
 
                      data.push_back( *mark++);
@@ -496,10 +496,12 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '\'')
+                     {
                         if( peek() != '\'')
                            break;
                         else
                            ++mark;
+                     }
 
                      data.push_back( sign);
                   }
@@ -653,7 +655,7 @@ namespace poly
                   }
                }
 
-               void operator() ( const node::nothing& node)
+               void operator() ( const node::nothing& )
                {
                   copy( "null");
                }

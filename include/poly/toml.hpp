@@ -248,7 +248,7 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '"')
-                        if( same || peek() != '"' && [&nrv] { return nrv.ends_with( R"("")") ? nrv.erase( nrv.size() - 2), true : false; }())
+                        if( same || ( peek() != '"' && [&nrv] { return nrv.ends_with( R"("")") ? nrv.erase( nrv.size() - 2), true : false; }()))
                            return nrv;
 
                      if( sign != '\\') [[likely]]
@@ -276,7 +276,7 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '\'')
-                        if( same || peek() != '\'' && [&nrv] { return nrv.ends_with( R"('')") ? nrv.erase( nrv.size() - 2), true : false; }())
+                        if( same || ( peek() != '\'' && [&nrv] { return nrv.ends_with( R"('')") ? nrv.erase( nrv.size() - 2), true : false; }()))
                            return nrv;
 
                      nrv.push_back( sign);
@@ -460,7 +460,7 @@ namespace poly
                   }
                }
 
-               void operator()( const node::nothing& node)
+               void operator()( const node::nothing& )
                {
                   if constexpr( firm)
                      halt( "node::nothing");

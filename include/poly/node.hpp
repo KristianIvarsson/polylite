@@ -114,7 +114,7 @@ namespace poly
 
             auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), array::size_type>
             {
-               if( pointer and pointer->to_array() and lookup < pointer->as_array().size())
+               if( pointer and pointer->to_array() and std::cmp_less( lookup, pointer->as_array().size()))
                   return proxy{ &pointer->as_array().at( lookup)};
 
                return proxy{ nullptr};
@@ -154,7 +154,7 @@ namespace poly
             if( not to_array())
                *this = node::array{};
             
-            while( as_array().size() <= lookup)
+            while( std::cmp_less_equal( as_array().size(), lookup))
                as_array().emplace_back();
 
             return as_array()[ lookup];
