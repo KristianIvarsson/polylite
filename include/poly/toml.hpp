@@ -67,8 +67,11 @@ namespace poly
 
                         where = &nrv;
 
-                        for( auto&& name : std::move( keys))
-                           where = &(*where)[ std::move( name)];
+                        for( auto&& name : keys | std::views::take( keys.size() - 1) | std::views::as_rvalue)
+                           if( where = &(*where)[ std::move( name)]; where->is_array() && ! where->as_array().empty())
+                              where = &where->as_array().back();
+
+                        where = &(*where)[ std::move( keys.back())];
 
                         if( peek() == ']')
                         {
