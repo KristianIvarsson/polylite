@@ -147,10 +147,23 @@ namespace poly
                      return 10;
                   }();
 
-                  node::integer value;
+                  std::make_unsigned_t< node::integer> value;
                   const auto result = std::from_chars( start, cease, value, base);
                   if( result.ec == std::errc{} && result.ptr == cease)
-                     return negative ? -value : value;
+                  {
+                     constexpr auto max = static_cast< std::make_unsigned_t< node::integer>>( std::numeric_limits< node::integer>::max());
+                     if( negative)
+                     {
+                        if( value <= max + 1u)
+                           return static_cast< node::integer>( - value);
+                     }
+                     else
+                     {
+                        if( value <= max + 0u)
+                           return static_cast< node::integer>( + value);
+                     }
+                     return {};
+                  }
                }
 
                // decimal
@@ -158,7 +171,7 @@ namespace poly
                   node::decimal value;
                   const auto result = std::from_chars( start, cease, value);
                   if( result.ec == std::errc{} && result.ptr == cease)
-                     return negative ? -value : value;
+                     return negative ? - value : + value;
                }
 
                return {};
