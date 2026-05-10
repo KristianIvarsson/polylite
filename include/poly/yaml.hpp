@@ -170,10 +170,10 @@ namespace poly
                   };
 
                   if( std::holds_alternative< begin>( info))
-                     line(), info = scan();
+                     dent = next(), info = scan();
 
                   while( std::holds_alternative< nill>( info) && good())
-                     line(), info = scan();
+                     dent = next(), info = scan();
 
                   if( std::holds_alternative< nill>( info))
                      return base ? std::optional< node>{ nullptr} : std::nullopt;
