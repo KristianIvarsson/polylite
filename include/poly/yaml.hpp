@@ -185,19 +185,13 @@ namespace poly
                   {
                      node::array array;
 
-                     while( good())
+                     do
                      {
-                        const auto content = dent + 1 + step();
-                        array.emplace_back( *spot( content));
+                        array.emplace_back( *spot( dent + 1 + step()));
 
-                        if( dent < base)
-                           break;
+                        if( dent < base) break;
 
-                        info = scan();
-
-                        if( ! std::holds_alternative< dash>( info))
-                           break;
-                     }
+                     } while( peek() == '-' && std::holds_alternative< dash>( info = scan()));
 
                      return array;
                   }
@@ -209,57 +203,37 @@ namespace poly
 
                   while( good())
                   {
-                     if( std::holds_alternative< nill>( info))
-                     {
-                        line();
-                        info = scan();
-                        continue;
-                     }
+                     while( good() && std::holds_alternative< nill>( info))
+                        line(), info = scan();
 
-                     if( boundary( info))
-                        break;
+                     if( ! good() || boundary( info)) break;
 
-                     auto& data = map[ std::get< name>( std::move( info)) ];
+                     auto& data = map[ std::get< name>( std::move( info))];
 
                      step();
+
                      info = scan();
 
                      if( std::holds_alternative< name>( info))
                         halt( "unexpected key");
 
-                     auto size = peek() == '\n' || ! good() ? next() : dent;
-
-                     if( size > base)
-                     {
-                        if( std::holds_alternative< node>( info))
-                           halt( "unexpected scalar");
-
-                        dent = size;
-                        data = *spot( size);
-
-                        if( dent < base)
-                           break;
-                     }
+                     if( peek() == '\n' || ! good())
+                        dent = next();
 
                      if( std::holds_alternative< node>( info))
+                     {
                         data = std::get< node>( std::move( info));
-
-                     if( size < base)
-                     {
-                        dent = size;
-                        break;
                      }
-
-                     if( good())
-                        info = scan();
                      else
-                        break;
+                     {
+                        if( dent < base) break;
 
-                     if( boundary( info))
-                        break;
+                        data = *spot( dent);
+                     }
+                     
+                     if( dent < base) break;
 
-                     if( std::holds_alternative< node>( info))
-                        halt( "unexpected scalar");
+                     info = scan();
                   }
 
                   return map;
