@@ -704,7 +704,7 @@ namespace poly
                   copy( "!!binary ");
 
                   if constexpr( spaces)
-                     copy( "|\n"), data( node);
+                     push( '|'), data( node, column * spaces);
                   else
                      data< 0>( node);
                }

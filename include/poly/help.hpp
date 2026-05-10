@@ -490,18 +490,20 @@ namespace poly
                   }
 
                   template< std::size_t wrap = 76>
-                  auto data( const auto& data)
+                  auto data( const auto& data, const std::size_t size = 0)
                   {
                      constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
 
                      auto chunks = data | std::views::chunk( 3);
-                     std::size_t list = 0;
+
+                     std::size_t list = wrap - 1;
 
                      auto emit = [&]( const char sign)
                      {
-                        *mark++ = sign;
                         if constexpr( wrap)
-                           if( ++list == wrap) { *mark++ = '\n'; list = 0; }
+                           if( ++list == wrap) { *mark++ = '\n'; std::fill_n( mark, size, ' '); list = 0; }
+
+                        *mark++ = sign;
                      };
 
                      for( auto chunk : chunks) 
@@ -530,6 +532,9 @@ namespace poly
                            emit( '=');
                         }
                      }
+
+                     if constexpr( wrap)
+                        *mark++ = '\n';
                   }
                };
 

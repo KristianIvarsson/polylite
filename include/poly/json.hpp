@@ -318,10 +318,7 @@ namespace poly
 
                   fill();
                   push( '"');
-                  if constexpr( spaces)
-                     data( node);
-                  else
-                     data< 0>( node);
+                  data< 0>( node);
                   push( '"');
                }
 
