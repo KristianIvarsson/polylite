@@ -147,10 +147,23 @@ namespace poly
                      return 10;
                   }();
 
-                  node::integer value;
+                  std::make_unsigned_t< node::integer> value;
                   const auto result = std::from_chars( start, cease, value, base);
                   if( result.ec == std::errc{} && result.ptr == cease)
-                     return negative ? -value : value;
+                  {
+                     constexpr auto max = static_cast< std::make_unsigned_t< node::integer>>( std::numeric_limits< node::integer>::max());
+                     if( negative)
+                     {
+                        if( value <= max + 1u)
+                           return static_cast< node::integer>( - value);
+                     }
+                     else
+                     {
+                        if( value <= max + 0u)
+                           return static_cast< node::integer>( + value);
+                     }
+                     return {};
+                  }
                }
 
                // decimal
@@ -158,7 +171,7 @@ namespace poly
                   node::decimal value;
                   const auto result = std::from_chars( start, cease, value);
                   if( result.ec == std::errc{} && result.ptr == cease)
-                     return negative ? -value : value;
+                     return negative ? - value : + value;
                }
 
                return {};
@@ -168,7 +181,7 @@ namespace poly
             {
                auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
                {
-                  type result;
+                  type result{};
                   std::ispanstream stream{ data};
                   if( stream >> std::chrono::parse( format, result) && stream.peek() == std::char_traits< char>::eof())
                      return result;
@@ -477,18 +490,20 @@ namespace poly
                   }
 
                   template< std::size_t wrap = 76>
-                  auto data( const auto& data)
+                  auto data( const auto& data, const std::size_t size = 0)
                   {
                      constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
 
                      auto chunks = data | std::views::chunk( 3);
-                     std::size_t list = 0;
+
+                     std::size_t list = wrap - 1;
 
                      auto emit = [&]( const char sign)
                      {
-                        *mark++ = sign;
                         if constexpr( wrap)
-                           if( ++list == wrap) { *mark++ = '\n'; list = 0; }
+                           if( ++list == wrap) { *mark++ = '\n'; std::fill_n( mark, size, ' '); list = 0; }
+
+                        *mark++ = sign;
                      };
 
                      for( auto chunk : chunks) 
@@ -517,6 +532,9 @@ namespace poly
                            emit( '=');
                         }
                      }
+
+                     if constexpr( wrap)
+                        *mark++ = '\n';
                   }
                };
 

@@ -102,9 +102,8 @@ namespace poly
                {
                   auto size = step();
 
-                  switch( peek())
-                  case '#': case '\n':
-                  return line(), next();
+                  if( done())
+                     return line(), next();
 
                   return size;
                }
@@ -170,10 +169,10 @@ namespace poly
                   };
 
                   if( std::holds_alternative< begin>( info))
-                     line(), info = scan();
+                     dent = next(), info = scan();
 
                   while( std::holds_alternative< nill>( info) && good())
-                     line(), info = scan();
+                     dent = next(), info = scan();
 
                   if( std::holds_alternative< nill>( info))
                      return base ? std::optional< node>{ nullptr} : std::nullopt;
@@ -185,19 +184,13 @@ namespace poly
                   {
                      node::array array;
 
-                     while( good())
+                     do
                      {
-                        const auto content = dent + 1 + step();
-                        array.emplace_back( *spot( content));
+                        array.emplace_back( *spot( dent + 1 + step()));
 
-                        if( dent < base)
-                           break;
+                        if( dent < base) break;
 
-                        info = scan();
-
-                        if( ! std::holds_alternative< dash>( info))
-                           break;
-                     }
+                     } while( peek() == '-' && std::holds_alternative< dash>( info = scan()));
 
                      return array;
                   }
@@ -209,57 +202,36 @@ namespace poly
 
                   while( good())
                   {
-                     if( std::holds_alternative< nill>( info))
-                     {
-                        line();
-                        info = scan();
-                        continue;
-                     }
+                     while( good() && std::holds_alternative< nill>( info))
+                        line(), info = scan();
 
-                     if( boundary( info))
-                        break;
+                     if( ! good() || boundary( info)) break;
 
-                     auto& data = map[ std::get< name>( std::move( info)) ];
+                     auto& data = map[ std::get< name>( std::move( info))];
 
                      step();
+
                      info = scan();
 
                      if( std::holds_alternative< name>( info))
                         halt( "unexpected key");
 
-                     auto size = peek() == '\n' || ! good() ? next() : dent;
-
-                     if( size > base)
-                     {
-                        if( std::holds_alternative< node>( info))
-                           halt( "unexpected scalar");
-
-                        dent = size;
-                        data = *spot( size);
-
-                        if( dent < base)
-                           break;
-                     }
+                     if( done()) dent = next();
 
                      if( std::holds_alternative< node>( info))
+                     {
                         data = std::get< node>( std::move( info));
-
-                     if( size < base)
-                     {
-                        dent = size;
-                        break;
                      }
-
-                     if( good())
-                        info = scan();
                      else
-                        break;
+                     {
+                        if( dent < base) break;
 
-                     if( boundary( info))
-                        break;
+                        data = *spot( dent);
+                     }
+                     
+                     if( dent < base) break;
 
-                     if( std::holds_alternative< node>( info))
-                        halt( "unexpected scalar");
+                     info = scan();
                   }
 
                   return map;
@@ -271,8 +243,8 @@ namespace poly
                   {
                   case '0': return '\0';
                   case 'a': return '\a';
+                  case 'e': return 0x1B; // \e
                   case 'v': return '\v';
-                  case 'e': return '\e';
                   case 'x': return unit< 2>();
                   case 'U': return unit< 8>();
                   case 'N': return 0x85;
@@ -287,6 +259,21 @@ namespace poly
                {
                   return json::detail::parser{ mark}.spot();
                }
+
+               bool more( const auto& data) const
+               {
+                  if( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')))
+                     return false;
+                  
+                  return good();
+               }
+
+               bool done() const
+               {
+                  return peek() == '\n' || peek() == '#';
+               }
+
+
 
                info alias()
                {
@@ -318,10 +305,7 @@ namespace poly
                {
                   std::string nrv;
 
-                  while( good())
-                     if( *mark == '\n' || *mark == '#' && nrv.ends_with( ' '))
-                        break;
-                     else
+                  while( more( nrv))
                         nrv.push_back( *mark++);
 
                   return nrv;
@@ -383,11 +367,8 @@ namespace poly
                {
                   std::string data;
 
-                  while( good())
+                  while( more( data))
                   {
-                     if( *mark == '\n' || *mark == '#' && data.ends_with( ' '))
-                        break;
-
                      data.push_back( *mark++);
 
                      if( data.back() == ':' && cusp())
@@ -496,10 +477,12 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '\'')
+                     {
                         if( peek() != '\'')
                            break;
                         else
                            ++mark;
+                     }
 
                      data.push_back( sign);
                   }
@@ -653,7 +636,7 @@ namespace poly
                   }
                }
 
-               void operator() ( const node::nothing& node)
+               void operator() ( const node::nothing& )
                {
                   copy( "null");
                }
@@ -702,7 +685,7 @@ namespace poly
                   copy( "!!binary ");
 
                   if constexpr( spaces)
-                     copy( "|\n"), data( node);
+                     push( '|'), data( node, column * spaces);
                   else
                      data< 0>( node);
                }

@@ -67,8 +67,11 @@ namespace poly
 
                         where = &nrv;
 
-                        for( auto&& name : std::move( keys))
-                           where = &(*where)[ std::move( name)];
+                        for( auto&& name : keys | std::views::take( keys.size() - 1) | std::views::as_rvalue)
+                           if( where = &(*where)[ std::move( name)]; where->is_array() && ! where->as_array().empty())
+                              where = &where->as_array().back();
+
+                        where = &(*where)[ std::move( keys.back())];
 
                         if( peek() == ']')
                         {
@@ -248,7 +251,7 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '"')
-                        if( same || peek() != '"' && [&nrv] { return nrv.ends_with( R"("")") ? nrv.erase( nrv.size() - 2), true : false; }())
+                        if( same || ( peek() != '"' && [&nrv] { return nrv.ends_with( R"("")") ? nrv.erase( nrv.size() - 2), true : false; }()))
                            return nrv;
 
                      if( sign != '\\') [[likely]]
@@ -276,7 +279,7 @@ namespace poly
                      const auto sign = pull();
 
                      if( sign == '\'')
-                        if( same || peek() != '\'' && [&nrv] { return nrv.ends_with( R"('')") ? nrv.erase( nrv.size() - 2), true : false; }())
+                        if( same || ( peek() != '\'' && [&nrv] { return nrv.ends_with( R"('')") ? nrv.erase( nrv.size() - 2), true : false; }()))
                            return nrv;
 
                      nrv.push_back( sign);
@@ -359,12 +362,11 @@ namespace poly
 
                void operator()( const node::object& node)
                {
-                  if( node.empty() || std::ranges::any_of( node, []( const auto& pair)
-                     { return pair.second.is_trivial() || ( !posh && pair.second.is_array() && shallow( pair.second.as_array())); }))
+                  if( node.empty() || ! std::ranges::all_of( node, section, &node::object::value_type::second))
                      table();
 
                   for( const auto& [ name, data] : node)
-                     if( trivial( data) || ( !posh && data.is_array() && shallow( data.as_array())))
+                     if( ! section( data))
                      {
                         key( name);
                         copy( " = ");
@@ -373,7 +375,7 @@ namespace poly
                      }
 
                   for( const auto& [ name, data] : node)
-                     if( complex( data) && !( !posh && data.is_array() && shallow( data.as_array())))
+                     if( section( data))
                      {
                         stack.emplace_back( name);
                         std::visit( *this, data);
@@ -389,13 +391,13 @@ namespace poly
                   };
 
 
-                  if( node.empty() || trivial( node))
+                  if( node.empty() || trivial( node) || ! std::ranges::all_of( node, &node::is_object))
                   {
                      push( '[');
                      auto commas = node.size();
                      for( const auto& data : node)
                      {
-                        std::visit( *this, data);
+                        place( data);
                         comma( commas);
                      }
                      push( ']');
@@ -407,7 +409,9 @@ namespace poly
                         for( const auto& data : node)
                         {
                            array();
+
                            const auto& table = data.as_object();
+
                            for( const auto& [ name, data] : table)
                               if( trivial( data))
                               {
@@ -416,6 +420,7 @@ namespace poly
                                  std::visit( *this, data);
                                  push( '\n');
                               }
+
                            for( const auto& [ name, data] : table)
                               if( complex( data))
                               {
@@ -460,7 +465,7 @@ namespace poly
                   }
                }
 
-               void operator()( const node::nothing& node)
+               void operator()( const node::nothing& )
                {
                   if constexpr( firm)
                      halt( "node::nothing");
@@ -529,6 +534,38 @@ namespace poly
                      (*this)( node::string{ name}); // quoted key
                }
 
+               void place( const node& node)
+               {
+                  if( node.is_trivial())
+                     return std::visit( *this, node);
+
+                  if( node.is_object())
+                  {
+                     copy( "{ ");
+                     auto tail = node.as_object().size();
+                     for( const auto& [ name, data] : node.as_object())
+                     {
+                        key( name);
+                        copy( " = ");
+                        place( data);
+                        if( --tail) copy( ", ");
+                     }
+                     copy( " }");
+                  }
+
+                  if( node.is_array())
+                  {
+                     push( '[');
+                     auto tail = node.as_array().size();
+                     for( const auto& item : node.as_array())
+                     {
+                        place( item);
+                        if( --tail) copy( ", ");
+                     }
+                     push( ']');
+                  }
+               }
+
                void glean()
                {
                   auto point = stack.size();
@@ -575,8 +612,19 @@ namespace poly
 
                static bool shallow( const node::array& array) noexcept
                {
-                  return std::ranges::all_of( array, []( const auto& item)
-                     { return item.is_object() && std::ranges::all_of( item.as_object(), []( const auto& pair){ return trivial( pair.second); }); });
+                  return std::ranges::all_of( array, [] ( const node& item)
+                     {
+                        return item.is_object() && std::ranges::all_of( item.as_object(), trivial, &node::object::value_type::second);
+                     });
+               }
+
+               static bool section( const node& item) noexcept
+               {
+                  if( item.is_object()) return true;
+                  if( ! item.is_array()) return false;
+                  if( ! std::ranges::all_of( item.as_array(), &node::is_object)) return false;
+                  if constexpr( posh) return true;
+                  return ! shallow( item.as_array());
                }
 
             private:

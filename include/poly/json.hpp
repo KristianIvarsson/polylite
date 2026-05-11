@@ -261,7 +261,7 @@ namespace poly
                   seal( ']');
                }
 
-               void operator() ( const node::nothing& node)
+               void operator() ( const node::nothing& )
                {
                   fill();
                   copy( "null");
@@ -318,10 +318,7 @@ namespace poly
 
                   fill();
                   push( '"');
-                  if constexpr( spaces)
-                     data( node);
-                  else
-                     data< 0>( node);
+                  data< 0>( node);
                   push( '"');
                }
 
@@ -330,10 +327,12 @@ namespace poly
                void fill()
                {
                   if constexpr( spaces)
+                  {
                      if( indent)
                         push( '\n'), std::fill_n( mark, column * spaces, ' ');
                      else
                         indent = true;
+                  }
                }
 
                void fill( const std::string::value_type sign)
