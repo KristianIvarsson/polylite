@@ -102,9 +102,8 @@ namespace poly
                {
                   auto size = step();
 
-                  switch( peek())
-                  case '#': case '\n':
-                  return line(), next();
+                  if( done())
+                     return line(), next();
 
                   return size;
                }
@@ -217,8 +216,7 @@ namespace poly
                      if( std::holds_alternative< name>( info))
                         halt( "unexpected key");
 
-                     if( peek() == '\n' || ! good())
-                        dent = next();
+                     if( done()) dent = next();
 
                      if( std::holds_alternative< node>( info))
                      {
@@ -262,6 +260,21 @@ namespace poly
                   return json::detail::parser{ mark}.spot();
                }
 
+               bool more( const auto& data) const
+               {
+                  if( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')))
+                     return false;
+                  
+                  return good();
+               }
+
+               bool done() const
+               {
+                  return peek() == '\n' || peek() == '#';
+               }
+
+
+
                info alias()
                {
                   ++mark; // '*'
@@ -292,10 +305,7 @@ namespace poly
                {
                   std::string nrv;
 
-                  while( good())
-                     if( *mark == '\n' || ( *mark == '#' && nrv.ends_with( ' ')))
-                        break;
-                     else
+                  while( more( nrv))
                         nrv.push_back( *mark++);
 
                   return nrv;
@@ -357,11 +367,8 @@ namespace poly
                {
                   std::string data;
 
-                  while( good())
+                  while( more( data))
                   {
-                     if( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')))
-                        break;
-
                      data.push_back( *mark++);
 
                      if( data.back() == ':' && cusp())
