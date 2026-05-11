@@ -6,4 +6,4 @@
 
 #pragma once
 
-#define version v4_1_5
+#define version v4_2_0

@@ -273,8 +273,6 @@ namespace poly
                   return peek() == '\n' || peek() == '#';
                }
 
-
-
                info alias()
                {
                   ++mark; // '*'
@@ -318,7 +316,7 @@ namespace poly
                   // only support core tags
                   test( '!', pull());
 
-                  const auto tag = read( bare);  // reads until non-bare char
+                  const auto tag = read( []( const auto sign) { return help::is::lower( sign); });
 
                   skip();
 
@@ -577,14 +575,6 @@ namespace poly
             {
                using base::base;
 
-               void key( const auto& name)
-               {
-                  if( ! name.empty() && std::ranges::all_of( name, bare))
-                     copy( name);
-                  else
-                     (*this)( node::string{ name});
-               }
-
                void operator() ( const node::object& node)
                {
                   if constexpr( spaces)
@@ -592,7 +582,7 @@ namespace poly
                      for( const auto& [ name, data] : node)
                      {
                         fill();
-                        key( name);
+                        (*this)( name);
                         if( data.is_trivial())
                         {
                            copy( ": ");
@@ -675,9 +665,30 @@ namespace poly
 
                void operator() ( const node::string& node)
                {
-                  push( '"');
-                  cast( node);
-                  push( '"');
+                  auto plain = [&node]
+                  {
+                     if( node.empty())
+                        return false;
+
+                     switch( node.front())
+                     case '{': case '[': case '*': case '&': 
+                     case '|': case '!': case '>': case '"': 
+                     case '~': case '-': case '.': case '\'':
+                        return false;
+
+                     if( help::is::space( node.front()) || help::is::space( node.back()))
+                        return false;
+
+                     if( node.find_first_of( ":#\n") != std::string::npos)
+                        return false;
+
+                     return ! help::transform::simple( node) && ! help::transform::number( node);
+                  };
+
+                  if( plain())
+                     copy( node);
+                  else
+                     push( '"'), cast( node), push( '"');
                }
 
                void operator() ( const node::binary& node)
