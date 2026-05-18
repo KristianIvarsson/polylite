@@ -652,6 +652,19 @@ g: "hello\nworld")";
                   assert( document.at( "g").as_string() == "hello\nworld");
                }
 
+               // same-line value, nested value, and implicit null
+               {
+                  const auto inline_value = yaml::parse( "a: 123\n");
+                  assert( inline_value.at( "a").as_integer() == 123);
+
+                  const auto nested_value = yaml::parse( "a:\n  b: true\n");
+                  assert( nested_value.at( "a").at( "b").as_boolean());
+
+                  const auto implicit_null = yaml::parse( "a:\nb: true\n");
+                  assert( implicit_null.at( "a").is_null());
+                  assert( implicit_null.at( "b").as_boolean());
+               }
+
                // document boundary: stop at ... and ---
                {
                   const auto d1 = yaml::parse( "a: 1\n...\nb: 2\n");
@@ -707,14 +720,55 @@ g: "hello\nworld")";
 
             void flow()
             {
-               // inline mapping
+               // inline mapping — quoted keys
                {
                   const auto target = yaml::parse( "point: {\"x\": 1, \"y\": 2}\n");
                   assert( target.at( "point").at( "x").as_integer() == 1);
                   assert( target.at( "point").at( "y").as_integer() == 2);
                }
 
-               // inline sequence
+               // inline mapping — bare keys and bare scalar values
+               {
+                  const auto target = yaml::parse( "p: {x: 1, y: 2}\n");
+                  assert( target.at( "p").at( "x").as_integer() == 1);
+                  assert( target.at( "p").at( "y").as_integer() == 2);
+               }
+
+               // bare values: null, bool, float, string
+               {
+                  const auto target = yaml::parse( "a: {n: ~, b: true, f: 3.14, s: hello}\n");
+                  assert( target.at( "a").at( "n").is_null());
+                  assert( target.at( "a").at( "b").as_boolean() == true);
+                  assert( target.at( "a").at( "f").as_decimal() == 3.14);
+                  assert( target.at( "a").at( "s").as_string() == "hello");
+               }
+
+               // bare values: special floats
+               {
+                  const auto target = yaml::parse( "a: {x: .nan, y: .inf, z: -.inf}\n");
+                  assert( std::isnan( target.at( "a").at( "x").as_decimal()));
+                  assert( std::isinf( target.at( "a").at( "y").as_decimal()) && target.at( "a").at( "y").as_decimal() > 0);
+                  assert( std::isinf( target.at( "a").at( "z").as_decimal()) && target.at( "a").at( "z").as_decimal() < 0);
+               }
+
+               // inline sequence — bare scalars
+               {
+                  const auto target = yaml::parse( "a: [1, 2, 3]\n");
+                  assert( target.at( "a").as_array().size() == 3);
+                  assert( target.at( "a").at( 0).as_integer() == 1);
+                  assert( target.at( "a").at( 2).as_integer() == 3);
+               }
+
+               // inline sequence — mixed bare types
+               {
+                  const auto target = yaml::parse( "a: [true, ~, 3.14, hello]\n");
+                  assert( target.at( "a").at( 0).as_boolean() == true);
+                  assert( target.at( "a").at( 1).is_null());
+                  assert( target.at( "a").at( 2).as_decimal() == 3.14);
+                  assert( target.at( "a").at( 3).as_string() == "hello");
+               }
+
+               // inline sequence — quoted strings
                {
                   const auto target = yaml::parse( "tags: [\"web\", \"api\", \"v2\"]\n");
                   assert( target.at( "tags").as_array().size() == 3);
@@ -728,6 +782,14 @@ g: "hello\nworld")";
                   assert( target.at( "server").at( "host").as_string() == "localhost");
                   assert( target.at( "server").at( "port").as_integer() == 8080);
                   assert( target.at( "server").at( "tags").at( 1).as_string() == "api");
+               }
+
+               // nested flow — bare keys
+               {
+                  const auto target = yaml::parse( "s: {host: localhost, port: 8080, tags: [web, api]}\n");
+                  assert( target.at( "s").at( "host").as_string() == "localhost");
+                  assert( target.at( "s").at( "port").as_integer() == 8080);
+                  assert( target.at( "s").at( "tags").at( 1).as_string() == "api");
                }
 
                // mixed block and flow
@@ -784,6 +846,48 @@ items: [1, 2, 3]
                   assert( target.at( "host").as_string() == "localhost");
                   assert( target.at( "port").as_integer() == 8080);
                   assert( target.at( "tags").at( 1).as_string() == "api");
+               }
+
+               // trailing comma — object
+               {
+                  const auto target = yaml::parse( "p: {x: 1, y: 2,}\n");
+                  assert( target.at( "p").at( "x").as_integer() == 1);
+                  assert( target.at( "p").at( "y").as_integer() == 2);
+               }
+
+               // trailing comma — array
+               {
+                  const auto target = yaml::parse( "a: [1, 2, 3,]\n");
+                  assert( target.at( "a").as_array().size() == 3);
+                  assert( target.at( "a").at( 2).as_integer() == 3);
+               }
+
+               // multiline flow object
+               {
+                  const auto source = R"(
+point: {
+  x: 1,
+  y: 2
+}
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "point").at( "x").as_integer() == 1);
+                  assert( target.at( "point").at( "y").as_integer() == 2);
+               }
+
+               // multiline flow array
+               {
+                  const auto source = R"(
+items: [
+  1,
+  2,
+  3
+]
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "items").as_array().size() == 3);
+                  assert( target.at( "items").at( 0).as_integer() == 1);
+                  assert( target.at( "items").at( 2).as_integer() == 3);
                }
             }
 
@@ -869,6 +973,109 @@ items: [1, 2, 3]
 
             void block()
             {
+               // sibling section after array of maps
+               {
+                  const auto source = R"(
+domain:
+   groups:
+      -  name: A
+      -  name: B
+   servers:
+      -  alias: a
+         path: /tmp/server
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "domain").at( "groups").as_array().size() == 2);
+                  assert( target.at( "domain").at( "groups").at( 1).at( "name").as_string() == "B");
+                  assert( target.at( "domain").at( "servers").as_array().size() == 1);
+                  assert( target.at( "domain").at( "servers").at( 0).at( "alias").as_string() == "a");
+               }
+
+               // roundtrip keeps sibling sections out of the preceding array item
+               {
+                  const auto source = R"(
+domain:
+   groups:
+      -  name: A
+         dependencies: [ user]
+      -  name: B
+         enabled: false
+         dependencies: [ B]
+   servers:
+      -  alias: a
+         path: /tmp/a
+         memberships: [ A]
+         instances: 2
+         restart: true
+      -  alias: b
+         path: /tmp/b
+         memberships: [ B]
+         instances: 2
+   executables:
+      -  alias: t
+         path: sleep
+         arguments: [ 60]
+         memberships: [ A]
+         instances: 0
+         restart: true
+      -  alias: x
+         path: sleep
+         instances: 2
+         arguments: [ 60]
+         memberships: [ A]
+)";
+
+                  const auto roundtrip = yaml::parse( yaml::write( yaml::parse( source)));
+                  const auto& domain = roundtrip.at( "domain");
+                  const auto& groups = domain.at( "groups").as_array();
+                  const auto& servers = domain.at( "servers").as_array();
+                  const auto& executables = domain.at( "executables").as_array();
+
+                  assert( groups.size() == 2);
+                  assert( groups.at( 0).at( "name").as_string() == "A");
+                  assert( groups.at( 1).at( "name").as_string() == "B");
+                  assert( ! groups.at( 1)( "servers"));
+
+                  assert( servers.size() == 2);
+                  assert( servers.at( 0).at( "alias").as_string() == "a");
+                  assert( servers.at( 1).at( "alias").as_string() == "b");
+
+                  assert( executables.size() == 2);
+                  assert( executables.at( 0).at( "alias").as_string() == "t");
+                  assert( executables.at( 1).at( "alias").as_string() == "x");
+               }
+
+               // sibling after nested map — provokes dent clobbering
+               {
+                  const auto source = R"(
+a:
+  x: 1
+  y: 2
+b: 3
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "a").at( "x").as_integer() == 1);
+                  assert( target.at( "a").at( "y").as_integer() == 2);
+                  assert( target.at( "b").as_integer() == 3);
+               }
+
+               // deeply nested maps followed by siblings at every level
+               {
+                  const auto source = R"(
+outer:
+  inner:
+    deep: 42
+    deep2: 99
+  sibling: hello
+top: world
+)";
+                  const auto target = yaml::parse( source);
+                  assert( target.at( "outer").at( "inner").at( "deep").as_integer() == 42);
+                  assert( target.at( "outer").at( "inner").at( "deep2").as_integer() == 99);
+                  assert( target.at( "outer").at( "sibling").as_string() == "hello");
+                  assert( target.at( "top").as_string() == "world");
+               }
+
                // literal: preserves newlines, clip (default)
                {
                   const auto target = yaml::parse( "key: |\n  hello\n  world\nnext: 1\n");

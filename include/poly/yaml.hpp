@@ -10,8 +10,9 @@
 #include "json.hpp"
 
 #include <format>
-#include <ranges>
 #include <string>
+#include <vector>
+#include <cassert>
 #include <sstream>
 #include <optional>
 #include <stdexcept>
@@ -43,6 +44,232 @@ namespace poly
             {
                using base::base;
 
+            protected:
+
+               using nill = std::monostate;
+               using name = node::object::key_type;
+
+               struct dash {};
+               struct begin {};
+               struct cease {};
+
+               using info = std::variant< nill, name, node, dash, begin, cease>;
+
+               template< class... types>
+               static bool hold( const auto& data)
+               {
+                  return ( std::holds_alternative< types>( data) || ... );
+               }
+
+               void skip()
+               {
+                  leap( [] ( const auto sign) { return help::is::space( sign); });
+
+                  if( peek() == '#')
+                  {
+                     leap( rest);
+                     if( good()) ++mark;
+                     skip();
+                  }
+               }
+
+               char pick() { return skip(), pull(); }
+               char peep() { return skip(), peek(); }
+
+
+               auto quoted()
+               {
+                  ++mark; // '"'
+
+                  std::string nrv;
+
+                  while( true)
+                  {
+                     const auto sign = pull();
+
+                     if( sign == '"') break;
+
+                     if( sign != '\\') [[likely]]
+                        nrv.push_back( sign);
+                     else
+                        nrv.append( help::transform::point( cast( pull())));
+                  }
+
+                  return nrv;
+               }
+
+               auto single()
+               {
+                  ++mark; // '\''
+
+                  std::string nrv;
+
+                  while( true)
+                  {
+                     const auto sign = pull();
+
+                     if( sign == '\'')
+                     {
+                        if( peek() != '\'') break;
+                        else ++mark;
+                     }
+
+                     nrv.push_back( sign);
+                  }
+
+                  return nrv;
+               }
+
+               auto cast( const auto sign) -> std::int32_t
+               {
+                  switch( sign)
+                  {
+                  case '0': return '\0';
+                  case 'a': return '\a';
+                  case 'e': return 0x1B; // \e
+                  case 'v': return '\v';
+                  case 'x': return unit< 2>();
+                  case 'U': return unit< 8>();
+                  case 'N': return 0x85;
+                  case '_': return 0xA0;
+                  case 'L': return 0x2028;
+                  case 'P': return 0x2029;
+                  default:  return base::cast( sign);
+                  }
+               }
+
+               static auto resolve( std::string data) -> info
+               {
+                  if( data.empty())
+                     return nill{};
+
+                  if( data == "~")
+                     return node{ nullptr};
+
+                  if( auto result = help::transform::simple( data))
+                     return std::move( *result);
+
+                  if( data == ".nan" || data == ".inf" || data == "+.inf" || data == "-.inf")
+                     std::erase( data, '.');
+
+                  if( auto result = help::transform::number( data))
+                     return std::move( *result);
+
+                  return node{ std::move( data)};
+               }
+
+               bool cusp() const
+               {
+                  return ! good() || help::is::space( *mark);
+               }
+            };
+
+            struct flow : parser
+            {
+               using parser::parser;
+
+               auto spot() -> node
+               {
+                  auto data = scan();
+
+                  if( auto* result = std::get_if< node>( &data))
+                     return std::move( *result);
+
+                  [[unlikely]] halt( "expected value");
+               }
+
+            private:
+
+               info decide( auto data)
+               {
+                  if( peep() == ':') 
+                     return ++mark, name{ std::move( data)};
+                  return node{ std::move( data)};
+               }
+
+               auto scan() -> info
+               {
+                  switch( peep())
+                  {
+                  case '{':   return node{ object()};
+                  case '[':   return node{ array()};
+                  case '"':   return decide( quoted());
+                  case '\'':  return decide( single());
+                  default:    return absent();
+                  }
+               }
+
+               auto object() -> node::object
+               {
+                  ++mark; // '{'
+
+                  node::object nrv;
+
+                  while( peep() != '}')
+                  {
+                     auto data = scan();
+
+                     if( ! std::holds_alternative< name>( data))
+                        [[unlikely]] halt( "expected key");
+
+                     nrv.emplace( std::get< name>( std::move( data)), spot());
+
+                     if( peep() == '}') break;
+
+                     test( ',', pull());
+                  }
+
+                  ++mark; // '}'
+
+                  return nrv;
+               }
+
+               auto array() -> node::array
+               {
+                  ++mark; // '['
+
+                  node::array nrv;
+
+                  while( peep() != ']')
+                  {
+                     nrv.emplace_back( spot());
+
+                     if( peep() == ']') break;
+                     
+                     test( ',', pull());
+                  }
+
+                  ++mark; // ']'
+
+                  return nrv;
+               }
+
+               bool more( const std::string& data) const
+               {
+                  return good() and not ( *mark == ',' || *mark == '}' || *mark == ']' || ( *mark == '#' && data.ends_with( ' ')));
+               }
+
+               info absent()
+               {
+                  name data;
+
+                  while( more( data))
+                  {
+                     data.push_back( *mark++);
+
+                     if( data.back() == ':' && cusp())
+                        return data.pop_back(), help::trim( std::move( data));
+                  }
+
+                  return resolve( help::trim( std::move( data)));
+               }
+
+            };
+
+            struct block : parser
+            {
+               using parser::parser;
+
                auto operator()() -> std::optional<node>
                {
                   directives();
@@ -54,31 +281,14 @@ namespace poly
 
                using size = int;
 
-               using nill = std::monostate;
-               using name = node::object::key_type;
+               size dent{};
 
-               struct dash {};
-
-               struct begin {};
-               struct cease {};
-
-               using info = std::variant< nill, name, node, dash, begin, cease>;
+            private:
 
                void line()
                {
                   leap( rest);
                   if( good()) ++mark;
-               }               
-
-               void skip()
-               {
-                  leap( [] ( const auto sign) { return help::is::space( sign); });
-
-                  if( peek() == '#')
-                  {
-                     line();
-                     skip();
-                  }
                }
 
                size step()
@@ -88,16 +298,6 @@ namespace poly
                   return size;
                }
 
-               char pick()
-               {
-                  return skip(), pull();
-               }
-
-               char peep()
-               {
-                  return skip(), peek();
-               }               
-               
                size next()
                {
                   auto size = step();
@@ -133,12 +333,19 @@ namespace poly
                   }
                }
 
+               info decide( auto data)
+               {
+                  if( peek() == ':') 
+                     return ++mark, name{ std::move( data)};
+                  return node{ std::move( data)};
+               }
+               
                auto scan()
                {
                   switch( peek())
                   {
                   case '{': case '[':
-                     return flow();
+                     return info{ flow{ mark}.spot()};
                   case '*':
                      return alias();
                   case '&':
@@ -146,126 +353,147 @@ namespace poly
                   case '!':
                      return tagged();
                   case '|': case '>':
-                     return block_scalar();
+                     return styled();
                   case '\"': 
-                     return double_quote();
+                     return decide( quoted());
                   case '\'': 
-                     return single_quote();
+                     return decide( single());
                   default: 
-                     return absent_quote();
+                     return absent();
                   }
                }
 
-               auto spot( const auto base) -> std::optional< node>
+
+               bool edge( const info& data)
                {
+                  if( hold< begin, cease>( data))
+                     return line(), dent = 0, true;
+
+                  return false;
+               }
+
+               void wrap()
+               {
+                  step();
+                  if( done())
+                     dent = next();
+               }
+
+               auto head() -> std::optional< info>
+               {
+                  while( good())
+                  {
+                     auto info = scan();
+
+                     if( hold< begin, nill>( info))
+                        dent = next();
+                     else
+                        return info;
+                  }
+
+                  return std::nullopt;
+               }
+
+               auto grab( const size base) -> node
+               {
+                  step();
                   auto info = scan();
 
-                  auto boundary = [this] ( const auto info)
-                  {
-                     if( std::holds_alternative< begin>( info) || std::holds_alternative< cease>( info))
-                        return line(), dent = 0, true;
-                     
-                     return false;
-                  };
+                  if( hold< name>( info))
+                     halt( "unexpected key");
 
-                  if( std::holds_alternative< begin>( info))
-                     dent = next(), info = scan();
+                  wrap();
 
-                  while( std::holds_alternative< nill>( info) && good())
-                     dent = next(), info = scan();
+                  if( hold< node>( info))
+                     return std::move( std::get< node>( std::move( info)));
 
-                  if( std::holds_alternative< nill>( info))
-                     return base ? std::optional< node>{ nullptr} : std::nullopt;
+                  if( base < dent || ( base == dent && peek() == '-'))
+                     return *spot( dent);
 
-                  if( boundary( info))
-                     return node{ nullptr};
+                  return nullptr;
+               }
 
-                  if( std::holds_alternative< dash>( info))
+               auto spot( const size base) -> std::optional< node>
+               {
+                  auto data = head();
+
+                  if( ! data) return base ? std::optional< node>{ nullptr} : std::nullopt;
+
+                  if( edge( *data)) return node{ nullptr};
+
+                  if( hold< node>( *data))
+                     return line(), dent = next(), std::get< node>( std::move( *data));
+
+                  if( hold< dash>( *data))
                   {
                      node::array array;
 
                      do
-                     {
                         array.emplace_back( *spot( dent + 1 + step()));
+                     while( dent >= base && peek() == '-' && hold< dash>( scan()));
 
-                        if( dent < base) break;
-
-                     } while( peek() == '-' && std::holds_alternative< dash>( info = scan()));
-
-                     return array;
+                     return { array};
                   }
 
-                  if( std::holds_alternative< node>( info))
-                     return line(), dent = next(), std::get< node>( std::move( info));
+                  node::object object;
 
-                  node::object map;
+                  auto& info = *data;
 
                   while( good())
                   {
-                     while( good() && std::holds_alternative< nill>( info))
+                     while( good() && hold< nill>( info))
                         line(), info = scan();
 
-                     if( ! good() || boundary( info)) break;
+                     if( ! good())
+                        break;
 
-                     auto& data = map[ std::get< name>( std::move( info))];
+                     if( edge( info))
+                        break;
 
-                     step();
+                     object[ std::get< name>( std::move( info))] = grab( dent);
 
-                     info = scan();
+                     if( dent < base)
+                        break;
 
-                     if( std::holds_alternative< name>( info))
-                        halt( "unexpected key");
+                     wrap();
 
-                     if( done()) dent = next();
-
-                     if( std::holds_alternative< node>( info))
-                     {
-                        data = std::get< node>( std::move( info));
-                     }
-                     else
-                     {
-                        if( dent < base) break;
-
-                        data = *spot( dent);
-                     }
-                     
-                     if( dent < base) break;
+                     if( dent < base)
+                        break;
 
                      info = scan();
                   }
 
-                  return map;
+                  return { object};
+              }
+
+               bool more( const std::string& data) const
+               {
+                  return good() and not ( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')));                  
                }
 
-               auto cast( const auto sign) -> std::int32_t
+               info absent()
                {
-                  switch( sign)
+                  name data;
+
+                  while( more( data))
                   {
-                  case '0': return '\0';
-                  case 'a': return '\a';
-                  case 'e': return 0x1B; // \e
-                  case 'v': return '\v';
-                  case 'x': return unit< 2>();
-                  case 'U': return unit< 8>();
-                  case 'N': return 0x85;
-                  case '_': return 0xA0;
-                  case 'L': return 0x2028;
-                  case 'P': return 0x2029;
-                  default:  return base::cast( sign);
+                     data.push_back( *mark++);
+
+                     if( data.back() == ':' && cusp())
+                        return data.pop_back(), help::trim( std::move( data));
+
+                     if( data.back() == '-' && cusp() && data.size() == 1)
+                        return dash{};
                   }
-               }               
 
-               info flow()
-               {
-                  return json::detail::parser{ mark}.spot();
-               }
+                  if( dent == 0)
+                  {
+                     // consuming potential values after start/end markers
+                     if( data.starts_with( "---")) return begin{};
+                     if( data.starts_with( "...")) return cease{};
+                  }
 
-               bool more( const auto& data) const
-               {
-                  if( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')))
-                     return false;
-                  
-                  return good();
+                  return resolve( help::trim( std::move( data)));
                }
 
                bool done() const
@@ -304,7 +532,7 @@ namespace poly
                   std::string nrv;
 
                   while( more( nrv))
-                        nrv.push_back( *mark++);
+                     nrv.push_back( *mark++);
 
                   return nrv;
                }
@@ -322,7 +550,7 @@ namespace poly
 
                   if( tag == "str")
                      if( peek() != '"' && peek() != '\'')
-                        return node{ scalar()};
+                        return node{ help::trim( scalar())};
    
                   auto info = scan();
 
@@ -358,53 +586,10 @@ namespace poly
                            return *result;
                   }
 
-                  [[unlikely]] halt( std::format( "invalid !!{} construct", tag));
+                  [[unlikely]] halt( std::format( "!!{} is invalid", tag));
                }
 
-               info absent_quote()
-               {
-                  std::string data;
-
-                  while( more( data))
-                  {
-                     data.push_back( *mark++);
-
-                     if( data.back() == ':' && cusp())
-                        return data.pop_back(), data;
-                     
-                     if( data.back() == '-' && cusp() && data.size() == 1)
-                        return dash{};
-                  }
-
-                  return [this]( auto data) -> info
-                  { 
-                     if( data.empty())
-                        return nill{};
-                     
-                     if( data == "~")
-                        return node{ nullptr};
-
-                     if( auto result = help::transform::simple( data))
-                        return std::move( *result);
-
-                     if( data == ".nan" || data == ".inf" || data == "+.inf" || data == "-.inf")
-                        std::erase( data, '.');
-                     
-                     if( auto result = help::transform::number( data))
-                        return std::move( *result);
-
-                     if( dent == 0)
-                     {
-                        if( data == "---") return begin{};
-                        if( data == "...") return cease{};
-                     }
-
-                     return node{ data};
-
-                  }( help::trim( std::move( data)));
-               }
-
-               info block_scalar()
+               info styled()
                {
                   const auto style = pull();
                   const auto chomp = peek() == '+' || peek() == '-' ? pull() : '\0';
@@ -464,66 +649,8 @@ namespace poly
                   return node{ std::move( data)};
                }
 
-               info single_quote()
-               {
-                  ++mark; // '
-
-                  std::string data;
-
-                  while( true)
-                  {
-                     const auto sign = pull();
-
-                     if( sign == '\'')
-                     {
-                        if( peek() != '\'')
-                           break;
-                        else
-                           ++mark;
-                     }
-
-                     data.push_back( sign);
-                  }
-
-                  if( peek() != ':')
-                     return node{ std::move( data)};
-
-                  return ++mark, data;
-               }
-
-               info double_quote()
-               {
-                  ++mark; // "
-
-                  std::string data;
-
-                  while( true)
-                  {
-                     const auto sign = pull();
-
-                     if( sign == '"')
-                        break;
-
-                     if( sign != '\\') [[likely]]
-                        data.push_back( sign);
-                     else
-                        data.append( help::transform::point( cast( pull())));
-                  }
-
-                  if( peek() != ':')
-                     return node{ std::move( data)};
-
-                  return ++mark, data;
-               }
-
-               bool cusp() const
-               {
-                  return ! good() || help::is::space( *mark);
-               }
-
             private:
 
-               int dent{};
                std::unordered_map< std::string, node> anchors;
 
             };
@@ -534,7 +661,7 @@ namespace poly
          {
             inline auto parse( std::istream& stream)
             {
-               return detail::parser{ stream}().value();
+               return detail::block{ stream}().value();
             }
 
             inline auto parse( std::string_view data)
@@ -548,7 +675,7 @@ namespace poly
          {
             inline auto parse( std::istream& stream)
             {
-               detail::parser parser{ stream};
+               detail::block parser{ stream};
 
                node::array nrv;
 

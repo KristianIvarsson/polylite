@@ -32,11 +32,12 @@ At the moment, JSON, TOML and YAML are supported. The implementation may be some
 
 ##### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored
-- Flow style (`{...}` and `[...]`) only supports strict JSON
-- Compact writing uses flow style JSON and thus have the same limitations as JSON
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
 - Merge keys (for anchors and aliases) are not implemented
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
+- Flow style parsing does currently not allow comments
+- Flow style writing (`{...}` and `[...]`) writes strict JSON
+- Compact writing uses flow style JSON and thus have the same limitations as JSON
 
 ### Roadmap
 
