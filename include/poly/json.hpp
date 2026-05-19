@@ -13,7 +13,6 @@
 #include <format>
 #include <sstream>
 #include <charconv>
-#include <stdexcept>
 #include <spanstream>
 #include <string_view>
 
@@ -153,20 +152,18 @@ namespace poly_version
 
             auto simple() -> node
             {
-               ++mark; // 'n', 't', 'f
-
                const auto data = read( []( const auto sign) 
                   { 
                      return help::is::lower( sign); 
                   });
 
-               if( data == "rue")
+               if( data == "true")
                   return true;
 
-               if( data == "alse")
+               if( data == "false")
                   return false;
 
-               if( data == "ull")
+               if( data == "null")
                   return nullptr;
 
                [[unlikely]] halt( "unexpected data");
@@ -279,7 +276,7 @@ namespace poly_version
             void operator() ( const node::decimal& node)
             {
                if( std::isnan( node) || std::isinf( node))
-                  [[unlikely]] throw std::invalid_argument{ std::format( "invalid decimal node [{}]", node)};
+                  [[unlikely]] halt( "node::decimal");
 
                fill();
                copy( std::format( "{}", node));
@@ -341,7 +338,6 @@ namespace poly_version
             void fill( const std::string& name)
             {
                fill();
-               //copy( '"' + name + '"' + ':');
                push( '"'); 
                copy( name);
                push( '"');
