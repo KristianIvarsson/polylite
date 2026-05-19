@@ -284,7 +284,7 @@ namespace poly_version
                using base = parser;
 
                std::istreambuf_iterator< std::istream::char_type> mark;
-               static constexpr const auto last = decltype( mark){};
+               static constexpr auto last = decltype( mark){};
 
                parser( decltype( mark) mark) : mark{ mark} {}
                parser( std::istream& stream) : mark{ stream} {}
