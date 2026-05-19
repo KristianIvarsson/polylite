@@ -66,15 +66,15 @@ namespace poly_version
          if(auto result = find( value.first); result != base_type::end())
             return std::make_pair( result, false);
          else
-            return base_type::emplace_back( std::move( value)), std::make_pair( std::prev( base_type::end()), true);
+            return base_type::emplace_back( std::forward< decltype( value)>( value)), std::make_pair( std::prev( base_type::end()), true);
       }
 
       auto insert_or_assign( auto&& key, auto&& object)
       {
          if(auto result = find( key); result != base_type::end())
-            return result->second = std::move( object), std::make_pair( result, false);
+            return result->second = std::forward< decltype( object)>( object), std::make_pair( result, false);
          else
-            return base_type::emplace_back( std::move( key), std::move( object)), std::make_pair( std::prev( base_type::end()), true);
+            return base_type::emplace_back( std::forward< decltype( key)>( key), std::forward< decltype( object)>( object)), std::make_pair( std::prev( base_type::end()), true);
       }
 
       auto emplace( auto&&... parameters)
