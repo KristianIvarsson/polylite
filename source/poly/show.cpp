@@ -34,7 +34,7 @@ namespace local
 
 int main()
 {
-   auto root = poly::json::parse( poly::tool::bom::ignore( local::json));
+   auto root = poly::json::parse( poly::tool::bom::skip( local::json));
 
    // access with bounds checking
    const auto& user_name = root.at( "user").at( "name").as_string();

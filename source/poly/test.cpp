@@ -11,6 +11,12 @@
 
 namespace poly_version
 {
+   constexpr auto throws = []( auto&& fn)
+   {
+      try { fn(); return false; }
+      catch( ... ) { return true; }
+   };
+
    namespace help::test
    {
       namespace cases
@@ -149,8 +155,8 @@ namespace poly_version
       {
          void bom()
          {
-            assert( json::parse( tool::bom::ignore( "\xEF\xBB\xBF{}")).is_object());
-            assert( json::parse( tool::bom::ignore( "{}")).is_object());
+            assert( json::parse( tool::bom::skip( "\xEF\xBB\xBF{}")).is_object());
+            assert( json::parse( tool::bom::skip( "{}")).is_object());
          }
       } // cases
 
@@ -244,7 +250,7 @@ namespace poly_version
 
             // strict: throws on binary
             { node source; source[ "b"] = hello;
-              auto ok = false; try { json::write( source); } catch( const std::invalid_argument&) { ok = true; } assert( ok); }
+              assert( throws( [&]{ json::write( source); })); }
 
             // gentle write contains base64
             { node source; source[ "b"] = hello;
@@ -571,7 +577,7 @@ earth = "\U0001F30D"
 
             // strict: throws on binary
             { node source; source[ "b"] = hello;
-              auto ok = false; try { toml::write( source); } catch( const std::invalid_argument&) { ok = true; } assert( ok); }
+              assert( throws( [&]{ toml::write( source); })); }
 
             // gentle elegant write contains base64
             { node source; source[ "b"] = hello;
@@ -1188,10 +1194,10 @@ top: world
             { const auto t = yaml::parse( "key: !!float .nan\n");  assert( std::isnan( t.at( "key").as_decimal())); }
 
             // error cases
-            { auto ok = false; try { yaml::parse( "key: !!bool 1\n"); }       catch( const std::exception&) { ok = true; } assert( ok); }
-            { auto ok = false; try { yaml::parse( "key: !!int 3.14\n"); }     catch( const std::exception&) { ok = true; } assert( ok); }
-            { auto ok = false; try { yaml::parse( "key: !!null banana\n"); }  catch( const std::exception&) { ok = true; } assert( ok); }
-            { auto ok = false; try { yaml::parse( "key: !!foo bar\n"); }      catch( const std::exception&) { ok = true; } assert( ok); }
+            assert( throws( []{ yaml::parse( "key: !!bool 1\n"); }));
+            assert( throws( []{ yaml::parse( "key: !!int 3.14\n"); }));
+            assert( throws( []{ yaml::parse( "key: !!null banana\n"); }));
+            assert( throws( []{ yaml::parse( "key: !!foo bar\n"); }));
          }
 
          void anchor()
@@ -1240,16 +1246,16 @@ top: world
             }
 
             // alias before anchor is undefined
-            { auto ok = false; try { yaml::parse( "a: *x\nb: &x 1\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+            assert( throws( []{ yaml::parse( "a: *x\nb: &x 1\n"); }));
 
             // anchors cleared between documents
-            { auto ok = false; try { yaml::all::parse( "a: &x 1\n---\nb: *x\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+            assert( throws( []{ yaml::all::parse( "a: &x 1\n---\nb: *x\n"); }));
 
             // block mapping anchor not supported
-            { auto ok = false; try { yaml::parse( "a: &x\n  p: 1\nb: *x\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+            assert( throws( []{ yaml::parse( "a: &x\n  p: 1\nb: *x\n"); }));
 
             // unknown alias error
-            { auto ok = false; try { yaml::parse( "a: *unknown\n"); } catch( const std::exception&) { ok = true; } assert( ok); }
+            assert( throws( []{ yaml::parse( "a: *unknown\n"); }));
          }
 
          void timestamp()
@@ -1297,7 +1303,7 @@ top: world
                assert( text.contains( "SGVsbG8=")); 
             }
 
-            // compact write emits !!binary when node is binary directly (object delegates to json writer)
+            // compact write emits !!binary when node is binary directly
             { 
                node source = hello;
                const auto text = yaml::compact::gentle::write( source);
@@ -1333,10 +1339,16 @@ try
    {
       for( int idx = 1; idx < argc; ++idx)
       {
-         if( std::ifstream file{ argv[ idx]})
-            poly::json::parse( file);
-         else
+         const std::string_view path{ argv[ idx]};
+         std::ifstream file{ argv[ idx]};
+         if( ! file)
             throw std::runtime_error{ std::format( "failed to open file [{}]", argv[ idx])};
+
+         if(      path.ends_with( ".json")) poly::json::parse( file);
+         else if( path.ends_with( ".toml")) poly::toml::parse( file);
+         else if( path.ends_with( ".yaml")
+               || path.ends_with( ".yml"))  poly::yaml::parse( file);
+         else throw std::runtime_error{ std::format( "unknown extension for file [{}] (expected .json, .toml, .yaml, .yml)", argv[ idx])};
       }
    }
    else

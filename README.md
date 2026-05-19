@@ -67,8 +67,8 @@ auto node = poly::json::parse( input);
 ```
 
 ```cpp
-// parse some stream or string and ignore potential utf8-bom
-auto node = poly::json::parse( poly::tool::bom::ignore( input));
+// parse some stream or string and skip potential utf8-bom
+auto node = poly::json::parse( poly::tool::bom::skip( input));
 ```
 
 ```cpp

@@ -20,9 +20,9 @@ namespace poly_version
       {
          constexpr std::string_view utf8 = "\xEF\xBB\xBF";
 
-         //! ignores possible UTF8-BOM
+         //! skips possible UTF8-BOM
          //! @{
-         inline auto ignore( std::istream& value) -> std::istream&
+         inline auto skip( std::istream& value) -> std::istream&
          {
             std::array< char, 3> data{};
 
@@ -34,7 +34,7 @@ namespace poly_version
             return value;
          }
 
-         inline auto ignore( std::string_view value)
+         inline auto skip( std::string_view value)
          {
             if( value.starts_with( utf8))
                return value.substr( utf8.size());
