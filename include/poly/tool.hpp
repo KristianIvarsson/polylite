@@ -12,40 +12,37 @@
 #include <string_view>
 
 
-namespace poly
+namespace poly_version
 {
-   inline namespace version
+   namespace tool
    {
-      namespace tool
+      namespace bom
       {
-         namespace bom
+         constexpr std::string_view utf8 = "\xEF\xBB\xBF";
+
+         //! ignores possible UTF8-BOM
+         //! @{
+         inline auto ignore( std::istream& value) -> std::istream&
          {
-            constexpr std::string_view utf8 = "\xEF\xBB\xBF";
+            std::array< char, 3> data{};
 
-            //! ignores possible UTF8-BOM
-            //! @{
-            inline auto ignore( std::istream& value) -> std::istream&
-            {
-               std::array< char, 3> data{};
+            const auto count  = value.read( data.data(), data.size()).gcount();
 
-               const auto count  = value.read( data.data(), data.size()).gcount();
+            if( ! std::ranges::equal( data, utf8))
+               value.clear(), value.seekg( 0 - count, std::ios::cur);
+            
+            return value;
+         }
 
-               if( ! std::ranges::equal( data, utf8))
-                  value.clear(), value.seekg( 0 - count, std::ios::cur);
-               
-               return value;
-            }
+         inline auto ignore( std::string_view value)
+         {
+            if( value.starts_with( utf8))
+               return value.substr( utf8.size());
 
-            inline auto ignore( std::string_view value)
-            {
-               if( value.starts_with( utf8))
-                  return value.substr( utf8.size());
+            return value;
+         }
+         //! @}
 
-               return value;
-            }
-            //! @}
-
-         } // bom
-      } // tool
-   } // version
-} // poly
+      } // bom
+   } // tool
+} // poly_version
