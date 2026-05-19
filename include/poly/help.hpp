@@ -490,7 +490,7 @@ namespace poly
                   }
 
                   template< std::size_t wrap = 76>
-                  auto data( const auto& data, const std::size_t size = 0)
+                  auto data( const auto& data, const std::size_t dent = 0)
                   {
                      constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
 
@@ -501,7 +501,7 @@ namespace poly
                      auto emit = [&]( const char sign)
                      {
                         if constexpr( wrap)
-                           if( ++list == wrap) { *mark++ = '\n'; std::fill_n( mark, size, ' '); list = 0; }
+                           if( ++list == wrap) { *mark++ = '\n'; std::fill_n( mark, dent, ' '); list = 0; }
 
                         *mark++ = sign;
                      };

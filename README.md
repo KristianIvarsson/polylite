@@ -35,9 +35,7 @@ At the moment, JSON, TOML and YAML are supported. The implementation may be some
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
 - Merge keys (for anchors and aliases) are not implemented
 - Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
-- Flow style parsing does currently not allow comments
-- Flow style writing (`{...}` and `[...]`) writes strict JSON
-- Compact writing uses flow style JSON and thus have the same limitations as JSON
+- Explicit keys (`? key` / `: value` syntax) are not supported — use `key: value` form
 
 ### Roadmap
 
@@ -85,7 +83,7 @@ auto json = poly::json::write( node);
 
 ```cpp
 // same as above (i.e. elegant)
-auto json = poly::json::v3_0_0::elegant::strict::write( node);
+auto json = poly::json::v4_2_0::elegant::strict::write( node);
 ```
 
 ```cpp

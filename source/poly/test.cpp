@@ -814,7 +814,7 @@ items: [1, 2, 3]
                   source[ "y"] = 2;
 
                   const auto text = yaml::compact::write( source);
-                  const auto target = json::parse( text);
+                  const auto target = yaml::parse( text);
                   assert( target.at( "x").as_integer() == 1);
                   assert( target.at( "y").as_integer() == 2);
                }
@@ -827,7 +827,7 @@ items: [1, 2, 3]
                   source[ 2] = "v2";
 
                   const auto text = yaml::compact::write( source);
-                  const auto target = json::parse( text);
+                  const auto target = yaml::parse( text);
                   assert( target.as_array().size() == 3);
                   assert( target.at( 0).as_string() == "web");
                   assert( target.at( 2).as_string() == "v2");
@@ -842,7 +842,7 @@ items: [1, 2, 3]
                   source[ "tags"][ 1] = "api";
 
                   const auto text = yaml::compact::write( source);
-                  const auto target = json::parse( text);
+                  const auto target = yaml::parse( text);
                   assert( target.at( "host").as_string() == "localhost");
                   assert( target.at( "port").as_integer() == 8080);
                   assert( target.at( "tags").at( 1).as_string() == "api");
@@ -888,6 +888,17 @@ items: [
                   assert( target.at( "items").as_array().size() == 3);
                   assert( target.at( "items").at( 0).as_integer() == 1);
                   assert( target.at( "items").at( 2).as_integer() == 3);
+               }
+
+               // flow style: comments inside [...] and {...} are accepted
+               {
+                  const auto target = yaml::parse( "a: [1, # comment\n 2]\n");
+                  assert( target.at( "a").as_array().size() == 2);
+                  assert( target.at( "a").at( 1).as_integer() == 2);
+               }
+               {
+                  const auto target = yaml::parse( "a: {x: 1, # comment\n y: 2}\n");
+                  assert( target.at( "a").at( "y").as_integer() == 2);
                }
             }
 
