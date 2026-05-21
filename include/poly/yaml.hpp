@@ -475,10 +475,21 @@ namespace poly_version
                      data.push_back( *mark++);
 
                      if( data.back() == ':' && cusp())
-                        return data.pop_back(), help::trim( std::move( data));
+                     {
+                        data.pop_back();
+                        auto key = help::trim( std::move( data));
+                        if( key == "<<") halt( "merge keys are not supported");
+                        return key;
+                     }
 
-                     if( data.back() == '-' && cusp() && data.size() == 1)
-                        return dash{};
+                     if( data.size() == 1)
+                     {
+                        if( data.back() == '-' && cusp())
+                           return dash{};
+
+                        if( data.back() == '?' && cusp())
+                           halt( "explicit keys are not supported");
+                     }
                   }
 
                   if( dent == 0)

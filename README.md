@@ -4,54 +4,56 @@
 > Licensed under the MIT License. See https://opensource.org/licenses/MIT for details.
 >
 
-### Objective
+## Objective
 PolyLite is a multiprotocol lightweight, header-only C++ library designed for ease of use and maintainability. Its primary goal is to parse and write various data formats, with support for access and mutation, using standard C++ features as much as possible.
 
-#### Disclaimer
+### Disclaimer
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
-### Current Status
+## Current Status
 At the moment, JSON, TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
 
-#### Note
+### Note
 
 `poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
 
-##### JSON
+#### JSON
 - `instant` (_time_) is not a native type
 - `binary` is not a native type
 
-##### TOML
+#### TOML
 - `nothing` (_null_) is not a native type
 - `binary` is not a native type
 
-##### YAML
+#### YAML
 - `local_time` inside `instant` is not a native type
 
-#### Known Limitations
+### Known Limitations
 
-##### YAML
+#### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored
 - Multi-line plain scalars are not supported — use block scalars (`|` or `>`) instead
-- Merge keys (for anchors and aliases) are not implemented
-- Custom tags (e.g. `!mytag`) are not supported — `!!` core tags only
-- Explicit keys (`? key` / `: value` syntax) are not supported — use `key: value` form
 
-### Roadmap
+The following are detected and rejected with an error:
+- Merge keys (for anchors and aliases)
+- Explicit keys (`? key` / `: value` syntax) — use `key: value` form
+- Custom tags (e.g. `!mytag`) — `!!` core tags only
 
-#### General
+## Roadmap
+
+### General
 - Remove compiler specific code
 - Perhaps have a node_view for writing to avoid copying expensive stuff
 
-### Usage & Reference
+## Usage & Reference
 There is currently no formal user documentation. However, some basic unit test-like code is available, which may serve as a useful reference for how to use the library. You can build and run it using:
 
-#### Test
+### Test
 ```bash
 g++ -std=c++23 -I include -o build/test ./source/poly/test.cpp && ./build/test
 ```
 
-#### Samples
+### Samples
 
 [show.cpp](source/poly/show.cpp)
 
@@ -59,7 +61,7 @@ g++ -std=c++23 -I include -o build/test ./source/poly/test.cpp && ./build/test
 g++ -std=c++23 -I include ./source/poly/show.cpp && ./a.out
 ```
 
-#### Examples
+### Examples
 
 ```cpp
 // parse either a string or an input stream
