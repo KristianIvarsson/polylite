@@ -263,6 +263,31 @@ namespace poly_version
               assert( decoded && *decoded == hello); }
          }
 
+         void containers()
+         {
+            node source;
+            source[ "aaa"] = nullptr;
+            source[ "bbb"] = true;
+            source[ "ccc"] = -42;
+            source[ "ddd"] = 3.14;
+            source[ "eee"] = "qwerty";
+
+            const auto text = write( source);
+
+            // std::vector< char> as source
+            const std::vector< char> chars{ text.begin(), text.end()};
+            assert( write( parse( chars)) == text);
+
+            std::vector< std::byte> bytes;
+            for( const auto sign : text) bytes.push_back( static_cast< std::byte>( sign));
+            assert( write( parse( bytes)) == text);
+
+            // round-trip: string -> parse -> vector<byte> target -> parse -> string
+            std::vector< std::byte> binary;
+            write( parse( text), binary);
+            assert( write( parse( binary)) == text);
+         }
+
       } // cases
 
       void all()
@@ -272,6 +297,7 @@ namespace poly_version
          cases::string();
          cases::strict_gentle();
          cases::binary();
+         cases::containers();
       }
    } // json::test
 
@@ -281,7 +307,7 @@ namespace poly_version
       {
          void parse()
          {
-            const auto source = R"(
+            const std::string_view source = R"(
 # this is a TOML document
 key = "value"
 bare."quoted" = 'bare with quoted'
@@ -621,7 +647,7 @@ earth = "\U0001F30D"
          {
             // nested map with directives, comments, blank lines, null, sequences, quoted strings
             {
-               const auto source = R"(#this is a YAML document
+               const std::string_view source = R"(#this is a YAML document
 %YAML 1.2
 a: 123
 # this is a comment
@@ -798,7 +824,7 @@ g: "hello\nworld")";
 
             // mixed block and flow
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 name: example
 config: {"debug": true, "timeout": 30}
 items: [1, 2, 3]
@@ -868,7 +894,7 @@ items: [1, 2, 3]
 
             // multiline flow object
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 point: {
   x: 1,
   y: 2
@@ -881,7 +907,7 @@ point: {
 
             // multiline flow array
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 items: [
   1,
   2,
@@ -990,7 +1016,7 @@ items: [
          {
             // sibling section after array of maps
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 domain:
    groups:
       -  name: A
@@ -1008,7 +1034,7 @@ domain:
 
             // roundtrip keeps sibling sections out of the preceding array item
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 domain:
    groups:
       -  name: A
@@ -1062,7 +1088,7 @@ domain:
 
             // sibling after nested map — provokes dent clobbering
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 a:
   x: 1
   y: 2
@@ -1076,7 +1102,7 @@ b: 3
 
             // deeply nested maps followed by siblings at every level
             {
-               const auto source = R"(
+               const std::string_view source = R"(
 outer:
   inner:
     deep: 42

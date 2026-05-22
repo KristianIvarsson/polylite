@@ -11,10 +11,7 @@
 #include <cmath>
 #include <string>
 #include <format>
-#include <sstream>
 #include <charconv>
-#include <spanstream>
-#include <string_view>
 
 
 namespace poly_version
@@ -23,9 +20,18 @@ namespace poly_version
    {
       namespace detail
       {
-         struct parser : help::stream::buffer::iterator::parser
+         template< help::sign type, help::source_iterator< type> iterator>
+         struct parser : help::parser< type, iterator>
          {
-            using base::base;
+            using base = help::parser< type, iterator>;
+            using base::mark;
+            using base::pull;
+            using base::peek;
+            using base::test;
+            using base::read;
+            using base::skip;
+            using base::cast;
+            using base::halt;
 
             auto operator()()
             {
@@ -53,21 +59,14 @@ namespace poly_version
 
          private:
 
-            void skip()
-            {
-               while( good() && help::is::space( *mark)) ++mark;
-            }
-
             char pick()
             {
-               while( good() && help::is::space( *mark)) ++mark;
-               return pull();
+               return skip(), pull();
             }
 
             char peep()
             {
-               while( good() && help::is::space( *mark)) ++mark;
-               return peek();
+               return skip(), peek();
             }
 
             auto object() -> node::object
@@ -203,15 +202,9 @@ namespace poly_version
 
       } // detail
 
-      inline auto parse( std::istream& stream)
+      auto parse( auto&& source)
       {
-         return detail::parser{ stream}();
-      }
-
-      inline auto parse( std::string_view data)
-      {
-         std::ispanstream stream{ data};
-         return parse( stream);
+         return help::make::source< detail::parser>( source)();
       }
 
 
@@ -219,10 +212,19 @@ namespace poly_version
       {
          constexpr std::size_t spaces = 3;
 
-         template< std::size_t spaces, bool strict>
-         struct writer : help::stream::buffer::iterator::writer
+         template< help::sign type, help::target_iterator< type> iterator, std::size_t spaces, bool strict>
+         struct writer : help::writer< type, iterator>
          {
-            using base::base;
+            using base = help::writer< type, iterator>;
+            using base::push;
+            using base::copy;
+            using base::cast;
+            using base::time;
+            using base::flat;
+            using base::halt;
+
+            char column{};
+            bool indent{};
             
             void operator() ( const node::object& node)
             {
@@ -312,7 +314,7 @@ namespace poly_version
 
                fill();
                push( '"');
-               data< 0>( node);
+               flat( node);
                push( '"');
             }
 
@@ -323,7 +325,7 @@ namespace poly_version
                if constexpr( spaces)
                {
                   if( indent)
-                     push( '\n'), std::fill_n( mark, column * spaces, ' ');
+                     base::fold( column * spaces);
                   else
                      indent = true;
                }
@@ -357,25 +359,22 @@ namespace poly_version
                fill( sign);
             }
 
-         private:
-
-            char column{};
-            bool indent{};
-
          };
 
          template< std::size_t spaces, bool strict>
-         auto write( const node& node, std::ostream& stream)
+         auto write( const node& root, auto&& target)
          {
-            std::visit( writer< spaces, strict>{ stream}, node);
+            auto sink = help::make::target< writer, spaces, strict>( target);
+            std::visit( sink, root);
          }
 
+         // the default write function
          template< std::size_t spaces, bool strict>
-         auto write( const node& node)
+         auto write( const node& root)
          {
-            std::ostringstream stream;
-            write< spaces, strict>( node, stream);
-            return std::move( stream).str();
+            std::string target;
+            write< spaces, strict>( root, target);
+            return target;
          }
 
       } // detail

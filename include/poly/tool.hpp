@@ -9,6 +9,7 @@
 #include <array>
 #include <ranges>
 #include <istream>
+#include <algorithm>
 #include <string_view>
 
 

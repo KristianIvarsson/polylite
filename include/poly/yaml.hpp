@@ -11,14 +11,8 @@
 #include <cmath>
 #include <format>
 #include <string>
-#include <vector>
-#include <cassert>
-#include <sstream>
+#include <variant>
 #include <optional>
-#include <stdexcept>
-#include <algorithm>
-#include <spanstream>
-#include <string_view>
 #include <unordered_map>
 
 
@@ -33,16 +27,18 @@ namespace poly_version
             return help::is::alnum( sign) || sign == '_' || sign == '-' || sign == '.';
          };
 
-         constexpr auto rest = [] ( const auto sign)
-         {
-            return sign != '\n';
-         };
-
          namespace parser
          {
-            struct core : help::stream::buffer::iterator::parser
+            template< help::sign type, help::source_iterator< type> iterator>
+            struct core : help::parser< type, iterator>
             {
-               using base::base;
+               using base = help::parser< type, iterator>;
+               using base::good;
+               using base::look;
+               using base::mark;
+               using base::peek;
+               using base::pull;
+               using base::rest;
 
             protected:
 
@@ -55,20 +51,13 @@ namespace poly_version
 
                using info = std::variant< nill, name, node, dash, begin, cease>;
 
-               template< class... types>
-               static bool hold( const auto& data)
-               {
-                  return ( std::holds_alternative< types>( data) || ... );
-               }
-
                void skip()
                {
-                  leap( [] ( const auto sign) { return help::is::space( sign); });
+                  base::skip();
 
                   if( peek() == '#')
                   {
-                     leap( rest);
-                     if( good()) ++mark;
+                     rest();
                      skip();
                   }
                }
@@ -127,8 +116,8 @@ namespace poly_version
                   case 'a': return '\a';
                   case 'e': return 0x1B; // \e
                   case 'v': return '\v';
-                  case 'x': return unit< 2>();
-                  case 'U': return unit< 8>();
+                  case 'x': return base::template unit< 2>();
+                  case 'U': return base::template unit< 8>();
                   case 'N': return 0x85;
                   case '_': return 0xA0;
                   case 'L': return 0x2028;
@@ -159,13 +148,32 @@ namespace poly_version
 
                bool cusp() const
                {
-                  return ! good() || help::is::space( *mark);
+                  return ! good() || help::is::space( look());
                }
             };
 
-            struct flow : core
+            template< help::sign type, help::source_iterator< type> iterator>
+            struct flow : core< type, iterator>
             {
-               using core::core;
+               using base = parser::core< type, iterator>;
+               using base::cusp;
+               using base::good;
+               using base::halt;
+               using base::mark;
+               using base::look;
+               using base::peep;
+               using base::pull;
+               using base::take;
+               using base::test;
+               using base::quoted;
+               using base::single;
+               using base::resolve;
+               using typename base::info;
+               using typename base::name;
+               using typename base::nill;
+
+               flow( iterator& mark, iterator last) : base{ mark, last}, keep{ mark} {}
+               ~flow() { keep = mark; }
 
                auto spot() -> node
                {
@@ -178,6 +186,8 @@ namespace poly_version
                }
 
             private:
+
+               iterator& keep;
 
                info decide( auto data)
                {
@@ -245,7 +255,7 @@ namespace poly_version
 
                bool more( const std::string& data) const
                {
-                  return good() and not ( *mark == ',' || *mark == '}' || *mark == ']' || ( *mark == '#' && data.ends_with( ' ')));
+                  return good() and not ( look() == ',' || look() == '}' || look() == ']' || ( look() == '#' && data.ends_with( ' ')));
                }
 
                info absent()
@@ -254,7 +264,7 @@ namespace poly_version
 
                   while( more( data))
                   {
-                     data.push_back( *mark++);
+                     data.push_back( take());
 
                      if( data.back() == ':' && cusp())
                         return data.pop_back(), help::trim( std::move( data));
@@ -265,9 +275,39 @@ namespace poly_version
 
             };
 
-            struct block : core
+            template< help::sign type, help::source_iterator< type> iterator>
+            struct block : core< type, iterator>
             {
-               using core::core;
+               using base = parser::core< type, iterator>;
+               using base::mark;
+               using base::last;
+               using base::good;
+               using base::pull;
+               using base::peek;
+               using base::look;
+               using base::take;
+               using base::test;
+               using base::read;
+               using base::leap;
+               using base::rest;
+               using base::halt;
+               using base::cusp;
+               using base::peep;
+               using base::skip;
+               using base::quoted;
+               using base::single;
+               using base::resolve;
+               using typename base::info;
+               using typename base::name;
+               using typename base::nill;
+               using typename base::dash;
+               using typename base::begin;
+               using typename base::cease;
+
+               using size = int;
+               
+               std::unordered_map< std::string, node> anchors;
+               size dent{};
 
                auto operator()() -> std::optional<node>
                {
@@ -278,12 +318,9 @@ namespace poly_version
 
             private:
 
-               using size = int;
-
                void line()
                {
-                  leap( rest);
-                  if( good()) ++mark;
+                  rest();
                }
 
                size step()
@@ -340,7 +377,7 @@ namespace poly_version
                   switch( peek())
                   {
                   case '{': case '[':
-                     return info{ flow{ mark}.spot()};
+                     return info{ parser::flow< type, iterator>{ mark, last}.spot()};
                   case '*':
                      return alias();
                   case '&':
@@ -361,7 +398,7 @@ namespace poly_version
 
                bool edge( const info& data)
                {
-                  if( hold< begin, cease>( data))
+                  if( help::hold< begin, cease>( data))
                      return line(), dent = 0, true;
 
                   return false;
@@ -380,7 +417,7 @@ namespace poly_version
                   {
                      auto info = scan();
 
-                     if( hold< begin, nill>( info))
+                     if( help::hold< begin, nill>( info))
                         dent = next();
                      else
                         return info;
@@ -394,12 +431,12 @@ namespace poly_version
                   step();
                   auto info = scan();
 
-                  if( hold< name>( info))
+                  if( help::hold< name>( info))
                      halt( "unexpected key");
 
                   wrap();
 
-                  if( hold< node>( info))
+                  if( help::hold< node>( info))
                      return std::move( std::get< node>( std::move( info)));
 
                   if( base < dent || ( base == dent && peek() == '-'))
@@ -416,16 +453,16 @@ namespace poly_version
 
                   if( edge( *data)) return node{ nullptr};
 
-                  if( hold< node>( *data))
+                  if( help::hold< node>( *data))
                      return line(), dent = next(), std::get< node>( std::move( *data));
 
-                  if( hold< dash>( *data))
+                  if( help::hold< dash>( *data))
                   {
                      node::array array;
 
                      do
                         array.emplace_back( *spot( dent + 1 + step()));
-                     while( dent >= base && peek() == '-' && hold< dash>( scan()));
+                     while( dent >= base && peek() == '-' && help::hold< dash>( scan()));
 
                      return { array};
                   }
@@ -436,7 +473,7 @@ namespace poly_version
 
                   while( good())
                   {
-                     while( good() && hold< nill>( info))
+                     while( good() && help::hold< nill>( info))
                         line(), info = scan();
 
                      if( ! good())
@@ -463,7 +500,7 @@ namespace poly_version
 
                bool more( const std::string& data) const
                {
-                  return good() and not ( *mark == '\n' || ( *mark == '#' && data.ends_with( ' ')));                  
+                  return good() and not ( look() == '\n' || ( look() == '#' && data.ends_with( ' ')));                  
                }
 
                info absent()
@@ -472,7 +509,7 @@ namespace poly_version
 
                   while( more( data))
                   {
-                     data.push_back( *mark++);
+                     data.push_back( take());
 
                      if( data.back() == ':' && cusp())
                      {
@@ -538,7 +575,7 @@ namespace poly_version
                   std::string nrv;
 
                   while( more( nrv))
-                     nrv.push_back( *mark++);
+                     nrv.push_back( take());
 
                   return nrv;
                }
@@ -597,10 +634,8 @@ namespace poly_version
 
                info styled()
                {
-                  const auto style = pull();
-                  const auto chomp = peek() == '+' || peek() == '-' ? pull() : '\0';
-
-                  leap( rest);
+                  const auto style = take();
+                  const auto chomp = peek() == '+' || peek() == '-' ? take() : '\0';
 
                   std::string data;
                   size base{};
@@ -608,14 +643,14 @@ namespace poly_version
 
                   while( good())
                   {
-                     ++mark; // '\n'
+                     rest();
 
                      dent = step();
 
                      if( dent < base && peek() != '\n')
                         break;
 
-                     const auto line = read( rest);
+                     const auto line = read( [] ( const auto sign) { return sign != '\n'; });
 
                      if( line.empty())
                      {
@@ -655,11 +690,6 @@ namespace poly_version
                   return node{ std::move( data)};
                }
 
-            private:
-
-               std::unordered_map< std::string, node> anchors;
-               size dent{};
-
             };
 
          } // parser
@@ -668,36 +698,24 @@ namespace poly_version
 
       inline namespace one
       {
-         inline auto parse( std::istream& stream)
+         auto parse( auto&& source)
          {
-            return detail::parser::block{ stream}().value();
-         }
-
-         inline auto parse( std::string_view data)
-         {
-            std::ispanstream stream{ data};
-            return parse( stream);
+            return help::make::source< detail::parser::block>( source)().value();
          }
       } // one
 
       namespace all
       {
-         inline auto parse( std::istream& stream)
+         auto parse( auto&& source)
          {
-            detail::parser::block parser{ stream};
+            auto parser = help::make::source< detail::parser::block>( source);
 
             node::array nrv;
 
             while( auto document = parser())
                nrv.emplace_back( std::move( *document));
-            
-            return nrv;
-         }
 
-         inline auto parse( std::string_view yaml)
-         {
-            std::ispanstream stream{ yaml};
-            return parse( stream);
+            return nrv;
          }
       } // all
 
@@ -709,10 +727,15 @@ namespace poly_version
          namespace writer
          {
 
-            template< bool strict>
-            struct core : help::stream::buffer::iterator::writer
+            template< help::sign type, help::target_iterator< type> iterator, bool strict>
+            struct core : help::writer< type, iterator>
             {
-               using base::base;
+               using base = help::writer< type, iterator>;
+               using base::push;
+               using base::copy;
+               using base::cast;
+               using base::time;
+               using base::halt;
 
                void operator() ( const node::nothing& )
                {
@@ -780,14 +803,15 @@ namespace poly_version
                }
             };
 
-            template< bool strict>
-            struct flow : core< strict>
+            template< help::sign type, help::target_iterator< type> iterator, bool strict>
+            struct flow : core< type, iterator, strict>
             {
-               using core< strict>::core;
-               using core< strict>::operator();
-               using core< strict>::push;
-               using core< strict>::copy;
-               using core< strict>::cast;
+               using base = writer::core< type, iterator, strict>;
+               using base::push;
+               using base::copy;
+               using base::cast;
+               using base::flat;
+               using base::operator();
 
                void operator() ( const node::object& node)
                {
@@ -820,25 +844,28 @@ namespace poly_version
                   if( node.find_first_of( ",]}") != std::string::npos)
                      push( '"'), cast( node), push( '"');
                   else
-                     core< strict>::operator()( node);
+                     base::operator()( node);
                }
 
                void operator() ( const node::binary& node)
                {
                   copy( "!!binary ");
-                  this->template data< 0>( node);
+                  flat( node);
                }
             };
 
-            template< std::size_t spaces, bool strict>
-            struct block : core< strict>
+            template< help::sign type, help::target_iterator< type> iterator, std::size_t spaces, bool strict>
+            struct block : core< type, iterator, strict>
             {
-               using core< strict>::core;
-               using core< strict>::operator();
-               using core< strict>::push;
-               using core< strict>::copy;
-               using core< strict>::data;
-               using core< strict>::mark;
+               using base = writer::core< type, iterator, strict>;
+               using base::mark;
+               using base::push;
+               using base::copy;
+               using base::wrap;
+               using base::operator();
+
+               char column{};
+               bool indent{};
 
                void operator() ( const node::object& node)
                {
@@ -865,7 +892,7 @@ namespace poly_version
                      else
                      {
                         push( ' ');
-                        std::visit( flow< strict>{ mark}, data);
+                        std::visit( flow< type, iterator, strict>{ mark}, data);
                      }
                   }
                }
@@ -892,13 +919,13 @@ namespace poly_version
                         }
                      }
                   else
-                     flow< strict>{ mark}( node);
+                     flow< type, iterator, strict>{ mark}( node);
                }
 
                void operator() ( const node::binary& node)
                {
                   copy( "!!binary ");
-                  push( '|'), data( node, column * spaces);
+                  push( '|'), wrap( node, column * spaces);
                }
 
             private:
@@ -906,31 +933,29 @@ namespace poly_version
                void fill()
                {
                   if( indent)
-                     push( '\n'), std::fill_n( mark, column * spaces, ' ');
+                     base::fold( column * spaces);
                   else
                      indent = true;
                }
 
-            private:
-
-               char column{};
-               bool indent{};
             };
 
          } // writer
 
          template< std::size_t spaces, bool strict>
-         auto write( const node& node, std::ostream& stream)
+         auto write( const node& root, auto&& target)
          {
-            std::visit( writer::block< spaces, strict>{ stream}, node);
+            auto sink = help::make::target< writer::block, spaces, strict>( target);
+            std::visit( sink, root);
          }
 
+         // the default write function
          template< std::size_t spaces, bool strict>
-         auto write( const node& node)
+         auto write( const node& root)
          {
-            std::ostringstream stream;
-            write< spaces, strict>( node, stream);
-            return std::move( stream).str();
+            std::string target;
+            write< spaces, strict>( root, target);
+            return target;
          }
 
       } // detail

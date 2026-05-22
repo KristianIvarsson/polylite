@@ -8,14 +8,10 @@
 
 #include "help.hpp"
 
-#include <format>
-#include <ranges>
-#include <string>
+#include <locale>
 #include <vector>
-#include <sstream>
-#include <algorithm>
-#include <spanstream>
-
+#include <istream>
+#include <string_view>
 
 namespace poly_version
 {
@@ -28,9 +24,19 @@ namespace poly_version
             return help::is::alnum( sign) || sign == '_' || sign == '-';
          };
 
-         struct parser : help::stream::buffer::iterator::parser
+         template< help::sign type, help::source_iterator< type> iterator>
+         struct parser : help::parser< type, iterator>
          {
-            using base::base;
+            using base = help::parser< type, iterator>;
+            using base::mark;
+            using base::good;
+            using base::pull;
+            using base::peek;
+            using base::take;
+            using base::test;
+            using base::read;
+            using base::rest;
+            using base::halt;
 
             auto operator()() -> node
             {
@@ -145,11 +151,11 @@ namespace poly_version
 
             void skip() 
             {
-               leap( [] ( const auto sign) { return help::is::space( sign); });
+               base::skip();
 
                if( peek() == '#')
                {
-                  leap( [] ( const auto sign) { return sign != '\n';});
+                  rest();
                   skip();
                }
             }
@@ -168,7 +174,7 @@ namespace poly_version
             {
                switch( sign)
                {
-               case 'U': return unit< 8>();
+               case 'U': return base::template unit< 8>();
                default:  return base::cast( sign);
                }
             }
@@ -177,13 +183,13 @@ namespace poly_version
             {
                ++mark; // '{'
 
-               node nrv;
+               node root;
 
                if( peep() != '}')
                {
                   while( true)
                   {
-                     auto where = &nrv;
+                     auto where = &root;
 
                      for( auto&& name : keys())
                         where = &(*where)[ std::move( name)];
@@ -204,7 +210,7 @@ namespace poly_version
                   ++mark; // '}'
                }
 
-               return std::move( nrv).as_object();
+               return std::move( root).as_object();
             }
 
             auto array() -> node::array
@@ -240,7 +246,7 @@ namespace poly_version
                   if( ++mark, peek() != '"')
                      return {};
 
-               const auto same = ! ( peek() == '"' ? pull(), skip(), true : false);
+               const auto same = ! ( peek() == '"' ? take(), skip(), true : false);
 
                std::string nrv;
 
@@ -268,7 +274,7 @@ namespace poly_version
                   if( ++mark, peek() != '\'')
                      return {};
 
-               const auto same = ! ( peek() == '\'' ? pull(), skip(), true : false); 
+               const auto same = ! ( peek() == '\'' ? take(), skip(), true : false); 
 
                std::string nrv;
 
@@ -294,7 +300,7 @@ namespace poly_version
                if( auto result = help::transform::simple( data))
                   return std::move( *result);
 
-               [[unlikely]] this->halt( "unexpected data");
+               [[unlikely]] halt( "unexpected data");
             }
 
             node scalar()
@@ -314,22 +320,18 @@ namespace poly_version
                if( auto result = help::transform::number( data))
                   return std::move( *result);
 
-               [[unlikely]] this->halt( "unexpected data");
+               [[unlikely]] halt( "unexpected data");
             }
          };
 
+
       } // detail
 
-      inline auto parse( std::istream& stream)
+      auto parse( auto&& source)
       {
-         return detail::parser{ stream}();
+         return help::make::source< detail::parser>( source)();
       }
 
-      inline auto parse( std::string_view data)
-      {
-         std::ispanstream stream{ data};
-         return parse( stream);
-      }
 
       namespace detail
       {
@@ -342,10 +344,19 @@ namespace poly_version
             std::string do_grouping() const override { return "\3"; }
          };
 
-         template< bool posh, bool firm>
-         struct writer : help::stream::buffer::iterator::writer
+         template< help::sign type, help::target_iterator< type> iterator, bool posh, bool firm>
+         struct writer : help::writer< type, iterator>
          {
-            using base::base;
+            using base = help::writer< type, iterator>;
+            using base::push;
+            using base::copy;
+            using base::cast;
+            using base::time;
+            using base::wrap;
+            using base::flat;
+            using base::halt;
+
+            std::vector< std::string_view> stack;
 
             void operator()( const node& node)
             {
@@ -511,13 +522,13 @@ namespace poly_version
                if constexpr( posh)
                {
                   copy( "'''");
-                  data( node);
+                  wrap( node);
                   copy( "'''");
                }
                else
                {
                   push( '"');
-                  data< 0>( node);
+                  flat( node);
                   push( '"');
                }
             }
@@ -625,24 +636,23 @@ namespace poly_version
                return ! shallow( item.as_array());
             }
 
-         private:
-
-            std::vector< std::string_view> stack;
          };
 
 
          template< bool posh, bool firm>
-         auto write( const node& node, std::ostream& stream)
+         auto write( const node& root, auto&& target)
          {
-            writer< posh, firm>{ stream}( node);
+            help::make::target< writer, posh, firm>( target)( root);
          }
 
+
+         // the default write function
          template< bool posh, bool firm>
-         auto write( const node& node)
+         auto write( const node& root)
          {
-            std::ostringstream stream;
-            write< posh, firm>( node, stream);
-            return std::move( stream).str();
+            std::string target;
+            write< posh, firm>( root, target);
+            return target;
          }
 
       } // detail

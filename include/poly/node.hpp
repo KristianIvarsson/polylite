@@ -14,7 +14,6 @@
 #include <vector>
 #include <cstddef>
 #include <variant>
-
 #include <cassert>
 
 namespace poly_version

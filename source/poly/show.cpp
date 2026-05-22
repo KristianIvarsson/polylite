@@ -7,28 +7,27 @@ namespace local
    namespace
    {
       constexpr std::string_view json = R"json(
-         {
-            "user": {
-               "id": 42,
-               "name": "Kristian Ivarsson",
-               "active": true,
-               "profile": {
-                  "title": "Senior Software Engineer",
-                  "location": "Järvsö, Gävleborg County, Sweden",
-                  "skills": ["C++", "Python", "Biking", "Photography", "Skiing", "Hiking"],
-                  "preferences": {
-                  "remote": true,
-                  "notifications": false,
-                  "theme": null
-                  }
+      {
+         "user": {
+            "id": 42,
+            "name": "Kristian Ivarsson",
+            "active": true,
+            "profile": {
+               "title": "Senior Software Engineer",
+               "location": "Järvsö, Gävleborg County, Sweden",
+               "skills": ["C++", "Python", "Biking", "Photography", "Skiing", "Hiking"],
+               "preferences": {
+               "remote": true,
+               "notifications": false,
+               "theme": null
                }
-            },
-            "metadata": {
-               "created_at": "2025-11-05T21:55:00Z",
-               "valid": true
             }
+         },
+         "metadata": {
+            "created_at": "2025-11-05T21:55:00Z",
+            "valid": true
          }
-      )json";
+      })json";
    } //
 } // local
 

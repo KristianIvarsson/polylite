@@ -64,7 +64,7 @@ g++ -std=c++23 -I include ./source/poly/show.cpp && ./a.out
 ### Examples
 
 ```cpp
-// parse either a string or an input stream
+// parse either an input stream, a string or some other byte oriented container
 auto node = poly::json::parse( input);
 ```
 
@@ -79,13 +79,31 @@ poly::json::write( node, stream);
 ```
 
 ```cpp
-// write to a string (rejects types not valid for the protocol)
+// write to a string (default for json)
 auto json = poly::json::write( node);
 ```
 
 ```cpp
+// write to a string
+std::string json;
+poly::json::write( node, json);
+```
+
+```cpp
+// write some bytes
+std::vector< std::byte> json;
+poly::json::write( node, json);
+```
+
+```cpp
+// write to a some other type
+std::list< uint8_t> json;
+poly::json::write( node, json);
+```
+
+```cpp
 // same as above (i.e. elegant)
-auto json = poly::json::v4_2_0::elegant::strict::write( node);
+auto json = poly::json::v4_3_0::elegant::strict::write( node);
 ```
 
 ```cpp

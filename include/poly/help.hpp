@@ -16,17 +16,25 @@
 #include <ranges>
 #include <string>
 #include <istream>
+#include <ostream>
 #include <charconv>
 #include <iterator>
 #include <optional>
 #include <algorithm>
 #include <stdexcept>
 #include <spanstream>
+#include <string_view>
 
 namespace poly_version
 {
    namespace help
    {
+
+      template< typename... types>
+      bool hold( const auto& data)
+      {
+         return ( std::holds_alternative< types>( data) || ... );
+      }
 
       //! for performance (only)
       namespace is
@@ -275,268 +283,364 @@ namespace poly_version
 
       } // transform
 
-      namespace stream
+
+      template< typename type>
+      concept sign = sizeof( type) == 1;
+
+      template< typename iterator, typename type>
+      concept source_iterator = std::input_iterator< iterator> && std::same_as< std::iter_value_t< iterator>, type>;
+
+      template< typename iterator, typename type>
+      concept target_iterator = std::output_iterator< iterator, type>;
+
+
+      template< sign type, source_iterator< type> iterator>
+      struct source
       {
-         namespace buffer::iterator
+         iterator mark;
+         iterator last;
+
+         bool good() const
          {
-            struct parser
+            return mark != last;
+         }
+
+         void drop()
+         {
+            ++mark;
+         }
+
+         char look() const
+         {
+            return static_cast< char>( *mark);
+         }
+
+         char take()
+         {
+            return static_cast< char>( *mark++);
+         }
+
+         char peek() const
+         {
+            if( good()) [[likely]] return look();
+            return std::char_traits< char>::eof();
+         }
+
+         char pull()
+         {
+            if( good()) [[likely]] return take();
+            halt( "unexpected end of stream");
+         }
+
+         void test( const char want, const char pick) const
+         {
+            if( want != pick) [[unlikely]] halt( "unexpected character");
+         }
+
+         [[noreturn]] void halt( const std::string_view message) const
+         {
+            throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, last))};
+         }
+      };
+
+      template< sign type, source_iterator< type> iterator>
+      struct parser : source< type, iterator>
+      {
+         using base = source< type, iterator>;
+         using base::mark;
+         using base::good;
+         using base::look;
+         using base::take;
+         using base::pull;
+         using base::test;
+         using base::halt;
+
+         auto read( auto&& till)
+         {
+            std::string nrv;
+            while( good() && till( look())) nrv.push_back( take());
+            return nrv;
+         }
+
+         auto leap( auto&& till)
+         {
+            while( good() && till( look())) ++mark;
+         }
+
+         //! rest of the line
+         void rest()
+         {
+            leap( [] ( const auto sign) { return sign != '\n';});
+            if( good()) ++mark; // '\n'
+         }
+
+         //! skip whitespace
+         void skip()
+         {
+            leap( [] ( const auto sign) { return is::space( sign);});
+         }
+
+         template< std::size_t size>
+         auto unit()
+         {
+            std::array< char, size> data;
+            for( auto& sign : data) sign = pull();
+
+            std::int32_t code;
+            const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
+
+            if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
+               [[unlikely]] halt( "invalid code point");
+
+            return code;
+         }
+
+         // c-style escape sequences
+         auto code()
+         {
+            const auto lead = unit< 4>();
+
+            if( lead < 0xD800 || lead > 0xDFFF)
+               return lead;
+
+            if( lead > 0xDBFF)
+               [[unlikely]] halt( "invalid 1st surrogate");
+
+            test( '\\', pull()); test( 'u', pull());
+
+            const auto tail = unit< 4>();
+
+            if( tail < 0xDC00 || tail > 0xDFFF)
+               [[unlikely]] halt( "invalid 2nd surrogate");
+
+            return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
+         }
+
+         // c-style escape sequences
+         auto cast( const auto sign) -> std::int32_t
+         {
+            switch( sign)
             {
-               using base = parser;
+            case '\\':return '\\';
+            case '"': return '\"';
+            case 'b': return '\b';
+            case 'f': return '\f';
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            case '/': return '/';
+            case 'u': return code();
+            default: [[unlikely]] halt( "invalid escape character");
+            }
+         }
+      };
 
-               std::istreambuf_iterator< std::istream::char_type> mark;
-               static constexpr auto last = decltype( mark){};
 
-               parser( decltype( mark) mark) : mark{ mark} {}
-               parser( std::istream& stream) : mark{ stream} {}
+      template< sign type, target_iterator< type> iterator>
+      struct target
+      {
+         iterator mark;
 
-               bool good() const
-               {
-                  return mark != last;
-               }
+         void push( const auto sign)
+         {
+            *mark++ = static_cast< type>( sign);
+         }
 
-               auto read( auto&& till)
-               {
-#if defined(_MSC_VER) // https://github.com/microsoft/STL/issues/5066
-                  std::string nrv;
-                  while(good() && till(*mark)) nrv.push_back(*mark++);
-                  return nrv;
-#else
-                  return std::ranges::subrange( mark, decltype( mark){}) |
-                     std::views::take_while( till) |
-                     std::ranges::to< std::string>();
-#endif
-               }
+         void emit( const std::ranges::contiguous_range auto& data)
+         {
+            for( const auto sign : data) push( sign);
+         }
 
-               auto leap( auto&& till)
-               {
-                  mark =
-                     std::ranges::begin(
-                        std::ranges::subrange( mark, last) | 
-                        std::views::drop_while( till));
-               }
+         [[noreturn]] static void halt( const auto& what)
+         {
+            throw std::invalid_argument{ std::format( "{} is not valid", what)};
+         }
+      };
 
-               char pull()
-               {
-                  if( good()) [[likely]] return *mark++;
-                  halt( "unexpected end of stream");
-               }
 
-               char peek() const
-               {
-                  if( good()) [[likely]] return *mark;
-                  return std::char_traits< std::istream::char_type>::eof();
-               }
+      template< sign type, target_iterator< type> iterator>
+      struct writer : target< type, iterator>
+      {
+         using base = target< type, iterator>;
+         using base::push;
+         using base::emit;
 
-               template< std::size_t size>
-               auto unit()
-               {
-                  std::array< char, size> data;
+         void copy( const std::string_view data)
+         {
+            emit( data);
+         }
 
-#if defined(_MSC_VER) // https://github.com/microsoft/STL/issues/5066
-                  for( auto& sign : data) sign = pull();
-#else
-                  std::copy_n(mark, data.size(), data.data());
-#endif
+         void fill( std::size_t size)
+         {
+            while( size--) push( ' ');
+         }
 
-                  std::int32_t code;
-                  const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
+         void fold( std::size_t size)
+         {
+            push( '\n'); fill( size);
+         }
 
-                  if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
-                     [[unlikely]] halt( "invalid code point");
+         void cast( const auto sign)
+         {
+            copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( sign)));
+         }
 
-                  return code;
-               }
-
-               // c-style escape sequences
-               auto code()
-               {
-                  const auto lead = unit< 4>();
-
-                  if( lead < 0xD800 || lead > 0xDFFF)
-                     return lead;
-
-                  if( lead > 0xDBFF)
-                     [[unlikely]] halt( "invalid 1st surrogate");
-
-                  test( '\\', pull()); test( 'u', pull());
-
-                  const auto tail = unit< 4>();
-
-                  if( tail < 0xDC00 || tail > 0xDFFF)
-                     [[unlikely]] halt( "invalid 2nd surrogate");
-
-                  return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
-               }
-
-               // c-style escape sequences
-               auto cast( const auto sign) -> std::int32_t
+         void cast( const std::string& data)
+         {
+            for( const auto sign : data)
+            {
+               if( is::cntrl( sign))
                {
                   switch( sign)
                   {
-                  case '\\':return '\\';
-                  case '"': return '\"';
-                  case 'b': return '\b';
-                  case 'f': return '\f';
-                  case 'n': return '\n';
-                  case 'r': return '\r';
-                  case 't': return '\t';
-                  case '/': return '/';
-                  case 'u': return code();
-                  default: [[unlikely]] halt( "invalid escape character");
+                  case '\b': copy( R"(\b)"); break;
+                  case '\t': copy( R"(\t)"); break;
+                  case '\n': copy( R"(\n)"); break;
+                  case '\f': copy( R"(\f)"); break;
+                  case '\r': copy( R"(\r)"); break;
+                  default: cast( sign);
                   }
                }
-
-               void test( const char want, const char pick) const
+               else [[likely]]
                {
-                  if( want != pick) [[unlikely]] halt( "unexpected character");
+                  switch( sign)
+                  case '\\': case '\"': push( '\\');
+                  push( sign);
                }
+            }
+         }
 
-               [[noreturn]] void halt( const std::string_view message) const
-               {
-                  throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, last))};
-               }
-            };
+         void time( const node::local_time data)
+         {
+            const auto duration = data.to_duration();
 
-
-            struct writer
+            auto sink = [&] ( const auto floored)
             {
-               using base = writer;
-
-               std::ostreambuf_iterator< std::istream::char_type> mark;
-
-               writer( decltype( mark) mark) : mark{ mark} {}
-               writer( std::ostream& stream) : mark{ stream} {}
-
-               void push( const auto sign)
-               {
-                  *mark++ = sign;
-               }
-
-               void copy( const std::string_view data)
-               {
-                  std::ranges::copy( data, mark);
-               }
-
-               void cast( const auto sign)
-               {
-                  copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( sign)));
-               }
-
-               void cast( const std::string& data)
-               {
-                  for( const auto sign : data)
-                  {
-                     if( is::cntrl( sign))
-                     {
-                        switch( sign)
-                        {
-                        case '\b': copy( R"(\b)"); break;
-                        case '\t': copy( R"(\t)"); break;
-                        case '\n': copy( R"(\n)"); break;
-                        case '\f': copy( R"(\f)"); break;
-                        case '\r': copy( R"(\r)"); break;
-                        default: cast( sign);
-                        }
-                     }
-                     else [[likely]]
-                     {
-                        switch( sign)
-                        case '\\': case '\"': push( '\\');
-                        push( sign);
-                     }
-                  }
-               }
-
-               void time( const node::local_time data)
-               {
-                  const auto duration = data.to_duration();
-
-                  auto sink = [&] ( const auto floored)
-                  {
-                     if( duration != floored) return false;
-                     copy( std::format( "{:%T}", floored));
-                     return true;
-                  };
-
-                  sink( std::chrono::floor< std::chrono::seconds>( duration)) ||
-                  sink( std::chrono::floor< std::chrono::milliseconds>( duration)) ||
-                  sink( std::chrono::floor< std::chrono::microseconds>( duration)) ||
-                  sink( duration);
-               }
-
-               void time( const node::local_date data)
-               {
-                  copy( std::format( "{:%F}", data));
-               }
-
-               void time( const node::local_datetime data)
-               {
-                  time( std::chrono::floor< std::chrono::days>( data));
-                  push( 'T');
-                  time( std::chrono::hh_mm_ss{ data - std::chrono::floor< std::chrono::days>( data)});
-               }
-
-               void time( const node::zoned_datetime data)
-               {
-                  time( data.get_local_time());
-                  copy( std::format( "{:%Ez}", data));
-               }
-
-               [[noreturn]] static void halt( const auto& type) 
-               {
-                  throw std::invalid_argument{ std::format( "{} is not valid", type)};
-               }
-
-               template< std::size_t wrap = 76>
-               auto data( const auto& data, const std::size_t dent = 0)
-               {
-                  constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
-
-                  auto chunks = data | std::views::chunk( 3);
-
-                  std::size_t list = wrap - 1;
-
-                  auto emit = [&]( const char sign)
-                  {
-                     if constexpr( wrap)
-                        if( ++list == wrap) { *mark++ = '\n'; std::fill_n( mark, dent, ' '); list = 0; }
-
-                     *mark++ = sign;
-                  };
-
-                  for( auto chunk : chunks) 
-                  {
-                     if( chunk.size() == 3) 
-                     {
-                        const auto b1 = std::to_integer< std::uint32_t>( chunk[0]);
-                        const auto b2 = std::to_integer< std::uint32_t>( chunk[1]);
-                        const auto b3 = std::to_integer< std::uint32_t>( chunk[2]);
-
-                        const uint32_t triple = ( b1 << 16) | ( b2 << 8) | b3;
-
-                        emit( alphabet[ (triple >> 18) & 0x3F]);
-                        emit( alphabet[ (triple >> 12) & 0x3F]);
-                        emit( alphabet[ (triple >> 6) & 0x3F]);
-                        emit( alphabet[ triple & 0x3F]);
-                     } 
-                     else 
-                     {
-                        std::uint32_t triple = std::to_integer< std::uint32_t>( chunk[0]) << 16;
-                        if( chunk.size() == 2) triple |= std::to_integer< std::uint32_t>( chunk[1]) << 8;
-
-                        emit( alphabet[ (triple >> 18) & 0x3F]);
-                        emit( alphabet[ (triple >> 12) & 0x3F]);
-                        emit( ( chunk.size() == 2) ? alphabet[ (triple >> 6) & 0x3F] : '=');
-                        emit( '=');
-                     }
-                  }
-
-                  if constexpr( wrap)
-                     *mark++ = '\n';
-               }
+               if( duration != floored) return false;
+               copy( std::format( "{:%T}", floored));
+               return true;
             };
 
-         } // buffer::iterator
-      } // stream
+            sink( std::chrono::floor< std::chrono::seconds>( duration)) ||
+            sink( std::chrono::floor< std::chrono::milliseconds>( duration)) ||
+            sink( std::chrono::floor< std::chrono::microseconds>( duration)) ||
+            sink( duration);
+         }
+
+         void time( const node::local_date data)
+         {
+            copy( std::format( "{:%F}", data));
+         }
+
+         void time( const node::local_datetime data)
+         {
+            time( std::chrono::floor< std::chrono::days>( data));
+            push( 'T');
+            time( std::chrono::hh_mm_ss{ data - std::chrono::floor< std::chrono::days>( data)});
+         }
+
+         void time( const node::zoned_datetime data)
+         {
+            time( data.get_local_time());
+            copy( std::format( "{:%Ez}", data));
+         }
+
+         template< std::size_t size = 76>
+         auto wrap( const auto& blob, const std::size_t dent = 0)
+         {
+            constexpr std::string_view alphabet{ "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
+
+            auto chunks = blob | std::views::chunk( 3);
+
+            std::size_t list = size - 1;
+
+            auto emit = [&]( const char sign)
+            {
+               if constexpr( size)
+                  if( ++list == size) { fold( dent); list = 0; }
+
+               push( sign);
+            };
+
+            for( auto chunk : chunks)
+            {
+               if( chunk.size() == 3)
+               {
+                  const auto b1 = std::to_integer< std::uint32_t>( chunk[0]);
+                  const auto b2 = std::to_integer< std::uint32_t>( chunk[1]);
+                  const auto b3 = std::to_integer< std::uint32_t>( chunk[2]);
+
+                  const uint32_t triple = ( b1 << 16) | ( b2 << 8) | b3;
+
+                  emit( alphabet[ (triple >> 18) & 0x3F]);
+                  emit( alphabet[ (triple >> 12) & 0x3F]);
+                  emit( alphabet[ (triple >> 6) & 0x3F]);
+                  emit( alphabet[ triple & 0x3F]);
+               }
+               else
+               {
+                  std::uint32_t triple = std::to_integer< std::uint32_t>( chunk[0]) << 16;
+                  if( chunk.size() == 2) triple |= std::to_integer< std::uint32_t>( chunk[1]) << 8;
+
+                  emit( alphabet[ (triple >> 18) & 0x3F]);
+                  emit( alphabet[ (triple >> 12) & 0x3F]);
+                  emit( ( chunk.size() == 2) ? alphabet[ (triple >> 6) & 0x3F] : '=');
+                  emit( '=');
+               }
+            }
+
+            if constexpr( size)
+               push( '\n');
+         }
+
+         auto flat( const auto& blob)
+         {
+            wrap< 0>( blob);
+         }
+      };
+
+
+      namespace make
+      {
+         template< template< typename, typename, auto...> class parser, auto... flags>
+         auto source( std::istream& source)
+         {
+            using iterator = std::istreambuf_iterator< std::istream::char_type>;
+            return parser< std::istream::char_type, iterator, flags...>{ iterator{ source}, iterator{}};
+         }
+
+         template< template< typename, typename, auto...> class parser, auto... flags>
+         auto source( const auto& source)
+            requires ( ! std::derived_from< std::remove_cvref_t< decltype( source)>, std::istream>)
+         {
+            using type     = std::ranges::range_value_t< decltype( source)>;
+            using iterator = std::ranges::iterator_t< const std::remove_cvref_t< decltype( source)>>;
+            return parser< type, iterator, flags...>{
+               std::ranges::begin( source), std::ranges::end( source)};
+         }
+
+         // utility for string literals (automatically deduces size and type) (essentially for testing)
+         template< template< typename, typename, auto...> class parser, auto... flags, std::size_t size>
+         auto source( const char (&string)[ size])
+         {
+            return source< parser, flags...>( std::string_view{ string, size - 1});
+         }
+
+         template< template< typename, typename, auto...> class writer, auto... flags>
+         auto target( std::ostream& target)
+         {
+            using iterator = std::ostreambuf_iterator< std::ostream::char_type>;
+            return writer< std::ostream::char_type, iterator, flags...>{ iterator{ target}};
+         }
+
+         template< template< typename, typename, auto...> class writer, auto... flags>
+         auto target( auto& target)
+            requires ( ! std::derived_from< std::remove_cvref_t< decltype( target)>, std::ostream>)
+         {
+            using type = std::remove_cvref_t< decltype( target)>;
+            return writer< typename type::value_type, std::back_insert_iterator< type>, flags...>{
+               std::back_inserter( target)};
+         }
+      } // make
    } // help
 } // poly_version
