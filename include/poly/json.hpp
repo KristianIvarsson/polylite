@@ -175,7 +175,7 @@ namespace poly_version
                   {
                      switch( sign)
                      case '.': case 'e': case 'E': return decimal = true;
-                     return help::is::digit( sign) || sign == '-';
+                     return help::is::digit( sign) || sign == '-' || sign == '+';
                   });
 
                const auto start = data.data();
