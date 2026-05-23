@@ -291,6 +291,7 @@ namespace poly_version
                using base::leap;
                using base::rest;
                using base::halt;
+               using base::deny;
                using base::cusp;
                using base::peep;
                using base::skip;
@@ -361,7 +362,7 @@ namespace poly_version
                         // we ignore custom tags (but consumes handle and prefix)
                         part(), part(); 
                      else [[unlikely]]
-                        halt( "unsupported directive");
+                        deny( "directive");
                   }
                }
 
@@ -515,7 +516,7 @@ namespace poly_version
                      {
                         data.pop_back();
                         auto key = help::trim( std::move( data));
-                        if( key == "<<") halt( "merge keys are not supported");
+                        if( key == "<<") deny( "merge keys");
                         return key;
                      }
 
@@ -525,7 +526,7 @@ namespace poly_version
                            return dash{};
 
                         if( data.back() == '?' && cusp())
-                           halt( "explicit keys are not supported");
+                           deny( "explicit keys");
                      }
                   }
 

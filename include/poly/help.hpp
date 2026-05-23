@@ -341,6 +341,11 @@ namespace poly_version
          {
             throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, last))};
          }
+
+         [[noreturn]] void deny( const std::string_view message) const
+         {
+            halt( std::format( "unsupported {}", message));
+         }
       };
 
       template< sign type, source_iterator< type> iterator>
@@ -354,6 +359,7 @@ namespace poly_version
          using base::pull;
          using base::test;
          using base::halt;
+         using base::deny;
 
          auto read( auto&& till)
          {
