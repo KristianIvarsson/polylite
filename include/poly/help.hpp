@@ -523,7 +523,7 @@ namespace poly_version
             auto sink = [&] ( const auto floored)
             {
                if( duration != floored) return false;
-               copy( std::format( "{:%T}", floored));
+               emit( std::format( "{:%T}", floored));
                return true;
             };
 
@@ -535,7 +535,7 @@ namespace poly_version
 
          void time( const node::local_date data)
          {
-            copy( std::format( "{:%F}", data));
+            emit( std::format( "{:%F}", data));
          }
 
          void time( const node::local_datetime data)
@@ -548,7 +548,7 @@ namespace poly_version
          void time( const node::zoned_datetime data)
          {
             time( data.get_local_time());
-            copy( std::format( "{:%Ez}", data));
+            emit( std::format( "{:%Ez}", data));
          }
 
          template< std::size_t size = 76>

@@ -1,3 +1,4 @@
+#include "poly/cbor.hpp"
 #include "poly/help.hpp"
 #include "poly/json.hpp"
 #include "poly/toml.hpp"
@@ -11,9 +12,9 @@
 
 namespace poly_version
 {
-   constexpr auto throws = []( auto&& fn)
+   constexpr auto throws = []( auto&& function)
    {
-      try { fn(); return false; }
+      try { function(); return false; }
       catch( ... ) { return true; }
    };
 
@@ -1354,6 +1355,158 @@ top: world
       }
 
    } // yaml::test
+
+      namespace cbor::test
+      {
+         namespace cases
+         {
+            namespace detail
+            {
+               // helper: build expected wire bytes from a brace-enclosed list of integers
+               auto bytes( std::initializer_list< unsigned> values)
+               {
+                  std::vector< std::byte> result;
+                  result.reserve( values.size());
+                  for( const auto value : values)
+                     result.push_back( static_cast< std::byte>( value));
+                  return result;
+               }
+            } // detail
+
+            void simples()
+            {
+               using detail::bytes;
+
+               assert( cbor::write( node{ nullptr})       == bytes({ 0xF6}));
+               assert( cbor::write( node{ false})         == bytes({ 0xF4}));
+               assert( cbor::write( node{ true})          == bytes({ 0xF5}));
+            }
+
+            void integers()
+            {
+               using detail::bytes;
+
+               assert( cbor::write( node{ 0L})            == bytes({ 0x00}));
+               assert( cbor::write( node{ 23L})           == bytes({ 0x17}));
+               assert( cbor::write( node{ 24L})           == bytes({ 0x18, 0x18}));
+               assert( cbor::write( node{ 100L})          == bytes({ 0x18, 0x64}));
+               assert( cbor::write( node{ 1000L})         == bytes({ 0x19, 0x03, 0xE8}));
+               assert( cbor::write( node{ 1000000L})      == bytes({ 0x1A, 0x00, 0x0F, 0x42, 0x40}));
+
+               assert( cbor::write( node{ -1L})           == bytes({ 0x20}));
+               assert( cbor::write( node{ -24L})          == bytes({ 0x37}));
+               assert( cbor::write( node{ -100L})         == bytes({ 0x38, 0x63}));
+               assert( cbor::write( node{ -1000L})        == bytes({ 0x39, 0x03, 0xE7}));
+            }
+
+            void decimals()
+            {
+               using detail::bytes;
+
+               // 1.5 as IEEE 754 double = 0x3FF8000000000000
+               assert( cbor::write( node{ 1.5})           == bytes({ 0xFB, 0x3F, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}));
+            }
+
+            void strings()
+            {
+               using detail::bytes;
+
+               assert( cbor::write( node{ ""})            == bytes({ 0x60}));
+               assert( cbor::write( node{ "a"})           == bytes({ 0x61, 0x61}));
+               assert( cbor::write( node{ "IETF"})        == bytes({ 0x64, 0x49, 0x45, 0x54, 0x46}));
+            }
+
+            void binaries()
+            {
+               using detail::bytes;
+
+               const node::binary blob{
+                  std::byte{ 0x01}, std::byte{ 0x02}, std::byte{ 0x03}, std::byte{ 0x04}};
+
+               assert( cbor::write( node{ blob})          == bytes({ 0x44, 0x01, 0x02, 0x03, 0x04}));
+            }
+
+            void arrays()
+            {
+               using detail::bytes;
+
+               assert( cbor::write( node{ node::array{}}) == bytes({ 0x80}));
+
+               node source = node::array{};
+               source[ 0] = 1L;
+               source[ 1] = 2L;
+               source[ 2] = 3L;
+               assert( cbor::write( source)               == bytes({ 0x83, 0x01, 0x02, 0x03}));
+            }
+
+            void objects()
+            {
+               using detail::bytes;
+
+               assert( cbor::write( node{ node::object{}}) == bytes({ 0xA0}));
+
+               node source;
+               source[ "a"] = 1L;
+               source[ "b"][ 0] = 2L;
+               source[ "b"][ 1] = 3L;
+               // map(2) "a":1 "b":[2,3]
+               assert( cbor::write( source)               == bytes({ 0xA2, 0x61, 0x61, 0x01, 0x61, 0x62, 0x82, 0x02, 0x03}));
+            }
+
+            void instants()
+            {
+               using detail::bytes;
+
+               // local_date -> tag 1004 + text "2025-01-01"
+               {
+                  node source;
+                  source[ "d"] = help::transform::instant( "2025-01-01").value();
+                  const auto wire = cbor::verbose::write( source);
+                  // {"d": tag(1004) "2025-01-01"}
+                  // A1 61 64                       map(1) "d"
+                  // D9 03 EC                       tag 1004
+                  // 6A 32 30 32 35 2D 30 31 2D 30 31    text(10) "2025-01-01"
+                  assert( wire == bytes({ 0xA1, 0x61, 0x64,
+                                          0xD9, 0x03, 0xEC,
+                                          0x6A, 0x32, 0x30, 0x32, 0x35, 0x2D, 0x30, 0x31, 0x2D, 0x30, 0x31}));
+               }
+
+               // strict: local_time / local_datetime throw
+               {
+                  node source;
+                  source[ "t"] = help::transform::instant( "12:34:56").value();
+                  assert( throws( [&]{ cbor::verbose::write( source); }));
+               }
+               {
+                  node source;
+                  source[ "t"] = help::transform::instant( "2025-01-01T12:34:56").value();
+                  assert( throws( [&]{ cbor::verbose::write( source); }));
+               }
+
+               // gentle: local_time / local_datetime written as bare text (no tag)
+               {
+                  node source;
+                  source[ "t"] = help::transform::instant( "12:34:56").value();
+                  const auto wire = cbor::verbose::gentle::write( source);
+                  // A1 61 74 68 31 32 3A 33 34 3A 35 36
+                  assert( wire == bytes({ 0xA1, 0x61, 0x74,
+                                          0x68, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
+               }
+            }
+         } // cases
+
+         void all()
+         {
+            cases::simples();
+            cases::integers();
+            cases::decimals();
+            cases::strings();
+            cases::binaries();
+            cases::arrays();
+            cases::objects();
+            cases::instants();
+         }
+      } // cbor::test
 } // poly_version
 
 
@@ -1385,6 +1538,7 @@ try
       poly::json::test::all();
       poly::toml::test::all();
       poly::yaml::test::all();
+      poly::cbor::test::all();
    }
 
    return 0;
