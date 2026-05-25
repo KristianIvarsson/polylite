@@ -335,7 +335,7 @@ namespace poly_version
                {
                   auto size = step();
 
-                  if( done())
+                  if( idle()) 
                      return line(), next();
 
                   return size;
@@ -408,7 +408,7 @@ namespace poly_version
                void wrap()
                {
                   step();
-                  if( done())
+                  if( idle())
                      dent = next();
                }
 
@@ -540,7 +540,7 @@ namespace poly_version
                   return resolve( help::trim( std::move( data)));
                }
 
-               bool done() const
+               bool idle() const
                {
                   return peek() == '\n' || peek() == '#';
                }

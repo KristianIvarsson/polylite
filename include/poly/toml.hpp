@@ -29,14 +29,15 @@ namespace poly_version
          {
             using base = help::parser< type, iterator>;
             using base::mark;
+            using base::done;
             using base::good;
+            using base::halt;
             using base::pull;
             using base::peek;
-            using base::take;
-            using base::test;
             using base::read;
             using base::rest;
-            using base::halt;
+            using base::take;
+            using base::test;
 
             auto operator()() -> node
             {
@@ -50,7 +51,8 @@ namespace poly_version
 
                   if( keys.empty())
                   {
-                     test( std::char_traits< std::istream::char_type>::eof(), peep());
+                     skip(); 
+                     done();
                      return nrv;
                   }
                   

@@ -25,20 +25,24 @@ namespace poly_version
          {
             using base = help::parser< type, iterator>;
             using base::mark;
-            using base::pull;
+            using base::cast;
+            using base::done;
+            using base::halt;
             using base::peek;
-            using base::test;
+            using base::pull;
             using base::read;
             using base::skip;
-            using base::cast;
-            using base::halt;
+            using base::test;
 
             auto operator()()
             {
                auto nrv = spot();
-               test( std::char_traits< std::istream::char_type>::eof(), peep());
+               skip(); 
+               done();
                return nrv;
             }
+
+         private:
 
             auto spot() -> node
             {
@@ -56,8 +60,6 @@ namespace poly_version
                   return number();
                }
             }
-
-         private:
 
             char pick()
             {

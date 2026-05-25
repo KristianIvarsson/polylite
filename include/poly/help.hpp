@@ -305,6 +305,11 @@ namespace poly_version
             return mark != last;
          }
 
+         void done() const
+         {
+            if( good()) [[unlikely]] halt( "expected end of stream");
+         }
+
          void drop()
          {
             ++mark;
@@ -334,7 +339,7 @@ namespace poly_version
 
          void test( const char want, const char pick) const
          {
-            if( want != pick) [[unlikely]] halt( "unexpected character");
+            if( want != pick) [[unlikely]] halt( "unexpected sign");
          }
 
          [[noreturn]] void halt( const std::string_view message) const
