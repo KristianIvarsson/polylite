@@ -105,22 +105,22 @@ namespace poly_version
       template< typename type>
       struct proxy
       {
-         explicit operator bool () const noexcept { return pointer; }
-         auto operator ->() const noexcept { assert( pointer); return pointer; }
-         auto& operator *() const noexcept { assert( pointer); return *pointer; }
+         explicit operator bool () const noexcept { return item; }
+         auto operator ->() const noexcept { assert( item); return item; }
+         auto& operator *() const noexcept { assert( item); return *item; }
 
          auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), array::size_type>
          {
-            if( pointer and pointer->to_array() and std::cmp_less( lookup, pointer->as_array().size()))
-               return proxy{ &pointer->as_array().at( lookup)};
+            if( item and item->to_array() and std::cmp_less( lookup, item->as_array().size()))
+               return proxy{ &item->as_array().at( lookup)};
 
             return proxy{ nullptr};
          }
 
          auto operator ()( const auto& lookup) const noexcept requires std::is_convertible_v< decltype( lookup), object::key_type>
          {
-            if( pointer and pointer->to_object() and pointer->as_object().contains( lookup))
-               return proxy{ &pointer->as_object().at( lookup)};
+            if( item and item->to_object() and item->as_object().contains( lookup))
+               return proxy{ &item->as_object().at( lookup)};
 
             return proxy{ nullptr};
          }
@@ -129,9 +129,9 @@ namespace poly_version
 
          friend struct node;
 
-         explicit proxy( type pointer) : pointer{ pointer} {}
+         explicit proxy( type from) : item{ from} {}
 
-         type pointer = nullptr;
+         type item = nullptr;
       };
 
       auto operator ()( this auto& self, const auto& lookup) noexcept

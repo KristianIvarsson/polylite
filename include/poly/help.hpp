@@ -31,7 +31,7 @@ namespace poly_version
    {
 
       template< typename... types>
-      bool hold( const auto& data)
+      constexpr bool hold( const auto& data)
       {
          return ( std::holds_alternative< types>( data) || ... );
       }
@@ -222,20 +222,20 @@ namespace poly_version
             {
                if( ! is::space( sign) && sign != '=')
                {
-                  const auto spot = []( const auto sign) -> std::optional< std::uint32_t>
+                  const auto spot = [sign]
                   {
                      if( is::upper( sign)) return sign - 'A';
                      if( is::lower( sign)) return sign - 'a' + 26;
                      if( is::digit( sign)) return sign - '0' + 52;
                      if( sign == '+') return 62;
                      if( sign == '/') return 63;
-                     return {};
-                  }( sign);
+                     return -1;
+                  }();
 
-                  if( ! spot)
+                  if( spot < 0)
                      return {};
 
-                  pack = ( pack << 6) | *spot;
+                  pack = ( pack << 6) | spot;
                   bits += 6;
 
                   if( bits >= 8)
@@ -565,7 +565,7 @@ namespace poly_version
 
             std::size_t list = size - 1;
 
-            auto emit = [&]( const char sign)
+            auto feed = [&]( const char sign)
             {
                if constexpr( size)
                   if( ++list == size) { fold( dent); list = 0; }
@@ -583,20 +583,20 @@ namespace poly_version
 
                   const uint32_t triple = ( b1 << 16) | ( b2 << 8) | b3;
 
-                  emit( alphabet[ (triple >> 18) & 0x3F]);
-                  emit( alphabet[ (triple >> 12) & 0x3F]);
-                  emit( alphabet[ (triple >> 6) & 0x3F]);
-                  emit( alphabet[ triple & 0x3F]);
+                  feed( alphabet[ (triple >> 18) & 0x3F]);
+                  feed( alphabet[ (triple >> 12) & 0x3F]);
+                  feed( alphabet[ (triple >> 6) & 0x3F]);
+                  feed( alphabet[ triple & 0x3F]);
                }
                else
                {
                   std::uint32_t triple = std::to_integer< std::uint32_t>( chunk[0]) << 16;
                   if( chunk.size() == 2) triple |= std::to_integer< std::uint32_t>( chunk[1]) << 8;
 
-                  emit( alphabet[ (triple >> 18) & 0x3F]);
-                  emit( alphabet[ (triple >> 12) & 0x3F]);
-                  emit( ( chunk.size() == 2) ? alphabet[ (triple >> 6) & 0x3F] : '=');
-                  emit( '=');
+                  feed( alphabet[ (triple >> 18) & 0x3F]);
+                  feed( alphabet[ (triple >> 12) & 0x3F]);
+                  feed( ( chunk.size() == 2) ? alphabet[ (triple >> 6) & 0x3F] : '=');
+                  feed( '=');
                }
             }
 

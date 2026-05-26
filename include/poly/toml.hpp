@@ -417,13 +417,11 @@ namespace poly_version
                {
                   auto section = [&]
                   {
-                     for( const auto& data : node)
+                     for( const auto& item : node)
                      {
                         array();
 
-                        const auto& table = data.as_object();
-
-                        for( const auto& [ name, data] : table)
+                        for( const auto& [ name, data] : item.as_object())
                            if( trivial( data))
                            {
                               key( name);
@@ -432,7 +430,7 @@ namespace poly_version
                               push( '\n');
                            }
 
-                        for( const auto& [ name, data] : table)
+                        for( const auto& [ name, data] : item.as_object())
                            if( complex( data))
                            {
                               stack.emplace_back( name);

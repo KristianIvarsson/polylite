@@ -172,7 +172,7 @@ namespace poly_version
                using typename base::name;
                using typename base::nill;
 
-               flow( iterator& mark, iterator last) : base{ mark, last}, keep{ mark} {}
+               flow( iterator& head, iterator tail) : base{ head, tail}, keep{ head} {}
                ~flow() { keep = mark; }
 
                auto spot() -> node
@@ -326,19 +326,19 @@ namespace poly_version
 
                size step()
                {
-                  auto size = 0;
-                  leap( [&size] ( const auto sign) { return sign == ' ' ? ++size, true : false;});
-                  return size;
+                  auto span = 0;
+                  leap( [&span] ( const auto sign) { return sign == ' ' ? ++span, true : false;});
+                  return span;
                }
 
                size next()
                {
-                  auto size = step();
+                  auto span = step();
 
                   if( idle()) 
                      return line(), next();
 
-                  return size;
+                  return span;
                }
 
                void directives()
@@ -353,12 +353,12 @@ namespace poly_version
                   {
                      ++mark; // '%'
 
-                     const auto name = part();
+                     const auto word = part();
 
-                     if( name == "YAML")
+                     if( word == "YAML")
                         // we ignore the version (but consumes it)
                         part();
-                     else if( name == "TAG")
+                     else if( word == "TAG")
                         // we ignore custom tags (but consumes handle and prefix)
                         part(), part(); 
                      else [[unlikely]]
@@ -416,84 +416,84 @@ namespace poly_version
                {
                   while( good())
                   {
-                     auto info = scan();
+                     auto item = scan();
 
-                     if( help::hold< begin, nill>( info))
+                     if( help::hold< begin, nill>( item))
                         dent = next();
                      else
-                        return info;
+                        return item;
                   }
 
                   return std::nullopt;
                }
 
-               auto grab( const size base) -> node
+               auto grab( const size root) -> node
                {
                   step();
-                  auto info = scan();
+                  auto item = scan();
 
-                  if( help::hold< name>( info))
+                  if( help::hold< name>( item))
                      halt( "unexpected key");
 
                   wrap();
 
-                  if( help::hold< node>( info))
-                     return std::move( std::get< node>( std::move( info)));
+                  if( help::hold< node>( item))
+                     return std::move( std::get< node>( std::move( item)));
 
-                  if( base < dent || ( base == dent && peek() == '-'))
+                  if( root < dent || ( root == dent && peek() == '-'))
                      return *spot( dent);
 
                   return nullptr;
                }
 
-               auto spot( const size base) -> std::optional< node>
+               auto spot( const size root) -> std::optional< node>
                {
-                  auto data = head();
+                  auto gist = head();
 
-                  if( ! data) return base ? std::optional< node>{ nullptr} : std::nullopt;
+                  if( ! gist) return root ? std::optional< node>{ nullptr} : std::nullopt;
 
-                  if( edge( *data)) return node{ nullptr};
+                  auto& item = *gist;
 
-                  if( help::hold< node>( *data))
-                     return line(), dent = next(), std::get< node>( std::move( *data));
+                  if( edge( item)) return node{ nullptr};
 
-                  if( help::hold< dash>( *data))
+                  if( help::hold< node>( item))
+                     return line(), dent = next(), std::get< node>( std::move( item));
+
+                  if( help::hold< dash>( item))
                   {
                      node::array array;
 
                      do
                         array.emplace_back( *spot( dent + 1 + step()));
-                     while( dent >= base && peek() == '-' && help::hold< dash>( scan()));
+                     while( dent >= root && peek() == '-' && help::hold< dash>( scan()));
 
                      return { array};
                   }
 
                   node::object object;
 
-                  auto& info = *data;
-
                   while( good())
                   {
-                     while( good() && help::hold< nill>( info))
-                        line(), info = scan();
+                     while( good() && help::hold< nill>( item))
+                        line(), item = scan();
 
                      if( ! good())
                         break;
 
-                     if( edge( info))
+                     if( edge( item))
                         break;
 
-                     object[ std::get< name>( std::move( info))] = grab( dent);
+                     object[ std::get< name>( std::move( item))] = grab( dent);
 
-                     if( dent < base)
+                     if( dent < root)
                         break;
 
                      wrap();
 
-                     if( dent < base)
+                     if( dent < root)
                         break;
 
-                     info = scan();
+                     item = scan();
                   }
 
                   return { object};
@@ -549,10 +549,10 @@ namespace poly_version
                {
                   ++mark; // '*'
 
-                  const auto name = read( bare);
+                  const auto word = read( bare);
 
-                  if( anchors.contains( name))
-                     return anchors.at( name);
+                  if( anchors.contains( word))
+                     return anchors.at( word);
 
                   [[unlikely]] halt( "invalid alias");
                }
@@ -561,12 +561,12 @@ namespace poly_version
                {
                   ++mark; // '&'
                   
-                  auto name = read( bare);
+                  auto word = read( bare);
                   skip();
-                  auto data = scan();
+                  auto item = scan();
 
-                  if( std::holds_alternative< node>( data))
-                     return anchors[ std::move( name)] = std::get< node>( std::move( data));
+                  if( std::holds_alternative< node>( item))
+                     return anchors[ std::move( word)] = std::get< node>( std::move( item));
 
                   [[unlikely]] halt( "invalid anchor");                  
                }
@@ -596,27 +596,27 @@ namespace poly_version
                      if( peek() != '"' && peek() != '\'')
                         return node{ help::trim( scalar())};
    
-                  auto info = scan();
+                  auto item = scan();
 
-                  if( std::holds_alternative< nill>( info))
-                     info = node{ nullptr};
+                  if( std::holds_alternative< nill>( item))
+                     item = node{ nullptr};
 
-                  if( auto data = std::get_if< node>( &info))
+                  if( auto data = std::get_if< node>( &item))
                   {
                      if( data->is_string() && tag == "str")
-                        return info;
+                        return item;
 
                      if( data->is_nothing() && tag == "null")  
-                        return info;
+                        return item;
 
                      if( data->is_boolean() && tag == "bool")  
-                        return info;
+                        return item;
 
                      if( data->is_integer() && tag == "int")  
-                        return info;
+                        return item;
 
                      if( data->is_decimal() && tag == "float")
-                        return info;
+                        return item;
 
                      if( data->is_integer() && tag == "float")
                         return node{ static_cast< node::decimal>( data->as_integer())};
@@ -638,8 +638,8 @@ namespace poly_version
                   const auto style = take();
                   const auto chomp = peek() == '+' || peek() == '-' ? take() : '\0';
 
-                  std::string data;
-                  size base{};
+                  std::string text;
+                  size root{};
                   size nada{};
 
                   while( good())
@@ -648,7 +648,7 @@ namespace poly_version
 
                      dent = step();
 
-                     if( dent < base && peek() != '\n')
+                     if( dent < root && peek() != '\n')
                         break;
 
                      const auto line = read( [] ( const auto sign) { return sign != '\n'; });
@@ -659,36 +659,28 @@ namespace poly_version
                         continue;
                      }
 
-                     if( data.empty())
-                     {
-                        data.append( nada, '\n');
-                     }
+                     if( text.empty())
+                        text.append( nada, '\n');
                      else
-                     {
                         if( style == '>')
-                        {
                            if( nada)
-                              data.append( nada, '\n');
+                              text.append( nada, '\n');
                            else
-                              data.push_back( ' ');
-                        }
+                              text.push_back( ' ');
                         else
-                        {
-                           data.append( nada + 1, '\n');
-                        }
-                     }
+                           text.append( nada + 1, '\n');
 
-                     if( ! base) 
-                        base = dent;
+                     if( ! root) 
+                        root = dent;
 
-                     data.append( line);
+                     text.append( line);
 
                      nada = 0;
                   }
 
-                  data.append( nada * (chomp == '+') + (chomp != '-'), '\n');
+                  text.append( nada * (chomp == '+') + (chomp != '-'), '\n');
 
-                  return node{ std::move( data)};
+                  return node{ std::move( text)};
                }
 
             };
