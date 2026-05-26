@@ -1371,7 +1371,46 @@ top: world
                      result.push_back( static_cast< std::byte>( value));
                   return result;
                }
+
+               auto roundtrip( const node& node)
+               {
+                  const auto source = cbor::write( node);
+                  const auto target = cbor::write( cbor::parse( source));
+                  assert( source == target);
+               }
             } // detail
+
+            void roundtrip()
+            {
+               detail::roundtrip( nullptr);
+               detail::roundtrip( true);
+               detail::roundtrip( false);
+               detail::roundtrip( 42L);
+               detail::roundtrip( -1000L);
+               detail::roundtrip( 3.14);
+               detail::roundtrip( "hello world");
+
+               const node::binary blob{
+                  std::byte{ 0x01}, std::byte{ 0x02}, std::byte{ 0xFF}};
+               detail::roundtrip( node{ blob});
+
+               node nested;
+               nested[ "aaa"] = nullptr;
+               nested[ "bbb"] = true;
+               nested[ "ccc"] = -42L;
+               nested[ "ddd"] = 3.14;
+               nested[ "eee"] = "qwerty";
+               nested[ "fff"][ 0] = 123456L;
+               nested[ "ggg"][ "xxx"] = 123L;
+               nested[ "ggg"][ "yyy"] = 456L;
+               nested[ "ggg"][ "zzz"] = 789L;
+               detail::roundtrip( nested);
+
+               // chrono: local_date via tag 100 (packed)
+               detail::roundtrip( help::transform::instant( "2025-01-01").value());
+               // chrono: zoned_datetime via tag 1 (packed)
+               detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56+00:00").value());
+            }
 
             void simples()
             {
@@ -1505,6 +1544,7 @@ top: world
             cases::arrays();
             cases::objects();
             cases::instants();
+            cases::roundtrip();
          }
       } // cbor::test
 } // poly_version

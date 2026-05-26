@@ -8,10 +8,17 @@
 
 #include "help.hpp"
 
+#include <bit>
+#include <cmath>
+#include <tuple>
+#include <chrono>
 #include <limits>
+#include <ranges>
+#include <string>
 #include <vector>
 #include <cstddef>
-
+#include <cstdint> 
+#include <stdfloat>
 
 namespace poly_version
 {
@@ -52,14 +59,280 @@ namespace poly_version
             date = 1004,   // RFC 3339 full-date string  (RFC 8943)
          };         
 
+         constexpr auto mask = std::uint8_t{ 0x1F};
 
-      } // detail
-
-      namespace detail
-      {
-         inline constexpr auto head( major kind, simple info) -> std::uint8_t
+         constexpr auto half( const std::uint16_t data) -> node::decimal
          {
-            constexpr std::uint8_t mask{ 0x1F};
+            struct layout
+            {
+               std::uint16_t mantissa : 10;
+               std::uint16_t exponent :  5;
+               std::uint16_t sign     :  1;
+            };
+
+            const auto bits = std::bit_cast< layout>( data);            
+
+            auto result = [&bits] -> node::decimal
+            {
+               if( bits.exponent == 0) 
+                  return std::ldexp( bits.mantissa, -24);
+
+               if( bits.exponent == 31) 
+                  return bits.mantissa ? 
+                     std::numeric_limits< node::decimal>::quiet_NaN() : 
+                     std::numeric_limits< node::decimal>::infinity();
+
+               return std::ldexp( bits.mantissa + 1024, bits.exponent - 25);
+            }();
+
+            return bits.sign ? -result : +result;
+         }
+
+         constexpr auto real( const std::uint32_t data) -> node::decimal
+         {
+            return std::bit_cast< std::float32_t>( data);
+         }
+
+         constexpr auto full( const std::uint64_t data) -> node::decimal
+         {
+            return std::bit_cast< std::float64_t>( data);
+         }
+
+         template< help::sign type, help::source_iterator< type> iterator>
+         struct parser : help::source< type, iterator>
+         {
+            using base = help::source< type, iterator>;
+            using base::mark;
+            using base::last;
+            using base::deny;
+            using base::done;
+            using base::drop;
+            using base::halt;
+            using base::peek;
+            using base::pull;
+
+            auto operator()() -> node
+            {
+               auto nrv = spot();
+               done();
+               return nrv;
+            }
+
+         private:
+
+            bool more()
+            {
+               if( static_cast< std::byte>( peek()) != std::byte{ 0xFF}) 
+                  return true;
+
+               return drop(), false;
+            }
+
+            auto array( auto size) -> node::array
+            {
+               node::array nrv;
+               nrv.reserve( size);
+               while( size--) nrv.push_back( spot());
+               return nrv;
+            }
+
+            auto array() -> node::array
+            {
+               node::array nrv;
+
+               while( more()) nrv.push_back( spot());
+               return nrv;
+            }
+
+            auto object( auto size) -> node::object
+            {
+               node::object nrv;
+               if constexpr( requires { nrv.reserve( size); }) nrv.reserve( size);
+               while( size--)
+               {
+                  auto name = spot();
+                  nrv.emplace( std::get< node::string>( std::move( name)), spot());
+               }
+               return nrv;
+            }
+
+            auto object() -> node::object
+            {
+               node::object nrv;
+               while( more())
+               {
+                  auto name = spot();
+                  nrv.emplace( std::get< node::string>( std::move( name)), spot());
+               }
+               return nrv;
+            }
+
+            auto when( const node& data) -> node::instant
+            {
+               return help::transform::instant( std::get< node::string>( data)).value();
+            }
+
+            auto tick( const node& data) -> node::instant
+            {
+               const auto elapsed = data.is_integer()
+                  ? std::chrono::duration_cast< std::chrono::system_clock::duration>( std::chrono::seconds{ data.as_integer()})
+                  : std::chrono::duration_cast< std::chrono::system_clock::duration>( std::chrono::duration< node::decimal>{ data.as_decimal()});
+
+               return node::zoned_datetime{ "UTC", std::chrono::sys_time{ elapsed}};
+            }
+
+            auto days( const node& data) -> node::instant
+            {
+               return node::local_date{ std::chrono::days{ data.as_integer()}};
+            }
+
+            auto tagged( const auto data) -> node
+            {
+               switch( static_cast< chrono>( data))
+               {
+               case chrono::when:
+               case chrono::date: return when( spot());
+               case chrono::tick: return tick( spot());
+               case chrono::days: return days( spot());
+               }
+
+               deny( "tag");
+            }
+
+            auto integer( const std::uint64_t data)
+            {
+               if( data > static_cast< std::uint64_t>( std::numeric_limits< node::integer>::max()))
+                  halt( "integer overflow");
+               return static_cast< node::integer>( data);
+            }
+
+            template< typename into>
+            auto read( const auto size)
+            {
+               auto save = mark;
+               if( std::ranges::advance( mark, size, last))
+                  halt( "unexpected end");
+               
+               return std::ranges::subrange( save, mark)
+                  | std::views::transform( []( auto byte) { return static_cast< typename into::value_type>( byte); })
+                  | std::ranges::to< into>();
+            }
+
+            template< typename into, major want>
+            auto read()
+            {
+               into nrv;
+               while( more())
+               {
+                  const auto [ kind, info] = next();
+                  if( kind != want || info == simple::stop) halt( "malformed chunk");
+                  //nrv.append_range( read< into>( load( info)));
+                  std::ranges::move( read< into>( load( info)), std::back_inserter( nrv));
+               }
+               return nrv;
+            }
+
+            auto binary( const auto size) -> node::binary
+            {
+               return read< node::binary>( size);
+            }
+
+            auto binary() -> node::binary
+            {
+               return read< node::binary, major::bytes>();
+            }
+
+            auto string( const auto size) -> node::string
+            {
+               return read< node::string>( size);
+            }
+
+            auto string() -> node::string
+            {
+               return read< node::string, major::text>();
+            }
+
+            template< std::size_t size>
+            auto take() -> std::uint64_t
+            {
+               std::uint64_t data{};
+               for( std::size_t item{}; item < size; ++item)
+                  data = ( data << 8) | static_cast< std::uint8_t>( pull());
+               return data;
+            }
+
+            auto next() -> std::tuple< major, simple>
+            {
+               const auto byte = static_cast< std::uint8_t>( pull());
+               
+               return { static_cast< major>( byte >> 5), static_cast< simple>( byte & mask)};
+            }
+
+            auto load( const simple info) -> std::uint64_t
+            {
+               if( info < simple::byte) 
+                  return std::to_underlying( info); // inline
+
+               switch( info)
+               {
+               case simple::byte: return take< sizeof( std::uint8_t )>();
+               case simple::half: return take< sizeof( std::uint16_t)>();
+               case simple::real: return take< sizeof( std::uint32_t)>();
+               case simple::full: return take< sizeof( std::uint64_t)>();
+               }
+
+               halt( "invalid info");
+            }
+
+            auto spot() -> node
+            {
+               const auto [ kind, info] = next();
+
+               if( info == simple::stop && kind != major::simple)
+               {
+                  switch( kind)
+                  {
+                  case major::bytes: return binary();
+                  case major::text:  return string();
+                  case major::array: return array();
+                  case major::map:   return object();
+                  }
+               }
+
+               const auto data = load( info);
+
+               switch( kind)
+               {
+               case major::positive: return  integer( data);
+               case major::negative: return ~integer( data);
+
+               case major::bytes:    return binary(   data);
+               case major::text:     return string(   data);
+               case major::array:    return array(    data);
+               case major::map:      return object(   data);
+               case major::tag:      return tagged(   data);
+               case major::simple:
+               {
+                  switch( info)
+                  {
+                  case simple::no:   return false;
+                  case simple::yes:  return true;
+                  case simple::null:
+                  case simple::none: return nullptr;
+                  case simple::half: return half( data);
+                  case simple::real: return real( data);
+                  case simple::full: return full( data);
+                  }
+               }
+               }
+
+               deny( "encoding");
+            }
+
+         };
+
+         constexpr auto head( major kind, simple info) -> std::uint8_t
+         {
             constexpr std::uint8_t bits{ 5};
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
@@ -68,8 +341,8 @@ namespace poly_version
          struct writer : help::target< type, iterator>
          {
             using base = help::target< type, iterator>;
-            using base::halt;
             using base::emit;
+            using base::halt;
             using base::push;
 
             void operator() ( const node::nothing&)
@@ -249,6 +522,11 @@ namespace poly_version
          }
 
       } // detail
+
+      auto parse( auto&& source)
+      {
+         return help::make::source< detail::parser>( source)();
+      }
 
       inline namespace compact
       {

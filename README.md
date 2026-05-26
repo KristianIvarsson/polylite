@@ -11,7 +11,7 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR (writer only), JSON, TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+At the moment, CBOR, JSON, TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
 
 ### Note
 
@@ -29,6 +29,18 @@ At the moment, CBOR (writer only), JSON, TOML and YAML are supported. The implem
 - `local_time` inside `instant` is not a native type
 
 ### Known Limitations
+
+#### CBOR
+
+The following are detected and rejected with an error:
+- Bignums (tags 2 and 3) — including values that would otherwise fit in `node::integer`
+- Decimal fractions (tag 4) and bigfloats (tag 5)
+- All other unregistered or unrecognised tags
+- Integer values outside `node::integer` range (`n > INT64_MAX` on either side)
+- Reserved additional-info values (28–30) and reserved simple values
+- Indefinite-length tag items
+- Nested indefinite-length string chunks (RFC 8949 §3.2.3 violation)
+- Indefinite-length string chunks of the wrong major type
 
 #### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored
