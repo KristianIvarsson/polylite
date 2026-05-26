@@ -30,13 +30,13 @@ namespace poly_version
             using base = help::parser< type, iterator>;
             using base::mark;
             using base::done;
+            using base::drop;
             using base::good;
             using base::halt;
             using base::pull;
             using base::peek;
             using base::read;
             using base::rest;
-            using base::take;
             using base::test;
 
             auto operator()() -> node
@@ -248,7 +248,7 @@ namespace poly_version
                   if( ++mark, peek() != '"')
                      return {};
 
-               const auto same = ! ( peek() == '"' ? take(), skip(), true : false);
+               const auto same = ! ( peek() == '"' ? drop(), skip(), true : false);
 
                std::string nrv;
 
@@ -276,7 +276,7 @@ namespace poly_version
                   if( ++mark, peek() != '\'')
                      return {};
 
-               const auto same = ! ( peek() == '\'' ? take(), skip(), true : false); 
+               const auto same = ! ( peek() == '\'' ? drop(), skip(), true : false); 
 
                std::string nrv;
 
@@ -314,12 +314,12 @@ namespace poly_version
                      return help::is::alnum( sign);
                   });
 
-               if( auto result = help::transform::instant( data))
-                  return std::move( *result);
-
                std::erase( data, '_');
 
                if( auto result = help::transform::number( data))
+                  return std::move( *result);
+
+               if( auto result = help::transform::instant( data))
                   return std::move( *result);
 
                [[unlikely]] halt( "unexpected data");
@@ -358,7 +358,7 @@ namespace poly_version
             using base::flat;
             using base::halt;
 
-            std::vector< std::string_view> stack;
+            std::vector< std::string_view> stack{};
 
             void operator()( const node& node)
             {

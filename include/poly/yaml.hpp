@@ -307,7 +307,7 @@ namespace poly_version
 
                using size = int;
                
-               std::unordered_map< std::string, node> anchors;
+               std::unordered_map< std::string, node> anchors{};
                size dent{};
 
                auto operator()() -> std::optional<node>

@@ -1,3 +1,4 @@
+#include "poly/cbor.hpp"
 #include "poly/json.hpp"
 #include "poly/toml.hpp"
 #include "poly/yaml.hpp"
@@ -81,12 +82,11 @@ namespace poly_version
 
       auto common()
       {
-         // shared constructs supported by all four formats:
-         // null, boolean, integer, decimal, string (plain/escaped/unicode), array, object, deep nesting
+         // strict intersection supported by all four formats:
+         // boolean, integer, decimal, string (plain/escaped/unicode), array, object, deep nesting
+         // (no null, no binary, no instant — those are excluded for apples-to-apples comparison)
 
          node root;
-
-         root[ "nothing"] = nullptr;
 
          root[ "boolean"][ "t"] = true;
          root[ "boolean"][ "f"] = false;
@@ -109,7 +109,6 @@ namespace poly_version
          mixed[ 1] = 42;
          mixed[ 2] = 3.14;
          mixed[ 3] = "qwerty";
-         mixed[ 4] = nullptr;
 
          for( int i = 0; i < 32; ++i)
             root[ "array"][ "numbers"][ i] = static_cast< node::integer>( i * i);
@@ -161,10 +160,6 @@ namespace poly_version
                // strict toml supports common constructs except null at top level.
                node source = pace::common();
 
-               // toml cannot represent null — drop it
-               source.as_object().erase( "nothing");
-               source[ "array"][ "mixed"].as_array().pop_back(); // drop trailing null
-
                detail::measure( "toml/elegant", source, detail::default_iterations,
                   []( const node& n) { return poly::toml::elegant::write( n); },
                   []( const auto& s) { return poly::toml::parse( s); });
@@ -206,6 +201,31 @@ namespace poly_version
          }
       } // yaml
 
+      namespace cbor
+      {
+         namespace cases
+         {
+            void all_constructs()
+            {
+               // cbor supports every node type natively
+               node source = pace::common();
+
+               detail::measure( "cbor/verbose", source, detail::default_iterations,
+                  []( const node& n) { return poly::cbor::verbose::write( n); },
+                  []( const auto& s) { return poly::cbor::parse( s); });
+
+               detail::measure( "cbor/compact", source, detail::default_iterations,
+                  []( const node& n) { return poly::cbor::compact::write( n); },
+                  []( const auto& s) { return poly::cbor::parse( s); });
+            }
+         } // cases
+
+         void all()
+         {
+            cases::all_constructs();
+         }
+      } // cbor
+
       void all()
       {
          std::println( "polylite pace -- {} iterations per measurement", detail::default_iterations);
@@ -214,6 +234,7 @@ namespace poly_version
          json::all();
          toml::all();
          yaml::all();
+         cbor::all();
       }
    } // pace
 } // poly_version

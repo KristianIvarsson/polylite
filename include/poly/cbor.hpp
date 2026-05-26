@@ -279,6 +279,7 @@ namespace poly_version
                case simple::half: return take< sizeof( std::uint16_t)>();
                case simple::real: return take< sizeof( std::uint32_t)>();
                case simple::full: return take< sizeof( std::uint64_t)>();
+               default: break; // -Wswitch
                }
 
                halt( "invalid info");
@@ -296,6 +297,7 @@ namespace poly_version
                   case major::text:  return string();
                   case major::array: return array();
                   case major::map:   return object();
+                  default: break; // -Wswitch
                   }
                }
 
@@ -322,6 +324,7 @@ namespace poly_version
                   case simple::half: return half( data);
                   case simple::real: return real( data);
                   case simple::full: return full( data);
+                  default: break; // -Wswitch
                   }
                }
                }

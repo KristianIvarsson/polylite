@@ -17,6 +17,10 @@ At the moment, CBOR, JSON, TOML and YAML are supported. The implementation may b
 
 `poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
 
+#### CBOR
+- `zoned_datetime` is the only type where *verbose/compact* mode changes semantics: *verbose* preserves the original zone offset, *compact* decays to UTC
+- `local_time` and `local_datetime` inside `instant` have no standard CBOR tag
+
 #### JSON
 - `instant` (_time_) is not a native type
 - `binary` is not a native type
@@ -38,9 +42,9 @@ The following are detected and rejected with an error:
 - All other unregistered or unrecognised tags
 - Integer values outside `node::integer` range (`n > INT64_MAX` on either side)
 - Reserved additional-info values (28–30) and reserved simple values
-- Indefinite-length tag items
+- Tagged items using indefinite-length encoding
 - Nested indefinite-length string chunks (RFC 8949 §3.2.3 violation)
-- Indefinite-length string chunks of the wrong major type
+- Indefinite-length string chunks whose major type doesn't match the outer string
 
 #### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored

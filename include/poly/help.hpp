@@ -334,7 +334,7 @@ namespace poly_version
          char pull()
          {
             if( good()) [[likely]] return take();
-            halt( "unexpected end of stream");
+            halt( "unexpected end");
          }
 
          void test( const char want, const char pick) const
