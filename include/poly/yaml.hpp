@@ -33,12 +33,15 @@ namespace poly_version
             struct core : help::parser< type, iterator>
             {
                using base = help::parser< type, iterator>;
+               using base::full;
+               using base::half;
                using base::good;
                using base::look;
                using base::mark;
                using base::peek;
                using base::pull;
                using base::rest;
+               using base::skip;
 
             protected:
 
@@ -51,19 +54,18 @@ namespace poly_version
 
                using info = std::variant< nill, name, node, dash, begin, cease>;
 
-               void skip()
+               void tidy()
                {
-                  base::skip();
+                  skip();
 
                   if( peek() == '#')
-                  {
-                     rest();
-                     skip();
-                  }
+                     rest(), tidy();
                }
 
-               char peep() { return skip(), peek(); }
-
+               char peep() 
+               { 
+                  return tidy(), peek(); 
+               }
 
                auto quoted()
                {
@@ -116,8 +118,8 @@ namespace poly_version
                   case 'a': return '\a';
                   case 'e': return 0x1B; // \e
                   case 'v': return '\v';
-                  case 'x': return base::template unit< 2>();
-                  case 'U': return base::template unit< 8>();
+                  case 'x': return half();
+                  case 'U': return full();
                   case 'N': return 0x85;
                   case '_': return 0xA0;
                   case 'L': return 0x2028;
@@ -294,7 +296,7 @@ namespace poly_version
                using base::deny;
                using base::cusp;
                using base::peep;
-               using base::skip;
+               using base::tidy;
                using base::quoted;
                using base::single;
                using base::resolve;
@@ -345,7 +347,7 @@ namespace poly_version
                {
                   auto part = [this]
                   {
-                     skip();
+                     tidy();
                      return read( [] ( const auto sign) { return ! help::is::space( sign); });
                   };
 
@@ -562,7 +564,7 @@ namespace poly_version
                   ++mark; // '&'
                   
                   auto word = read( bare);
-                  skip();
+                  tidy();
                   auto item = scan();
 
                   if( std::holds_alternative< node>( item))
@@ -590,7 +592,7 @@ namespace poly_version
 
                   const auto tag = read( []( const auto sign) { return help::is::lower( sign); });
 
-                  skip();
+                  tidy();
 
                   if( tag == "str")
                      if( peek() != '"' && peek() != '\'')

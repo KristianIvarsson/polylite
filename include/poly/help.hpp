@@ -406,10 +406,26 @@ namespace poly_version
             return code;
          }
 
+         auto half()
+         {
+            return unit< 2>();
+         }
+
+         auto real()
+         {
+            return unit< 4>();
+         }
+
+         auto full()
+         {
+            return unit< 8>();
+         }
+
+
          // c-style escape sequences
          auto code()
          {
-            const auto lead = unit< 4>();
+            const auto lead = real();
 
             if( lead < 0xD800 || lead > 0xDFFF)
                return lead;
@@ -419,7 +435,7 @@ namespace poly_version
 
             test( '\\', pull()); test( 'u', pull());
 
-            const auto tail = unit< 4>();
+            const auto tail = real();
 
             if( tail < 0xDC00 || tail > 0xDFFF)
                [[unlikely]] halt( "invalid 2nd surrogate");

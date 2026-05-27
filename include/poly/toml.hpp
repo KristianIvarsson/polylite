@@ -31,12 +31,14 @@ namespace poly_version
             using base::mark;
             using base::done;
             using base::drop;
+            using base::full;
             using base::good;
             using base::halt;
             using base::pull;
             using base::peek;
             using base::read;
             using base::rest;
+            using base::skip;
             using base::test;
 
             auto operator()() -> node
@@ -51,7 +53,7 @@ namespace poly_version
 
                   if( keys.empty())
                   {
-                     skip(); 
+                     tidy(); 
                      done();
                      return nrv;
                   }
@@ -151,32 +153,29 @@ namespace poly_version
                return nrv;
             }
 
-            void skip() 
+            void tidy() 
             {
-               base::skip();
+               skip();
 
                if( peek() == '#')
-               {
-                  rest();
-                  skip();
-               }
+                  rest(), tidy();
             }
 
             char pick()
             {
-               return skip(), pull();
+               return tidy(), pull();
             }
 
             char peep()
             {
-               return skip(), peek();
+               return tidy(), peek();
             }
 
             auto cast( const auto sign) -> std::int32_t
             {
                switch( sign)
                {
-               case 'U': return base::template unit< 8>();
+               case 'U': return full();
                default:  return base::cast( sign);
                }
             }
@@ -248,7 +247,7 @@ namespace poly_version
                   if( ++mark, peek() != '"')
                      return {};
 
-               const auto same = ! ( peek() == '"' ? drop(), skip(), true : false);
+               const auto same = ! ( peek() == '"' ? drop(), tidy(), true : false);
 
                std::string nrv;
 
@@ -266,7 +265,7 @@ namespace poly_version
                      if( peek() != '\n' && same)
                         nrv.append( help::transform::point( cast( pull())));
                      else
-                        skip();
+                        tidy();
                }
             }
 
@@ -276,7 +275,7 @@ namespace poly_version
                   if( ++mark, peek() != '\'')
                      return {};
 
-               const auto same = ! ( peek() == '\'' ? drop(), skip(), true : false); 
+               const auto same = ! ( peek() == '\'' ? drop(), tidy(), true : false); 
 
                std::string nrv;
 
@@ -350,13 +349,13 @@ namespace poly_version
          struct writer : help::writer< type, iterator>
          {
             using base = help::writer< type, iterator>;
-            using base::push;
-            using base::copy;
             using base::cast;
-            using base::time;
-            using base::wrap;
             using base::flat;
             using base::halt;
+            using base::copy;
+            using base::push;
+            using base::time;
+            using base::wrap;
 
             std::vector< std::string_view> stack{};
 
