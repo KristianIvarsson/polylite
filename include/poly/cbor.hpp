@@ -209,13 +209,23 @@ namespace poly_version
             template< typename into>
             auto read( const auto size)
             {
-               auto save = mark;
-               if( std::ranges::advance( mark, size, last))
-                  halt( "unexpected end");
-               
-               return std::ranges::subrange( save, mark)
-                  | std::views::transform( []( auto byte) { return static_cast< typename into::value_type>( byte); })
-                  | std::ranges::to< into>();
+               if constexpr( std::contiguous_iterator< iterator>)
+               {
+                  auto save = mark;
+                  if( std::ranges::advance( mark, size, last))
+                     pull(); // provoke an error
+
+                  return std::ranges::subrange( save, mark)
+                     | std::views::transform( []( auto byte) { return static_cast< into::value_type>( byte); })
+                     | std::ranges::to< into>();
+               }
+               else
+               {
+                  into data( size, {});
+                  for( std::size_t item{}; item < size; ++item)
+                     data[ item] = static_cast< into::value_type>( pull());
+                  return data;
+               } 
             }
 
             template< typename into, major want>
@@ -226,7 +236,6 @@ namespace poly_version
                {
                   const auto [ kind, info] = next();
                   if( kind != want || info == simple::stop) halt( "malformed chunk");
-                  //nrv.append_range( read< into>( load( info)));
                   std::ranges::move( read< into>( load( info)), std::back_inserter( nrv));
                }
                return nrv;

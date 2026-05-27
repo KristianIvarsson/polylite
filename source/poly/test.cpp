@@ -5,10 +5,11 @@
 #include "poly/tool.hpp"
 #include "poly/yaml.hpp"
 
-#include <stdexcept>
+#include <print>
 #include <cassert>
 #include <fstream>
-#include <print>
+#include <sstream>
+#include <stdexcept>
 
 namespace poly_version
 {
@@ -1547,6 +1548,89 @@ top: world
             cases::roundtrip();
          }
       } // cbor::test
+
+   namespace streams::test
+   {
+      namespace cases
+      {
+         node sample()
+         {
+            node root;
+            root[ "name"] = std::string{ "polylite"};
+            root[ "answer"] = node::integer{ 42};
+            root[ "ratio"] = node::decimal{ 3.5};
+            root[ "tags"] = node::array{ std::string{ "x"}, std::string{ "y"}};
+            return root;
+         }
+
+         void json_streams()
+         {
+            const auto root = sample();
+            const auto text = json::write( root);
+
+            std::ostringstream out;
+            json::write( root, out);
+            assert( out.str() == text);
+
+            std::istringstream in{ text};
+            const auto back = json::parse( in);
+            assert( json::write( back) == text);
+         }
+
+         void yaml_streams()
+         {
+            const auto root = sample();
+            const auto text = yaml::write( root);
+
+            std::ostringstream out;
+            yaml::write( root, out);
+            assert( out.str() == text);
+
+            std::istringstream in{ text};
+            const auto back = yaml::parse( in);
+            assert( yaml::write( back) == text);
+         }
+
+         void toml_streams()
+         {
+            const auto root = sample();
+            const auto text = toml::write( root);
+
+            std::ostringstream out;
+            toml::write( root, out);
+            assert( out.str() == text);
+
+            std::istringstream in{ text};
+            const auto back = toml::parse( in);
+            assert( toml::write( back) == text);
+         }
+
+         void cbor_streams()
+         {
+            const auto root = sample();
+            const auto bytes = cbor::write( root);
+
+            std::ostringstream out;
+            cbor::write( root, out);
+            const auto produced = out.str();
+            assert( produced.size() == bytes.size());
+            assert( std::equal( bytes.begin(), bytes.end(), produced.begin(),
+               []( std::byte a, char b) { return a == static_cast< std::byte>( b); }));
+
+            std::istringstream in{ produced};
+            const auto back = cbor::parse( in);
+            assert( cbor::write( back) == bytes);
+         }
+      } // cases
+
+      void all()
+      {
+         cases::json_streams();
+         cases::yaml_streams();
+         cases::toml_streams();
+         cases::cbor_streams();
+      }
+   } // streams::test
 } // poly_version
 
 
@@ -1579,6 +1663,7 @@ try
       poly::toml::test::all();
       poly::yaml::test::all();
       poly::cbor::test::all();
+      poly::streams::test::all();
    }
 
    return 0;
