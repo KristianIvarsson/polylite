@@ -221,6 +221,11 @@ namespace poly_version
                }
                else
                {
+                  //
+                  // fallback for non-contiguous iterators
+                  // - correctness for single-pass iterators
+                  // - performance for non-contiguous iterators
+
                   into data( size, {});
                   for( std::size_t item{}; item < size; ++item)
                      data[ item] = static_cast< into::value_type>( pull());

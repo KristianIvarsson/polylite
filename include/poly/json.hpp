@@ -218,12 +218,13 @@ namespace poly_version
          struct writer : help::writer< type, iterator>
          {
             using base = help::writer< type, iterator>;
-            using base::push;
-            using base::copy;
             using base::cast;
-            using base::time;
+            using base::copy;
             using base::flat;
+            using base::fold;
             using base::halt;
+            using base::push;
+            using base::time;
 
             char column{};
             bool indent{};
@@ -327,7 +328,7 @@ namespace poly_version
                if constexpr( spaces)
                {
                   if( indent)
-                     base::fold( column * spaces);
+                     fold( column * spaces);
                   else
                      indent = true;
                }
