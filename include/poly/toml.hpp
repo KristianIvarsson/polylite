@@ -473,7 +473,7 @@ namespace poly_version
                }
             }
 
-            void operator()( const node::nothing& )
+            void operator()( const node::nothing )
             {
                if constexpr( firm)
                   halt( "node::nothing");
@@ -481,7 +481,7 @@ namespace poly_version
                   copy( R"("null")");
             }
 
-            void operator()( const node::boolean& node)
+            void operator()( const node::boolean node)
             {
                copy( node ? "true" : "false");
             }

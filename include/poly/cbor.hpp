@@ -362,17 +362,17 @@ namespace poly_version
             using base::halt;
             using base::push;
 
-            void operator() ( const node::nothing&)
+            void operator() ( const node::nothing)
             {
                push( head( major::simple, simple::null));
             }
 
-            void operator() ( const node::boolean& node)
+            void operator() ( const node::boolean node)
             {
                push( head( major::simple, node ? simple::yes : simple::no));
             }
 
-            void operator() ( const node::integer& node)
+            void operator() ( const node::integer node)
             {
                if( node < 0)
                   pack( major::negative, ~static_cast< std::uint64_t>( node));
@@ -380,7 +380,7 @@ namespace poly_version
                   pack( major::positive,  static_cast< std::uint64_t>( node));
             }
 
-            void operator() ( const node::decimal& node)
+            void operator() ( const node::decimal node)
             {
                full( major::simple, std::bit_cast< std::uint64_t>( node));
             }
@@ -418,7 +418,7 @@ namespace poly_version
                   std::visit( *this, data);
             }
 
-            void operator() ( const node::local_date& time)
+            void operator() ( const node::local_date time)
             {
                if constexpr( packed)
                {
@@ -432,14 +432,14 @@ namespace poly_version
                }
             }
 
-            void operator() ( const node::local_time& time)
+            void operator() ( const node::local_time time)
             {
                if constexpr( strict) 
                   [[unlikely]] halt( "node::local_time");
                text( time);
             }
 
-            void operator() ( const node::zoned_datetime& time)
+            void operator() ( const node::zoned_datetime time)
             {
                if constexpr( packed)
                {
@@ -458,7 +458,7 @@ namespace poly_version
                }
             }
 
-            void operator() ( const node::local_datetime& time)
+            void operator() ( const node::local_datetime time)
             {
                if constexpr( strict) 
                   [[unlikely]] halt( "node::local_datetime");

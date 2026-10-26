@@ -260,25 +260,25 @@ namespace poly_version
                seal( ']');
             }
 
-            void operator() ( const node::nothing& )
+            void operator() ( const node::nothing )
             {
                fill();
                copy( "null");
             }
 
-            void operator() ( const node::boolean& node)
+            void operator() ( const node::boolean node)
             {
                fill();
                copy( node ? "true" : "false");
             }
 
-            void operator() ( const node::integer& node)
+            void operator() ( const node::integer node)
             {
                fill();
                copy( std::format( "{}", node));
             }
 
-            void operator() ( const node::decimal& node)
+            void operator() ( const node::decimal node)
             {
                if( std::isnan( node) || std::isinf( node))
                   [[unlikely]] halt( "node::decimal");

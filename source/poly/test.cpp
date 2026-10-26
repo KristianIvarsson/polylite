@@ -19,6 +19,15 @@ namespace poly_version
       catch( ... ) { return true; }
    };
 
+   static_assert( std::is_trivially_copyable_v< poly::node::nothing>);
+   static_assert( std::is_trivially_copyable_v< poly::node::boolean>);
+   static_assert( std::is_trivially_copyable_v< poly::node::integer>);
+   static_assert( std::is_trivially_copyable_v< poly::node::decimal>);
+   static_assert( std::is_trivially_copyable_v< poly::node::local_date>);
+   static_assert( std::is_trivially_copyable_v< poly::node::local_time>);
+   static_assert( std::is_trivially_copyable_v< poly::node::local_datetime>);
+   static_assert( std::is_trivially_copyable_v< poly::node::zoned_datetime>);
+
    namespace help::test
    {
       namespace cases

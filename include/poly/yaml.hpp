@@ -732,22 +732,22 @@ namespace poly_version
                using base::time;
                using base::halt;
 
-               void operator() ( const node::nothing& )
+               void operator() ( const node::nothing )
                {
                   copy( "null");
                }
 
-               void operator() ( const node::boolean& node)
+               void operator() ( const node::boolean node)
                {
                   copy( node ? "true" : "false");
                }
 
-               void operator() ( const node::integer& node)
+               void operator() ( const node::integer node)
                {
                   copy( std::format( "{}", node));
                }
 
-               void operator() ( const node::decimal& node)
+               void operator() ( const node::decimal node)
                {
                   if( std::isnan( node))
                      [[unlikely]] return copy( ".nan");
