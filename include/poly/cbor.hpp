@@ -418,33 +418,38 @@ namespace poly_version
                   std::visit( *this, data);
             }
 
-            void operator() ( const node::local_date time)
+            void operator() ( const node::local_date data)
             {
                if constexpr( packed)
                {
                   pack( major::tag, std::to_underlying( chrono::days));
-                  (*this)( static_cast< node::integer>( time.time_since_epoch().count()));
+                  (*this)( static_cast< node::integer>( data.time_since_epoch().count()));
                }
                else
                {
                   pack( major::tag, std::to_underlying( chrono::date));
-                  text( time);
+                  time( data);
                }
             }
 
-            void operator() ( const node::local_time time)
+            void operator() ( const node::local_time data)
             {
-               if constexpr( strict) 
-                  [[unlikely]] halt( "node::local_time");
-               text( time);
+               if constexpr( strict) [[unlikely]] halt( "node::local_time");
+               time( data);
             }
 
-            void operator() ( const node::zoned_datetime time)
+            void operator() ( const node::local_datetime data)
+            {
+               if constexpr( strict) [[unlikely]] halt( "node::local_datetime");
+               time( data);
+            }
+
+            void operator() ( const node::zoned_datetime data)
             {
                if constexpr( packed)
                {
                   pack( major::tag, std::to_underlying( chrono::tick));
-                  const auto elapsed = time.get_sys_time().time_since_epoch();
+                  const auto elapsed = data.get_sys_time().time_since_epoch();
                   const auto rounded = std::chrono::floor< std::chrono::seconds>( elapsed);
                   if( elapsed == rounded)
                      (*this)( std::chrono::duration< node::integer>( rounded).count());
@@ -454,25 +459,17 @@ namespace poly_version
                else
                {
                   pack( major::tag, std::to_underlying( chrono::when));
-                  text( time);
+                  time( data);
                }
             }
 
-            void operator() ( const node::local_datetime time)
-            {
-               if constexpr( strict) 
-                  [[unlikely]] halt( "node::local_datetime");
-               text( time);
-            }
-
-
          private:
 
-            void text( const auto& time)
+            void time( const auto data)
             {
-               std::string result;
-               help::writer< char, std::back_insert_iterator< std::string>>{ std::back_inserter( result)}.time( time);
-               (*this)( result);
+               std::string string;
+               help::writer< char, std::back_insert_iterator< std::string>>{ std::back_inserter( string)}.time( data);
+               (*this)( string);
             }
 
             void full( major kind, std::uint64_t data)

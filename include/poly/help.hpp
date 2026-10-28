@@ -468,9 +468,9 @@ namespace poly_version
       {
          iterator mark;
 
-         void push( const auto sign)
+         void push( const sign auto data)
          {
-            *mark++ = static_cast< type>( sign);
+            *mark++ = static_cast< type>( data);
          }
 
          void emit( const std::ranges::contiguous_range auto& data)
