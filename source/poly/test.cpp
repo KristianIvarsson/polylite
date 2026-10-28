@@ -1,6 +1,7 @@
 #include "poly/cbor.hpp"
 #include "poly/help.hpp"
 #include "poly/json.hpp"
+#include "poly/pack.hpp"
 #include "poly/toml.hpp"
 #include "poly/tool.hpp"
 #include "poly/yaml.hpp"
@@ -1558,6 +1559,148 @@ top: world
          }
       } // cbor::test
 
+   namespace pack::test
+   {
+      namespace cases
+      {
+         namespace detail
+         {
+            // helper: build expected wire bytes from a brace-enclosed list of integers
+            auto bytes( std::initializer_list< unsigned> values)
+            {
+               std::vector< std::byte> result;
+               result.reserve( values.size());
+               for( const auto value : values)
+                  result.push_back( static_cast< std::byte>( value));
+               return result;
+            }
+
+            // helper: a zoned datetime at the given offset from the Unix epoch
+            auto timestamp( std::chrono::milliseconds since_epoch)
+            {
+               return node{ node::zoned_datetime{ std::chrono::sys_time< std::chrono::milliseconds>{ since_epoch}}};
+            }
+         } // detail
+
+         void simples()
+         {
+            assert( pack::write( nullptr) == detail::bytes({ 0xC0}));
+            assert( pack::write( false) == detail::bytes({ 0xC2}));
+            assert( pack::write( true) == detail::bytes({ 0xC3}));
+         }
+
+         void integers()
+         {
+            assert( pack::write( 0L) == detail::bytes({ 0x00}));
+            assert( pack::write( 127L) == detail::bytes({ 0x7F}));
+            assert( pack::write( 128L) == detail::bytes({ 0xCC, 0x80}));
+            assert( pack::write( 255L) == detail::bytes({ 0xCC, 0xFF}));
+            assert( pack::write( 256L) == detail::bytes({ 0xCD, 0x01, 0x00}));
+            assert( pack::write( 65536L) == detail::bytes({ 0xCE, 0x00, 0x01, 0x00, 0x00}));
+            assert( pack::write( 4294967296L) == detail::bytes({ 0xCF, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}));
+
+            assert( pack::write( -1L) == detail::bytes({ 0xFF}));
+            assert( pack::write( -32L) == detail::bytes({ 0xE0}));
+            assert( pack::write( -33L) == detail::bytes({ 0xD0, 0xDF}));
+            assert( pack::write( -128L) == detail::bytes({ 0xD0, 0x80}));
+            assert( pack::write( -129L) == detail::bytes({ 0xD1, 0xFF, 0x7F}));
+         }
+
+         void decimals()
+         {
+            // 1.5 is exact as float32, 3.14 is not
+            assert( pack::write( 1.5) == detail::bytes({ 0xCA, 0x3F, 0xC0, 0x00, 0x00}));
+            assert( pack::write( 3.14) == detail::bytes({ 0xCB, 0x40, 0x09, 0x1E, 0xB8, 0x51, 0xEB, 0x85, 0x1F}));
+         }
+
+         void strings()
+         {
+            assert( pack::write( "") == detail::bytes({ 0xA0}));
+            assert( pack::write( "a") == detail::bytes({ 0xA1, 0x61}));
+
+            // 31 bytes is the last length that fits in fixstr
+            const auto fixed = pack::write( std::string( 31, 'a'));
+            assert( fixed.size() == 32 && fixed.front() == std::byte{ 0xBF});
+
+            // 32 bytes needs the str8 header
+            const auto str8 = pack::write( std::string( 32, 'a'));
+            assert( str8.size() == 34 && str8[ 0] == std::byte{ 0xD9} && str8[ 1] == std::byte{ 0x20});
+         }
+
+         void binaries()
+         {
+            assert( pack::write( node{ node::binary{}}) == detail::bytes({ 0xC4, 0x00}));
+            assert( pack::write( node{ node::binary{ std::byte{ 0x01}, std::byte{ 0x02}}}) == detail::bytes({ 0xC4, 0x02, 0x01, 0x02}));
+         }
+
+         void arrays()
+         {
+            assert( pack::write( node{ node::array{}}) == detail::bytes({ 0x90}));
+            assert( pack::write( node{ node::array{ 1L, 2L}}) == detail::bytes({ 0x92, 0x01, 0x02}));
+
+            // 16 elements do not fit in fixarray, so the array16 header is used
+            node::array items;
+            for( long value = 0; value < 16; ++value)
+               items.push_back( value);
+
+            const auto wire = pack::write( node{ items});
+            assert( wire.size() == 19);
+            assert( wire[ 0] == std::byte{ 0xDC} && wire[ 1] == std::byte{ 0x00} && wire[ 2] == std::byte{ 0x10});
+         }
+
+         void objects()
+         {
+            assert( pack::write( node{ node::object{}}) == detail::bytes({ 0x80}));
+
+            node source;
+            source[ "a"] = 1L;
+            assert( pack::write( source) == detail::bytes({ 0x81, 0xA1, 0x61, 0x01}));
+         }
+
+         void timestamps()
+         {
+            using namespace std::chrono_literals;
+
+            // Timestamp32: seconds fit in 32 bits and nanoseconds are zero
+            assert( pack::write( detail::timestamp( 0ms)) == detail::bytes({ 0xD6, 0xFF, 0x00, 0x00, 0x00, 0x00}));
+            assert( pack::write( detail::timestamp( 1000ms)) == detail::bytes({ 0xD6, 0xFF, 0x00, 0x00, 0x00, 0x01}));
+            assert( pack::write( detail::timestamp( 4294967295000ms)) == detail::bytes({ 0xD6, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}));
+
+            // Timestamp64: nanoseconds are present, or seconds need more than 32 bits
+            assert( pack::write( detail::timestamp( 1500ms)) == detail::bytes({ 0xD7, 0xFF, 0x77, 0x35, 0x94, 0x00, 0x00, 0x00, 0x00, 0x01}));
+            assert( pack::write( detail::timestamp( 4294967296000ms)) == detail::bytes({ 0xD7, 0xFF, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}));
+
+            // Timestamp96: negative seconds
+            assert( pack::write( detail::timestamp( -1500ms)) == detail::bytes({ 0xC7, 0x0C, 0xFF, 0x1D, 0xCD, 0x65, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE}));
+         }
+
+         void strictness()
+         {
+            node source;
+            source[ "t"] = help::transform::instant( "12:34:56").value();
+
+            // strict: local_time throws
+            assert( throws( [&]{ pack::write( source); }));
+
+            // gentle: local_time is written as text, A1 74 A8 "12:34:56"
+            assert( pack::gentle::write( source) == detail::bytes({ 0x81, 0xA1, 0x74, 0xA8, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
+         }
+      } // cases
+
+      void all()
+      {
+         cases::simples();
+         cases::integers();
+         cases::decimals();
+         cases::strings();
+         cases::binaries();
+         cases::arrays();
+         cases::objects();
+         cases::timestamps();
+         cases::strictness();
+      }
+   } // pack::test
+
    namespace streams::test
    {
       namespace cases
@@ -1672,6 +1815,7 @@ try
       poly::toml::test::all();
       poly::yaml::test::all();
       poly::cbor::test::all();
+      poly::pack::test::all();
       poly::streams::test::all();
    }
 
