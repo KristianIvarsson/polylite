@@ -1543,6 +1543,21 @@ top: world
                                           0x68, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
                }
             }
+
+            void parsing()
+            {
+               using detail::bytes;
+
+               // uint16 holding 1, which would fit in the initial byte
+               assert( cbor::parse( bytes({ 0x19, 0x00, 0x01})).as_integer() == 1);
+               // indefinite text with the chunks "a" and "b", then break
+               assert( cbor::parse( bytes({ 0x7F, 0x61, 0x61, 0x61, 0x62, 0xFF})).as_string() == "ab");
+               // indefinite array [1, 2], then break
+               assert( cbor::parse( bytes({ 0x9F, 0x01, 0x02, 0xFF})).as_array().size() == 2);
+
+               // uint64 holding 2^63, which does not fit in a long
+               assert( throws( []{ cbor::parse( bytes({ 0x1B, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})); }));
+            }
          } // cases
 
          void all()
@@ -1556,6 +1571,7 @@ top: world
             cases::objects();
             cases::instants();
             cases::roundtrip();
+            cases::parsing();
          }
       } // cbor::test
 
@@ -1580,7 +1596,97 @@ top: world
             {
                return node{ node::zoned_datetime{ std::chrono::sys_time< std::chrono::milliseconds>{ since_epoch}}};
             }
+
+            auto roundtrip( const node& node)
+            {
+               const auto source = pack::write( node);
+               const auto target = pack::write( pack::parse( source));
+               assert( source == target);
+            }
          } // detail
+
+         void roundtrip()
+         {
+            detail::roundtrip( nullptr);
+            detail::roundtrip( true);
+            detail::roundtrip( false);
+
+            // positive fixint, uint8, uint16, uint32, uint64
+            detail::roundtrip( 127L);
+            detail::roundtrip( 128L);
+            detail::roundtrip( 256L);
+            detail::roundtrip( 65536L);
+            detail::roundtrip( 4294967296L);
+            detail::roundtrip( std::numeric_limits< long>::max());
+
+            // negative fixint, sint8, sint16, sint32, sint64
+            detail::roundtrip( -32L);
+            detail::roundtrip( -33L);
+            detail::roundtrip( -129L);
+            detail::roundtrip( -32769L);
+            detail::roundtrip( -2147483649L);
+            detail::roundtrip( std::numeric_limits< long>::min());
+
+            // float32, float64
+            detail::roundtrip( 1.5);
+            detail::roundtrip( 3.14);
+
+            // fixstr, str8, str16, str32
+            detail::roundtrip( "hello world");
+            detail::roundtrip( std::string( 32, 'x'));
+            detail::roundtrip( std::string( 256, 'x'));
+            detail::roundtrip( std::string( 65536, 'x'));
+
+            // bin8, bin16
+            const node::binary blob{
+               std::byte{ 0x01}, std::byte{ 0x02}, std::byte{ 0xFF}};
+            detail::roundtrip( node{ blob});
+            detail::roundtrip( node{ node::binary( 256)});
+
+            // fixarray, array16
+            node items = node::array{};
+            for( long index = 0; index < 16; ++index)
+               items[ index] = index;
+            detail::roundtrip( items);
+
+            // fixmap, map16
+            node names;
+            for( long index = 0; index < 16; ++index)
+               names[ std::format( "key{}", index)] = index;
+            detail::roundtrip( names);
+
+            node nested;
+            nested[ "aaa"] = nullptr;
+            nested[ "bbb"] = true;
+            nested[ "ccc"] = -42L;
+            nested[ "ddd"] = 3.14;
+            nested[ "eee"] = "qwerty";
+            nested[ "fff"][ 0] = 123456L;
+            nested[ "ggg"][ "xxx"] = 123L;
+            nested[ "ggg"][ "yyy"] = 456L;
+            nested[ "ggg"][ "zzz"] = 789L;
+            detail::roundtrip( nested);
+
+            // timestamp32, timestamp64, timestamp96
+            detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56+00:00").value());
+            detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56.5+00:00").value());
+            detail::roundtrip( help::transform::instant( "1960-01-01T12:34:56.5+00:00").value());
+         }
+
+         void parsing()
+         {
+            using detail::bytes;
+
+            // uint16 holding 1, which would fit in a positive fixint
+            assert( pack::parse( bytes({ 0xCD, 0x00, 0x01})).as_integer() == 1);
+            // sint8 holding a positive 5
+            assert( pack::parse( bytes({ 0xD0, 0x05})).as_integer() == 5);
+            // float64 holding 1.5, which would fit in float32
+            assert( pack::parse( bytes({ 0xCB, 0x3F, 0xF8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})).as_decimal() == 1.5);
+
+            // uint64 holding 2^63, which does not fit in a long
+            assert( throws( []{ pack::parse( bytes({ 0xCF, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})); }));
+         }
 
          void simples()
          {
@@ -1698,6 +1804,8 @@ top: world
          cases::objects();
          cases::timestamps();
          cases::strictness();
+         cases::roundtrip();
+         cases::parsing();
       }
    } // pack::test
 

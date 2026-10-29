@@ -1,5 +1,6 @@
 #include "poly/cbor.hpp"
 #include "poly/json.hpp"
+#include "poly/pack.hpp"
 #include "poly/toml.hpp"
 #include "poly/yaml.hpp"
 
@@ -226,6 +227,27 @@ namespace poly_version
          }
       } // cbor
 
+      namespace pack
+      {
+         namespace cases
+         {
+            void all_constructs()
+            {
+               // messagepack supports every node type natively
+               node source = pace::common();
+
+               detail::measure( "pack", source, detail::default_iterations,
+                  []( const node& n) { return poly::pack::write( n); },
+                  []( const auto& s) { return poly::pack::parse( s); });
+            }
+         } // cases
+
+         void all()
+         {
+            cases::all_constructs();
+         }
+      } // pack
+
       void all()
       {
          std::println( "polylite pace -- {} iterations per measurement", detail::default_iterations);
@@ -235,6 +257,7 @@ namespace poly_version
          toml::all();
          yaml::all();
          cbor::all();
+         pack::all();
       }
    } // pace
 } // poly_version
