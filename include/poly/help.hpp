@@ -110,6 +110,15 @@ namespace poly_version
          return data;
       }
 
+      namespace size
+      {
+         //! helper to prevent evil size
+         inline constexpr auto clip( const std::size_t size)
+         {
+            return std::min( size, std::size_t{ 1024});
+         }
+      } // size
+
       namespace transform
       {
          inline auto simple( std::string_view data) -> std::optional< node>
@@ -337,6 +346,36 @@ namespace poly_version
             halt( "unexpected end");
          }
 
+         template< typename into>
+         auto grab( const std::size_t size) -> into
+         {
+            if constexpr( std::contiguous_iterator< iterator>)
+            {
+               // const auto left = static_cast< std::size_t>( std::ranges::distance( mark, last));
+               // if( size > left) [[unlikely]] halt( "unexpected end");
+
+               auto save = mark;
+               if( std::ranges::advance( mark, size, last))
+                  pull(); // provoke an error
+
+               return std::ranges::subrange( save, mark)
+                  | std::views::transform( []( auto byte) { return static_cast< typename into::value_type>( byte); })
+                  | std::ranges::to< into>();
+            }
+            else
+            {
+               //
+               // fallback for non-contiguous iterators
+               // - correctness for single-pass iterators
+               // - performance for non-contiguous iterators
+
+               into data; data.reserve( help::size::clip( size));
+               for( std::size_t item{}; item < size; ++item)
+                  data.push_back( static_cast< typename into::value_type>( pull()));
+               return data;
+            }
+         }
+
          void test( const char want, const char pick) const
          {
             if( want != pick) [[unlikely]] halt( "unexpected sign");
@@ -344,7 +383,7 @@ namespace poly_version
 
          [[noreturn]] void halt( const std::string_view message) const
          {
-            throw std::runtime_error{ std::format( "{} with just {} bytes left to parse", message, std::distance( mark, last))};
+            throw std::runtime_error{ std::format( "{} with {} bytes left to parse", message, std::distance( mark, last))};
          }
 
          [[noreturn]] void deny( const std::string_view message) const

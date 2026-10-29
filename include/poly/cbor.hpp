@@ -131,7 +131,7 @@ namespace poly_version
             auto array( auto size) -> node::array
             {
                node::array nrv;
-               nrv.reserve( size);
+               nrv.reserve( help::size::clip( size));
                while( size--) nrv.push_back( spot());
                return nrv;
             }
@@ -144,15 +144,20 @@ namespace poly_version
                return nrv;
             }
 
+            auto pair()
+            {
+               auto data = spot();
+               if( auto name = std::get_if< node::string>( &data))
+                  return std::make_pair( std::move( *name), spot());
+               [[unlikely]] halt( "expected key");
+            }
+
             auto object( auto size) -> node::object
             {
                node::object nrv;
-               if constexpr( requires { nrv.reserve( size); }) nrv.reserve( size);
+               nrv.reserve( help::size::clip( size));
                while( size--)
-               {
-                  auto name = spot();
-                  nrv.emplace( std::get< node::string>( std::move( name)), spot());
-               }
+                  nrv.insert( pair());
                return nrv;
             }
 
@@ -160,10 +165,7 @@ namespace poly_version
             {
                node::object nrv;
                while( more())
-               {
-                  auto name = spot();
-                  nrv.emplace( std::get< node::string>( std::move( name)), spot());
-               }
+                  nrv.insert( pair());
                return nrv;
             }
 
@@ -202,35 +204,14 @@ namespace poly_version
             auto integer( const std::uint64_t data)
             {
                if( data > static_cast< std::uint64_t>( std::numeric_limits< node::integer>::max()))
-                  halt( "integer overflow");
+                  [[unlikely]] halt( "integer overflow");
                return static_cast< node::integer>( data);
             }
 
             template< typename into>
             auto read( const auto size)
             {
-               if constexpr( std::contiguous_iterator< iterator>)
-               {
-                  auto save = mark;
-                  if( std::ranges::advance( mark, size, last))
-                     pull(); // provoke an error
-
-                  return std::ranges::subrange( save, mark)
-                     | std::views::transform( []( auto byte) { return static_cast< into::value_type>( byte); })
-                     | std::ranges::to< into>();
-               }
-               else
-               {
-                  //
-                  // fallback for non-contiguous iterators
-                  // - correctness for single-pass iterators
-                  // - performance for non-contiguous iterators
-
-                  into data( size, {});
-                  for( std::size_t item{}; item < size; ++item)
-                     data[ item] = static_cast< into::value_type>( pull());
-                  return data;
-               } 
+               return this->template grab< into>( size);
             }
 
             template< typename into, major want>
