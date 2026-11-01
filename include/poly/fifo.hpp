@@ -47,7 +47,7 @@ namespace poly_version
 
       auto& at( this auto&& self, const auto& key)
       {
-         if(auto result = self.find( key); result != self.end())
+         if( auto result = self.find( key); result != self.end())
             return result->second;
          else
             throw std::out_of_range{ std::format( "{} '{}'", __func__, key)};
@@ -55,7 +55,7 @@ namespace poly_version
 
       auto& operator []( auto&& key)
       {
-         if(auto result = find( key); result != base_type::end())
+         if( auto result = find( key); result != base_type::end())
             return result->second;
          else
             return base_type::emplace_back( std::forward< decltype( key)>( key), mapped_type{}).second;
@@ -63,7 +63,7 @@ namespace poly_version
 
       auto insert( auto&& value)
       {
-         if(auto result = find( value.first); result != base_type::end())
+         if( auto result = find( value.first); result != base_type::end())
             return std::make_pair( result, false);
          else
             return base_type::emplace_back( std::forward< decltype( value)>( value)), std::make_pair( std::prev( base_type::end()), true);
@@ -71,7 +71,7 @@ namespace poly_version
 
       auto insert_or_assign( auto&& key, auto&& object)
       {
-         if(auto result = find( key); result != base_type::end())
+         if( auto result = find( key); result != base_type::end())
             return result->second = std::forward< decltype( object)>( object), std::make_pair( result, false);
          else
             return base_type::emplace_back( std::forward< decltype( key)>( key), std::forward< decltype( object)>( object)), std::make_pair( std::prev( base_type::end()), true);
@@ -79,7 +79,7 @@ namespace poly_version
 
       auto emplace( auto&&... parameters)
       {
-         if(auto result = find( std::get< 0>( std::tie( parameters...))); result != base_type::end())
+         if( auto result = find( std::get< 0>( std::tie( parameters...))); result != base_type::end())
             return std::make_pair( result, false);
          else
             return base_type::emplace_back( std::forward< decltype( parameters)>( parameters)...), std::make_pair( std::prev( base_type::end()), true);

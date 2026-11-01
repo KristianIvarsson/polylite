@@ -312,7 +312,7 @@ namespace poly_version
                std::unordered_map< std::string, node> anchors{};
                size dent{};
 
-               auto operator()() -> std::optional<node>
+               auto operator()() -> std::optional< node>
                {
                   directives();
                   anchors.clear();
@@ -732,7 +732,7 @@ namespace poly_version
                using base::time;
                using base::halt;
 
-               void operator() ( const node::nothing )
+               void operator() ( const node::nothing)
                {
                   copy( "null");
                }
@@ -766,7 +766,7 @@ namespace poly_version
                      if constexpr( strict)
                         halt( "node::local_time");
                   
-                  std::visit( [ this]( const auto& data) { time( data); }, node);
+                  std::visit( [ this]( const auto& data) { this->time( data); }, node);
                }
 
                void operator() ( const node::string& node)

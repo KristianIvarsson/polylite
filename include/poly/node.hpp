@@ -105,7 +105,7 @@ namespace poly_version
       template< typename type>
       struct proxy
       {
-         explicit operator bool () const noexcept { return item; }
+         explicit operator bool () const noexcept { return item != nullptr; }
          auto operator ->() const noexcept { assert( item); return item; }
          auto& operator *() const noexcept { assert( item); return *item; }
 

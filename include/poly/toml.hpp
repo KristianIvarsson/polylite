@@ -71,7 +71,7 @@ namespace poly_version
                   }
                   else
                   {
-                     test(']', next);
+                     test( ']', next);
 
                      where = &nrv;
 
@@ -359,7 +359,7 @@ namespace poly_version
 
             std::vector< std::string_view> stack{};
 
-            void operator()( const node& node)
+            void operator() ( const node& node)
             {
                if( node.is_object())
                   (*this)( node.as_object());
@@ -370,7 +370,7 @@ namespace poly_version
                      (*this)( node::object{ { {}, node}});
             }
 
-            void operator()( const node::object& node)
+            void operator() ( const node::object& node)
             {
                if( node.empty() || ! std::ranges::all_of( node, section, &node::object::value_type::second))
                   table();
@@ -393,7 +393,7 @@ namespace poly_version
                   }
             }
 
-            void operator()( const node::array& node)
+            void operator() ( const node::array& node)
             {
                auto comma = [this] ( auto& tail)
                {
@@ -473,7 +473,7 @@ namespace poly_version
                }
             }
 
-            void operator()( const node::nothing )
+            void operator() ( const node::nothing)
             {
                if constexpr( firm)
                   halt( "node::nothing");
@@ -481,12 +481,12 @@ namespace poly_version
                   copy( R"("null")");
             }
 
-            void operator()( const node::boolean node)
+            void operator() ( const node::boolean node)
             {
                copy( node ? "true" : "false");
             }
 
-            void operator()( const number auto& node)
+            void operator() ( const number auto& node)
             {
                if constexpr( posh)
                {
@@ -499,12 +499,12 @@ namespace poly_version
                }
             }
 
-            void operator()( const node::instant& node)
+            void operator() ( const node::instant& node)
             {
-               std::visit( [ this]( const auto& data) { time( data); }, node);
+               std::visit( [ this]( const auto& data) { this->time( data); }, node);
             }
 
-            void operator()( const node::string& node)
+            void operator() ( const node::string& node)
             {
                if constexpr( posh)
                   if( ! node.contains( '\'') && std::ranges::none_of( node, []( const auto sign){ return help::is::cntrl( sign); }))
@@ -513,22 +513,26 @@ namespace poly_version
                push( '"'), cast( node), push( '"');
             }
 
-            void operator()( const node::binary& node)
+            void operator() ( const node::binary& node)
             {
                if constexpr( firm)
-                  halt( "node::binary");
-
-               if constexpr( posh)
                {
-                  copy( "'''");
-                  wrap( node);
-                  copy( "'''");
+                  halt( "node::binary");
                }
                else
                {
-                  push( '"');
-                  flat( node);
-                  push( '"');
+                  if constexpr( posh)
+                  {
+                     copy( "'''");
+                     wrap( node);
+                     copy( "'''");
+                  }
+                  else
+                  {
+                     push( '"');
+                     flat( node);
+                     push( '"');
+                  }
                }
             }
 
@@ -632,7 +636,7 @@ namespace poly_version
                if( ! item.is_array()) return false;
                if( ! std::ranges::all_of( item.as_array(), &node::is_object)) return false;
                if constexpr( posh) return true;
-               return ! shallow( item.as_array());
+               else return ! shallow( item.as_array());
             }
 
          };

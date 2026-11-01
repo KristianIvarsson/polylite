@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "help.hpp"
+
 #include <bit>
 #include <cmath>
 #include <limits>
@@ -13,11 +15,20 @@
 #include <cstddef>
 #include <cstdint> 
 #include <utility>
-#include <stdfloat>
 #include <algorithm>
 
-#include "help.hpp"
-#include "node.hpp"
+#if defined( __STDCPP_FLOAT32_T__) && defined( __STDCPP_FLOAT64_T__)
+#include <stdfloat>
+#else
+static_assert( std::numeric_limits< float>::is_iec559 && sizeof( float) == sizeof( std::uint32_t));
+static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( std::uint64_t));
+namespace std
+{
+   using float32_t = float;
+   using float64_t = double;
+}
+#endif
+
 
 namespace poly_version
 {
@@ -194,7 +205,12 @@ namespace poly_version
             {
                const auto data = take( root, code);
                const auto shift = 64 - ( 8u << ( std::to_underlying( code) - std::to_underlying( root)));
-               return static_cast< node::integer>( data << shift) >> shift;
+               const auto value = static_cast< std::int64_t>( data << shift) >> shift;
+
+               if( value < std::numeric_limits< node::integer>::min() || value > std::numeric_limits< node::integer>::max())
+                  [[unlikely]] halt( "integer overflow");
+
+               return static_cast< node::integer>( value);
             }
 
             auto timestamp( const std::size_t size)
@@ -312,7 +328,7 @@ namespace poly_version
 
             void operator() ( const node::integer node)
             {
-               if(node < 0)
+               if( node < 0)
                   negative( static_cast< std::uint64_t>( node));
                else
                   positive( static_cast< std::uint64_t>( node));
@@ -398,20 +414,20 @@ namespace poly_version
 
             void operator() ( const node::local_date data)
             {
-               if constexpr( strict) [[unlikely]] halt( "node::local_date");
-               time( data);
+               if constexpr( strict) halt( "node::local_date");
+               else time( data);
             }
 
             void operator() ( const node::local_time data)
             {
-               if constexpr( strict) [[unlikely]] halt( "node::local_time");
-               time( data);
+               if constexpr( strict) halt( "node::local_time");
+               else time( data);
             }
 
             void operator() ( const node::local_datetime data)
             {
-               if constexpr( strict) [[unlikely]] halt( "node::local_datetime");
-               time( data);
+               if constexpr( strict) halt( "node::local_datetime");
+               else time( data);
             }
          
             void operator() ( const node::zoned_datetime data)

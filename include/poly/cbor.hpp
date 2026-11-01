@@ -18,7 +18,19 @@
 #include <vector>
 #include <cstddef>
 #include <cstdint> 
+
+
+#if defined( __STDCPP_FLOAT32_T__) && defined( __STDCPP_FLOAT64_T__)
 #include <stdfloat>
+#else
+static_assert( std::numeric_limits< float>::is_iec559 && sizeof( float) == sizeof( std::uint32_t));
+static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( std::uint64_t));
+namespace std
+{
+   using float32_t = float;
+   using float64_t = double;
+}
+#endif
 
 namespace poly_version
 {
@@ -180,7 +192,7 @@ namespace poly_version
                   ? std::chrono::duration_cast< std::chrono::system_clock::duration>( std::chrono::seconds{ data.as_integer()})
                   : std::chrono::duration_cast< std::chrono::system_clock::duration>( std::chrono::duration< node::decimal>{ data.as_decimal()});
 
-               return node::zoned_datetime{ "UTC", std::chrono::sys_time{ elapsed}};
+               return node::zoned_datetime{ std::chrono::sys_time< std::chrono::system_clock::duration>{ elapsed}};
             }
 
             auto days( const node& data) -> node::instant
@@ -316,9 +328,9 @@ namespace poly_version
                   case simple::yes:  return true;
                   case simple::null:
                   case simple::none: return nullptr;
-                  case simple::half: return half( data);
-                  case simple::real: return real( data);
-                  case simple::full: return full( data);
+                  case simple::half: return half( static_cast< std::uint16_t>( data));
+                  case simple::real: return real( static_cast< std::uint32_t>( data));
+                  case simple::full: return full( static_cast< std::uint64_t>( data));
                   default: break; // -Wswitch
                   }
                }
@@ -415,14 +427,14 @@ namespace poly_version
 
             void operator() ( const node::local_time data)
             {
-               if constexpr( strict) [[unlikely]] halt( "node::local_time");
-               time( data);
+               if constexpr( strict) halt( "node::local_time");
+               else time( data);
             }
 
             void operator() ( const node::local_datetime data)
             {
-               if constexpr( strict) [[unlikely]] halt( "node::local_datetime");
-               time( data);
+               if constexpr( strict) halt( "node::local_datetime");
+               else time( data);
             }
 
             void operator() ( const node::zoned_datetime data)

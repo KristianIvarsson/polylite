@@ -170,12 +170,12 @@ namespace poly_version
                   if( negative)
                   {
                      if( value <= max + 1u)
-                        return static_cast< node::integer>( - value);
+                        return static_cast< node::integer>( 0u - value);
                   }
                   else
                   {
                      if( value <= max + 0u)
-                        return static_cast< node::integer>( + value);
+                        return static_cast< node::integer>( 0u + value);
                   }
                   return {};
                }
@@ -196,10 +196,11 @@ namespace poly_version
          {
             auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
             {
-               type result{};
+               // parse with nanosecond precision and truncate to the precision of type
+               decltype( std::chrono::floor< std::chrono::nanoseconds>( type{})) result{};
                std::ispanstream stream{ data};
                if( stream >> std::chrono::parse( format, result) && stream.peek() == std::char_traits< char>::eof())
-                  return result;
+                  return std::chrono::floor< decltype( type{} - type{})>( result);
 
                return {};
             };
@@ -337,7 +338,7 @@ namespace poly_version
          char peek() const
          {
             if( good()) [[likely]] return look();
-            return std::char_traits< char>::eof();
+            return static_cast< char>( std::char_traits< char>::eof());
          }
 
          char pull()
@@ -672,7 +673,7 @@ namespace poly_version
          auto source( std::istream& source)
          {
             using iterator = std::istreambuf_iterator< std::istream::char_type>;
-            return parser< std::istream::char_type, iterator, flags...>{ iterator{ source}, iterator{}};
+            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ source}, iterator{}}};
          }
 
          template< template< typename, typename, auto...> class parser, auto... flags>
@@ -682,7 +683,7 @@ namespace poly_version
             using type     = std::ranges::range_value_t< decltype( source)>;
             using iterator = std::ranges::iterator_t< const std::remove_cvref_t< decltype( source)>>;
             return parser< type, iterator, flags...>{
-               std::ranges::begin( source), std::ranges::end( source)};
+               { std::ranges::begin( source), std::ranges::end( source)}};
          }
 
          // utility for string literals (automatically deduces size and type) (essentially for testing)
@@ -696,7 +697,7 @@ namespace poly_version
          auto target( std::ostream& target)
          {
             using iterator = std::ostreambuf_iterator< std::ostream::char_type>;
-            return writer< std::ostream::char_type, iterator, flags...>{ iterator{ target}};
+            return writer< std::ostream::char_type, iterator, flags...>{ { iterator{ target}}};
          }
 
          template< template< typename, typename, auto...> class writer, auto... flags>
@@ -705,7 +706,7 @@ namespace poly_version
          {
             using type = std::remove_cvref_t< decltype( target)>;
             return writer< typename type::value_type, std::back_insert_iterator< type>, flags...>{
-               std::back_inserter( target)};
+               { std::back_inserter( target)}};
          }
       } // make
    } // help

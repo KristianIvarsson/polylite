@@ -260,7 +260,7 @@ namespace poly_version
                seal( ']');
             }
 
-            void operator() ( const node::nothing )
+            void operator() ( const node::nothing)
             {
                fill();
                copy( "null");
@@ -297,7 +297,7 @@ namespace poly_version
                {
                   fill();
                   push( '"');
-                  std::visit( [ this]( const auto& data) { time( data); }, node);
+                  std::visit( [ this]( const auto& data) { this->time( data); }, node);
                   push( '"');
                }
             }
@@ -313,12 +313,16 @@ namespace poly_version
             void operator() ( const node::binary& node)
             {
                if constexpr( strict)
+               {
                   halt( "node::binary");
-
-               fill();
-               push( '"');
-               flat( node);
-               push( '"');
+               }
+               else
+               {
+                  fill();
+                  push( '"');
+                  flat( node);
+                  push( '"');
+               }
             }
 
          private:
