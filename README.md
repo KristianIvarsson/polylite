@@ -11,19 +11,23 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
 
 ### Note
 
 `poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
 
 #### CBOR
-- `zoned_datetime` is the only type where *verbose/compact* mode changes semantics: *verbose* preserves the original zone offset, *compact* decays to UTC
-- `local_time` and `local_datetime` inside `instant` have no standard CBOR tag
+- `zoned_datetime` is written with its zone offset in *verbose* mode and as UTC in *compact* mode, but is always parsed as UTC
+- `local_time` and `local_datetime` inside `instant` have no standard CBOR tag but are written as strings in *gentle* mode
 
 #### JSON
 - `instant` (_time_) is not a native type
 - `binary` is not a native type
+
+#### PACK
+- `zoned_datetime` is written and parsed as UTC, since the timestamp extension has no zone offset
+- `local_date`, `local_time` and `local_datetime` inside `instant` are not native MSGPACK types but are written as strings in *gentle* mode
 
 #### TOML
 - `nothing` (_null_) is not a native type
@@ -40,11 +44,17 @@ The following are detected and rejected with an error:
 - Bignums (tags 2 and 3) — including values that would otherwise fit in `node::integer`
 - Decimal fractions (tag 4) and bigfloats (tag 5)
 - All other unregistered or unrecognised tags
-- Integer values outside `node::integer` range (`n > INT64_MAX` on either side)
+- Integer values outside `node::integer` range
 - Reserved additional-info values (28–30) and reserved simple values
 - Tagged items using indefinite-length encoding
 - Nested indefinite-length string chunks (RFC 8949 §3.2.3 violation)
 - Indefinite-length string chunks whose major type doesn't match the outer string
+
+#### PACK
+The following are detected and rejected with an error:
+- Integer values outside `node::integer` range
+- Extension types other than _timestamp_ (due to the nature of poly::node)
+- Map keys that aren't strings (due to the nature of poly::node::object)
 
 #### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored
@@ -79,6 +89,10 @@ g++ -std=c++23 -I include ./source/poly/show.cpp && ./a.out
 
 ### Examples
 
+#### Parsing
+
+Every format can be parsed from any byte oriented container or stream
+
 ```cpp
 // parse either an input stream, a string or some other byte oriented container
 auto node = poly::json::parse( input);
@@ -89,14 +103,13 @@ auto node = poly::json::parse( input);
 auto node = poly::json::parse( poly::tool::bom::skip( input));
 ```
 
+#### Writing
+
+Every format can be written to any byte oriented container or stream and each writer has its default (usually `std::string` or `std::vector< std::byte>`)
+
 ```cpp
 // write to an output stream
 poly::json::write( node, stream);
-```
-
-```cpp
-// write to a string (default for json)
-auto json = poly::json::write( node);
 ```
 
 ```cpp
@@ -115,6 +128,16 @@ poly::json::write( node, json);
 // write to a some other type
 std::list< uint8_t> json;
 poly::json::write( node, json);
+```
+
+```cpp
+// write to a string (default for json)
+auto json = poly::json::write( node);
+```
+
+```cpp
+// write to a vector of bytes (default for cbor)
+auto cbor = poly::cbor::write( node);
 ```
 
 ```cpp
@@ -142,6 +165,7 @@ auto json = poly::json::gentle::write( node);
 auto json = poly::json::elegant::gentle::write( node);
 ```
 
+#### Access
 ```cpp
 // access some data
 auto integer = node.as_object().at( "a").as_array().at( 1).as_integer();
@@ -152,6 +176,7 @@ auto integer = node.as_object().at( "a").as_array().at( 1).as_integer();
 auto integer = node( "a")( 1)->as_integer();
 ```
 
+#### Mutate
 ```cpp
 // mutate some data
 node[ "x"][ 4] = std::chrono::system_clock::now();
@@ -165,6 +190,7 @@ poly::node node = poly::node::object{
 };
 ```
 
+#### Lookup
 ```cpp
 // lookup
 if( node.is_integer())
