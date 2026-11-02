@@ -1616,20 +1616,16 @@ top: world
             detail::roundtrip( 128L);
             detail::roundtrip( 256L);
             detail::roundtrip( 65536L);
-#if LONG_MAX > INT_MAX
             detail::roundtrip( 4294967296L);
-#endif
-            detail::roundtrip( std::numeric_limits< long>::max());
+            detail::roundtrip( std::numeric_limits< node::integer>::max());
 
             // negative fixint, sint8, sint16, sint32, sint64
             detail::roundtrip( -32L);
             detail::roundtrip( -33L);
             detail::roundtrip( -129L);
             detail::roundtrip( -32769L);
-#if LONG_MAX > INT_MAX
             detail::roundtrip( -2147483649L);
-#endif
-            detail::roundtrip( std::numeric_limits< long>::min());
+            detail::roundtrip( std::numeric_limits< node::integer>::min());
 
             // float32, float64
             detail::roundtrip( 1.5);
@@ -1707,9 +1703,7 @@ top: world
             assert( pack::write( 255L) == detail::bytes({ 0xCC, 0xFF}));
             assert( pack::write( 256L) == detail::bytes({ 0xCD, 0x01, 0x00}));
             assert( pack::write( 65536L) == detail::bytes({ 0xCE, 0x00, 0x01, 0x00, 0x00}));
-#if LONG_MAX > INT_MAX
             assert( pack::write( 4294967296L) == detail::bytes({ 0xCF, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}));
-#endif
             assert( pack::write( -1L) == detail::bytes({ 0xFF}));
             assert( pack::write( -32L) == detail::bytes({ 0xE0}));
             assert( pack::write( -33L) == detail::bytes({ 0xD0, 0xDF}));

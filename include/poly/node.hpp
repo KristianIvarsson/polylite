@@ -12,19 +12,37 @@
 #include <chrono>
 #include <string>
 #include <vector>
-#include <cstddef>
-#include <variant>
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <variant>
+#if __has_include(<stdfloat>)
+#include <stdfloat>
+#endif
 
 namespace poly_version
 {
+   namespace detail
+   {
+      using nothing = std::nullptr_t;
+      using boolean = bool;
+      using integer = std::int64_t;
+
+      #if defined( __STDCPP_FLOAT64_T__)
+      using decimal = std::float64_t;
+      #else
+      static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( std::uint64_t));
+      using decimal = double;
+      #endif
+   } // detail
+
    struct node;
 
    using data = std::variant< 
-      std::nullptr_t, 
-      bool, 
-      long, 
-      double, 
+      detail::nothing, 
+      detail::boolean, 
+      detail::integer, 
+      detail::decimal, 
       std::variant
       < 
          std::chrono::local_time< std::chrono::days>, 
