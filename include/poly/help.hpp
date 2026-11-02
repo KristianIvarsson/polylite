@@ -7,14 +7,15 @@
 #pragma once
 
 #include "tale.hpp"
-
 #include "node.hpp"
 
 #include <array>
 #include <chrono>
 #include <format>
+#include <limits>
 #include <ranges>
 #include <string>
+#include <cstdint>
 #include <istream>
 #include <ostream>
 #include <charconv>
@@ -25,10 +26,42 @@
 #include <spanstream>
 #include <string_view>
 
+#if __has_include(<stdfloat>)
+#include <stdfloat>
+#endif
+
 namespace poly_version
 {
    namespace help
    {
+      namespace type
+      {
+         using i08 = std::int8_t;
+         using i16 = std::int16_t;
+         using i32 = std::int32_t;
+         using i64 = std::int64_t;
+
+         using u08 = std::uint8_t;
+         using u16 = std::uint16_t;
+         using u32 = std::uint32_t;
+         using u64 = std::uint64_t;
+
+#if defined(__STDCPP_FLOAT32_T__)
+         using f32 = std::float32_t;
+#else
+         static_assert( std::numeric_limits< float>::is_iec559 && sizeof( float) == sizeof( u32));
+         using f32 = float;
+#endif
+
+#if defined(__STDCPP_FLOAT64_T__)
+         using f64 = std::float64_t;
+#else
+         static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( u64));
+         using f64 = double;
+#endif
+      } // type
+
+
 
       template< typename... types>
       constexpr bool hold( const auto& data)
@@ -225,7 +258,7 @@ namespace poly_version
             node::binary result;
             result.reserve( data.size() * 3 / 4);
 
-            std::uint32_t pack{};
+            help::type::u32 pack{};
             int bits{};
 
             for( const auto sign : data)
@@ -259,7 +292,7 @@ namespace poly_version
             return result;
          }            
 
-         auto point( const std::same_as< std::int32_t> auto code)
+         auto point( const std::same_as< help::type::i32> auto code)
          {
             std::string nrv;
 
@@ -437,7 +470,7 @@ namespace poly_version
             std::array< char, size> data;
             for( auto& sign : data) sign = pull();
 
-            std::int32_t code;
+            help::type::i32 code;
             const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
 
             if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
@@ -484,7 +517,7 @@ namespace poly_version
          }
 
          // c-style escape sequences
-         auto cast( const auto sign) -> std::int32_t
+         auto cast( const auto sign) -> help::type::i32
          {
             switch( sign)
             {
@@ -633,11 +666,11 @@ namespace poly_version
             {
                if( chunk.size() == 3)
                {
-                  const auto b1 = std::to_integer< std::uint32_t>( chunk[0]);
-                  const auto b2 = std::to_integer< std::uint32_t>( chunk[1]);
-                  const auto b3 = std::to_integer< std::uint32_t>( chunk[2]);
+                  const auto b1 = std::to_integer< help::type::u32>( chunk[0]);
+                  const auto b2 = std::to_integer< help::type::u32>( chunk[1]);
+                  const auto b3 = std::to_integer< help::type::u32>( chunk[2]);
 
-                  const uint32_t triple = ( b1 << 16) | ( b2 << 8) | b3;
+                  const help::type::u32 triple = ( b1 << 16) | ( b2 << 8) | b3;
 
                   feed( alphabet[ (triple >> 18) & 0x3F]);
                   feed( alphabet[ (triple >> 12) & 0x3F]);
@@ -646,8 +679,8 @@ namespace poly_version
                }
                else
                {
-                  std::uint32_t triple = std::to_integer< std::uint32_t>( chunk[0]) << 16;
-                  if( chunk.size() == 2) triple |= std::to_integer< std::uint32_t>( chunk[1]) << 8;
+                  help::type::u32 triple = std::to_integer< help::type::u32>( chunk[0]) << 16;
+                  if( chunk.size() == 2) triple |= std::to_integer< help::type::u32>( chunk[1]) << 8;
 
                   feed( alphabet[ (triple >> 18) & 0x3F]);
                   feed( alphabet[ (triple >> 12) & 0x3F]);

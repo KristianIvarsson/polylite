@@ -17,20 +17,6 @@
 #include <string>
 #include <vector>
 #include <cstddef>
-#include <cstdint> 
-
-
-#if defined( __STDCPP_FLOAT32_T__) && defined( __STDCPP_FLOAT64_T__)
-#include <stdfloat>
-#else
-static_assert( std::numeric_limits< float>::is_iec559 && sizeof( float) == sizeof( std::uint32_t));
-static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( std::uint64_t));
-namespace std
-{
-   using float32_t = float;
-   using float64_t = double;
-}
-#endif
 
 namespace poly_version
 {
@@ -38,7 +24,7 @@ namespace poly_version
    {
       namespace detail
       {
-         enum class major : std::uint8_t
+         enum class major : help::type::u08
          {
             positive = 0,  // unsigned integer
             negative = 1,  // negative integer
@@ -50,7 +36,7 @@ namespace poly_version
             simple   = 7,  // float / simple / break / floating point
          };
 
-         enum class simple : std::uint8_t
+         enum class simple : help::type::u08
          {
             no       = 20, // false
             yes      = 21, // true
@@ -63,7 +49,7 @@ namespace poly_version
             stop     = 31, // break
          };
 
-         enum class chrono : std::uint64_t
+         enum class chrono : help::type::u64
          {
             when = 0,      // standard date/time string  (RFC 8949)
             tick = 1,      // epoch-based date/time      (RFC 8949)
@@ -71,15 +57,15 @@ namespace poly_version
             date = 1004,   // RFC 3339 full-date string  (RFC 8943)
          };         
 
-         constexpr auto mask = std::uint8_t{ 0x1F};
+         constexpr auto mask = help::type::u08{ 0x1F};
 
-         constexpr auto half( const std::uint16_t data) -> node::decimal
+         constexpr auto half( const help::type::u16 data) -> node::decimal
          {
             struct layout
             {
-               std::uint16_t mantissa : 10;
-               std::uint16_t exponent :  5;
-               std::uint16_t sign     :  1;
+               help::type::u16 mantissa : 10;
+               help::type::u16 exponent :  5;
+               help::type::u16 sign     :  1;
             };
 
             const auto bits = std::bit_cast< layout>( data);            
@@ -100,14 +86,14 @@ namespace poly_version
             return bits.sign ? -result : +result;
          }
 
-         constexpr auto real( const std::uint32_t data) -> node::decimal
+         constexpr auto real( const help::type::u32 data) -> node::decimal
          {
-            return std::bit_cast< std::float32_t>( data);
+            return std::bit_cast< help::type::f32>( data);
          }
 
-         constexpr auto full( const std::uint64_t data) -> node::decimal
+         constexpr auto full( const help::type::u64 data) -> node::decimal
          {
-            return std::bit_cast< std::float64_t>( data);
+            return std::bit_cast< help::type::f64>( data);
          }
 
          template< help::sign type, help::source_iterator< type> iterator>
@@ -213,9 +199,9 @@ namespace poly_version
                deny( "tag");
             }
 
-            auto integer( const std::uint64_t data)
+            auto integer( const help::type::u64 data)
             {
-               if( data > static_cast< std::uint64_t>( std::numeric_limits< node::integer>::max()))
+               if( data > static_cast< help::type::u64>( std::numeric_limits< node::integer>::max()))
                   [[unlikely]] halt( "integer overflow");
                return static_cast< node::integer>( data);
             }
@@ -260,32 +246,32 @@ namespace poly_version
             }
 
             template< std::size_t size>
-            auto take() -> std::uint64_t
+            auto take() -> help::type::u64
             {
-               std::uint64_t data{};
+               help::type::u64 data{};
                for( std::size_t item{}; item < size; ++item)
-                  data = ( data << 8) | static_cast< std::uint8_t>( pull());
+                  data = ( data << 8) | static_cast< help::type::u08>( pull());
                return data;
             }
 
             auto next() -> std::tuple< major, simple>
             {
-               const auto byte = static_cast< std::uint8_t>( pull());
+               const auto byte = static_cast< help::type::u08>( pull());
                
                return { static_cast< major>( byte >> 5), static_cast< simple>( byte & mask)};
             }
 
-            auto load( const simple info) -> std::uint64_t
+            auto load( const simple info) -> help::type::u64
             {
                if( info < simple::byte) 
                   return std::to_underlying( info); // inline
 
                switch( info)
                {
-               case simple::byte: return take< sizeof( std::uint8_t )>();
-               case simple::half: return take< sizeof( std::uint16_t)>();
-               case simple::real: return take< sizeof( std::uint32_t)>();
-               case simple::full: return take< sizeof( std::uint64_t)>();
+               case simple::byte: return take< sizeof( help::type::u08)>();
+               case simple::half: return take< sizeof( help::type::u16)>();
+               case simple::real: return take< sizeof( help::type::u32)>();
+               case simple::full: return take< sizeof( help::type::u64)>();
                default: break; // -Wswitch
                }
 
@@ -328,9 +314,9 @@ namespace poly_version
                   case simple::yes:  return true;
                   case simple::null:
                   case simple::none: return nullptr;
-                  case simple::half: return half( static_cast< std::uint16_t>( data));
-                  case simple::real: return real( static_cast< std::uint32_t>( data));
-                  case simple::full: return full( static_cast< std::uint64_t>( data));
+                  case simple::half: return half( static_cast< help::type::u16>( data));
+                  case simple::real: return real( static_cast< help::type::u32>( data));
+                  case simple::full: return full( static_cast< help::type::u64>( data));
                   default: break; // -Wswitch
                   }
                }
@@ -341,9 +327,9 @@ namespace poly_version
 
          };
 
-         constexpr auto head( major kind, simple info) -> std::uint8_t
+         constexpr auto head( major kind, simple info) -> help::type::u08
          {
-            constexpr std::uint8_t bits{ 5};
+            constexpr help::type::u08 bits{ 5};
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
 
@@ -368,14 +354,14 @@ namespace poly_version
             void operator() ( const node::integer node)
             {
                if( node < 0)
-                  pack( major::negative, ~static_cast< std::uint64_t>( node));
+                  pack( major::negative, ~static_cast< help::type::u64>( node));
                else
-                  pack( major::positive,  static_cast< std::uint64_t>( node));
+                  pack( major::positive,  static_cast< help::type::u64>( node));
             }
 
             void operator() ( const node::decimal node)
             {
-               full( major::simple, std::bit_cast< std::uint64_t>( node));
+               full( major::simple, std::bit_cast< help::type::u64>( node));
             }
 
             void operator() ( const node::instant& node)
@@ -465,21 +451,21 @@ namespace poly_version
                (*this)( string);
             }
 
-            void full( major kind, std::uint64_t data)
+            void full( major kind, help::type::u64 data)
             {
                push( head( kind, simple::full));
 
-               push( static_cast< std::uint8_t>( data >> 56));
-               push( static_cast< std::uint8_t>( data >> 48));
-               push( static_cast< std::uint8_t>( data >> 40));
-               push( static_cast< std::uint8_t>( data >> 32));
-               push( static_cast< std::uint8_t>( data >> 24));
-               push( static_cast< std::uint8_t>( data >> 16));
-               push( static_cast< std::uint8_t>( data >>  8));
-               push( static_cast< std::uint8_t>( data));
+               push( static_cast< help::type::u08>( data >> 56));
+               push( static_cast< help::type::u08>( data >> 48));
+               push( static_cast< help::type::u08>( data >> 40));
+               push( static_cast< help::type::u08>( data >> 32));
+               push( static_cast< help::type::u08>( data >> 24));
+               push( static_cast< help::type::u08>( data >> 16));
+               push( static_cast< help::type::u08>( data >>  8));
+               push( static_cast< help::type::u08>( data));
             }
 
-            void pack( major kind, std::uint64_t data)
+            void pack( major kind, help::type::u64 data)
             {
                constexpr auto edge = std::to_underlying( simple::byte);
 
@@ -487,24 +473,24 @@ namespace poly_version
                {
                   push( head( kind, static_cast< simple>( data)));
                }
-               else if( data <= std::numeric_limits< std::uint8_t>::max())
+               else if( data <= std::numeric_limits< help::type::u08>::max())
                {
                   push( head( kind, simple::byte));
-                  push( static_cast< std::uint8_t>( data));
+                  push( static_cast< help::type::u08>( data));
                }
-               else if( data <= std::numeric_limits< std::uint16_t>::max())
+               else if( data <= std::numeric_limits< help::type::u16>::max())
                {
                   push( head( kind, simple::half));
-                  push( static_cast< std::uint8_t>( data >> 8));
-                  push( static_cast< std::uint8_t>( data));
+                  push( static_cast< help::type::u08>( data >> 8));
+                  push( static_cast< help::type::u08>( data));
                }
-               else if( data <= std::numeric_limits< std::uint32_t>::max())
+               else if( data <= std::numeric_limits< help::type::u32>::max())
                {
                   push( head( kind, simple::real));
-                  push( static_cast< std::uint8_t>( data >> 24));
-                  push( static_cast< std::uint8_t>( data >> 16));
-                  push( static_cast< std::uint8_t>( data >>  8));
-                  push( static_cast< std::uint8_t>( data));
+                  push( static_cast< help::type::u08>( data >> 24));
+                  push( static_cast< help::type::u08>( data >> 16));
+                  push( static_cast< help::type::u08>( data >>  8));
+                  push( static_cast< help::type::u08>( data));
                }
                else
                {
