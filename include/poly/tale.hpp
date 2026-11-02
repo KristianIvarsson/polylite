@@ -6,4 +6,4 @@
 
 #pragma once
 
-#define poly_version poly::inline v4_5_0
+#define poly_version poly::inline v5_0_0

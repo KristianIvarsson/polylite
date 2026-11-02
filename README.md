@@ -17,6 +17,8 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), TOML and YAML are support
 
 `poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
 
+`poly::node::integer` is `std::int64_t` and `poly::node::decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
+
 #### CBOR
 - `zoned_datetime` is written with its zone offset in *verbose* mode and as UTC in *compact* mode, but is always parsed as UTC
 - `local_time` and `local_datetime` inside `instant` have no standard CBOR tag but are written as strings in *gentle* mode
