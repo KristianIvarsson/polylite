@@ -83,10 +83,10 @@ namespace poly_version
             negative_fixint = 0xE0,
          };
 
-         template< help::sign type, help::source_iterator< type> iterator>
-         struct parser : help::source< type, iterator>
+         template< help::sign unit, help::source_iterator< unit> iterator>
+         struct parser : help::source< unit, iterator>
          {
-            using base = help::source< type, iterator>;
+            using base = help::source< unit, iterator>;
             using base::deny;
             using base::done;
             using base::halt;
@@ -261,7 +261,7 @@ namespace poly_version
             auto array( std::size_t size) -> node::array
             {
                node::array nrv;
-               nrv.reserve( help::size::clip( size));
+               nrv.reserve( help::clip::size( size));
                while( size--)
                   nrv.push_back( spot());
                return nrv;
@@ -270,7 +270,7 @@ namespace poly_version
             auto object( std::size_t size) -> node::object
             {
                node::object nrv;
-               nrv.reserve( help::size::clip( size));
+               nrv.reserve( help::clip::size( size));
                while( size--)
                {
                   auto data = spot();
@@ -294,10 +294,10 @@ namespace poly_version
       namespace detail
       {
 
-         template< help::sign type, help::target_iterator< type> iterator, bool strict>
-         struct writer : help::target< type, iterator>
+         template< help::sign unit, help::target_iterator< unit> iterator, bool strict>
+         struct writer : help::target< unit, iterator>
          {
-            using base = help::target< type, iterator>;
+            using base = help::target< unit, iterator>;
             using base::emit;
             using base::halt;
             using base::push;

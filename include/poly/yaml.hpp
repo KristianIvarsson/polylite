@@ -29,10 +29,10 @@ namespace poly_version
 
          namespace parser
          {
-            template< help::sign type, help::source_iterator< type> iterator>
-            struct core : help::parser< type, iterator>
+            template< help::sign unit, help::source_iterator< unit> iterator>
+            struct core : help::parser< unit, iterator>
             {
-               using base = help::parser< type, iterator>;
+               using base = help::parser< unit, iterator>;
                using base::full;
                using base::half;
                using base::good;
@@ -154,10 +154,10 @@ namespace poly_version
                }
             };
 
-            template< help::sign type, help::source_iterator< type> iterator>
-            struct flow : core< type, iterator>
+            template< help::sign unit, help::source_iterator< unit> iterator>
+            struct flow : core< unit, iterator>
             {
-               using base = parser::core< type, iterator>;
+               using base = parser::core< unit, iterator>;
                using base::cusp;
                using base::good;
                using base::halt;
@@ -277,10 +277,10 @@ namespace poly_version
 
             };
 
-            template< help::sign type, help::source_iterator< type> iterator>
-            struct block : core< type, iterator>
+            template< help::sign unit, help::source_iterator< unit> iterator>
+            struct block : core< unit, iterator>
             {
-               using base = parser::core< type, iterator>;
+               using base = parser::core< unit, iterator>;
                using base::mark;
                using base::last;
                using base::good;
@@ -380,7 +380,7 @@ namespace poly_version
                   switch( peek())
                   {
                   case '{': case '[':
-                     return info{ parser::flow< type, iterator>{ mark, last}.spot()};
+                     return info{ parser::flow< unit, iterator>{ mark, last}.spot()};
                   case '*':
                      return alias();
                   case '&':
@@ -722,10 +722,10 @@ namespace poly_version
          namespace writer
          {
 
-            template< help::sign type, help::target_iterator< type> iterator, bool strict>
-            struct core : help::writer< type, iterator>
+            template< help::sign unit, help::target_iterator< unit> iterator, bool strict>
+            struct core : help::writer< unit, iterator>
             {
-               using base = help::writer< type, iterator>;
+               using base = help::writer< unit, iterator>;
                using base::push;
                using base::copy;
                using base::cast;
@@ -798,10 +798,10 @@ namespace poly_version
                }
             };
 
-            template< help::sign type, help::target_iterator< type> iterator, bool strict>
-            struct flow : core< type, iterator, strict>
+            template< help::sign unit, help::target_iterator< unit> iterator, bool strict>
+            struct flow : core< unit, iterator, strict>
             {
-               using base = writer::core< type, iterator, strict>;
+               using base = writer::core< unit, iterator, strict>;
                using base::push;
                using base::copy;
                using base::cast;
@@ -849,10 +849,10 @@ namespace poly_version
                }
             };
 
-            template< help::sign type, help::target_iterator< type> iterator, std::size_t spaces, bool strict>
-            struct block : core< type, iterator, strict>
+            template< help::sign unit, help::target_iterator< unit> iterator, std::size_t spaces, bool strict>
+            struct block : core< unit, iterator, strict>
             {
-               using base = writer::core< type, iterator, strict>;
+               using base = writer::core< unit, iterator, strict>;
                using base::mark;
                using base::push;
                using base::copy;
@@ -887,7 +887,7 @@ namespace poly_version
                      else
                      {
                         push( ' ');
-                        std::visit( flow< type, iterator, strict>{ mark}, data);
+                        std::visit( flow< unit, iterator, strict>{ mark}, data);
                      }
                   }
                }
@@ -914,7 +914,7 @@ namespace poly_version
                         }
                      }
                   else
-                     flow< type, iterator, strict>{ mark}( node);
+                     flow< unit, iterator, strict>{ mark}( node);
                }
 
                void operator() ( const node::binary& node)

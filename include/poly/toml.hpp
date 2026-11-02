@@ -24,10 +24,10 @@ namespace poly_version
             return help::is::alnum( sign) || sign == '_' || sign == '-';
          };
 
-         template< help::sign type, help::source_iterator< type> iterator>
-         struct parser : help::parser< type, iterator>
+         template< help::sign unit, help::source_iterator< unit> iterator>
+         struct parser : help::parser< unit, iterator>
          {
-            using base = help::parser< type, iterator>;
+            using base = help::parser< unit, iterator>;
             using base::mark;
             using base::done;
             using base::drop;
@@ -345,10 +345,10 @@ namespace poly_version
             std::string do_grouping() const override { return "\3"; }
          };
 
-         template< help::sign type, help::target_iterator< type> iterator, bool posh, bool firm>
-         struct writer : help::writer< type, iterator>
+         template< help::sign unit, help::target_iterator< unit> iterator, bool posh, bool firm>
+         struct writer : help::writer< unit, iterator>
          {
-            using base = help::writer< type, iterator>;
+            using base = help::writer< unit, iterator>;
             using base::cast;
             using base::flat;
             using base::halt;

@@ -20,10 +20,10 @@ namespace poly_version
    {
       namespace detail
       {
-         template< help::sign type, help::source_iterator< type> iterator>
-         struct parser : help::parser< type, iterator>
+         template< help::sign unit, help::source_iterator< unit> iterator>
+         struct parser : help::parser< unit, iterator>
          {
-            using base = help::parser< type, iterator>;
+            using base = help::parser< unit, iterator>;
             using base::mark;
             using base::cast;
             using base::done;
@@ -214,10 +214,10 @@ namespace poly_version
       {
          constexpr std::size_t spaces = 3;
 
-         template< help::sign type, help::target_iterator< type> iterator, std::size_t spaces, bool strict>
-         struct writer : help::writer< type, iterator>
+         template< help::sign unit, help::target_iterator< unit> iterator, std::size_t spaces, bool strict>
+         struct writer : help::writer< unit, iterator>
          {
-            using base = help::writer< type, iterator>;
+            using base = help::writer< unit, iterator>;
             using base::cast;
             using base::copy;
             using base::flat;

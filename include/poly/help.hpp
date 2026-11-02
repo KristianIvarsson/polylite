@@ -143,14 +143,14 @@ namespace poly_version
          return data;
       }
 
-      namespace size
+      namespace clip
       {
          //! helper to prevent evil size
-         inline constexpr auto clip( const std::size_t size)
+         inline constexpr auto size( const std::size_t size)
          {
             return std::min( size, std::size_t{ 1024});
          }
-      } // size
+      } // clip
 
       namespace transform
       {
@@ -227,13 +227,13 @@ namespace poly_version
 
          inline auto instant( std::string_view data) -> std::optional< node::instant>
          {
-            auto parse = [&data] < typename type>( const auto& format) -> std::optional< type>
+            auto parse = [&data] < typename unit>( const auto& format) -> std::optional< unit>
             {
                // parse with nanosecond precision and truncate to the precision of type
-               decltype( std::chrono::floor< std::chrono::nanoseconds>( type{})) result{};
+               decltype( std::chrono::floor< std::chrono::nanoseconds>( unit{})) result{};
                std::ispanstream stream{ data};
-               if( stream >> std::chrono::parse( format, result) && stream.peek() == std::char_traits< char>::eof())
-                  return std::chrono::floor< decltype( type{} - type{})>( result);
+               if( stream >> std::chrono::parse( format, result) && stream.peek() == std::ispanstream::traits_type::eof())
+                  return std::chrono::floor< decltype( unit{} - unit{})>( result);
 
                return {};
             };
@@ -258,7 +258,7 @@ namespace poly_version
             node::binary result;
             result.reserve( data.size() * 3 / 4);
 
-            help::type::u32 pack{};
+            type::u32 pack{};
             int bits{};
 
             for( const auto sign : data)
@@ -292,33 +292,33 @@ namespace poly_version
             return result;
          }            
 
-         auto point( const std::same_as< help::type::i32> auto code)
+         auto point( const std::same_as< type::i32> auto code)
          {
             std::string nrv;
 
-            using type = std::string::value_type;
+            using unit = std::string::value_type;
 
             if( code < 0x80)
             {
-               nrv.push_back( static_cast< type>( code));
+               nrv.push_back( static_cast< unit>( code));
             }
             else if( code < 0x800)
             {
-               nrv.push_back( static_cast< type>( 0xC0 | (( code >> 6) & 0x1F)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xC0 | (( code >> 6) & 0x1F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
             }
             else if( code < 0x10000)
             {
-               nrv.push_back( static_cast< type>( 0xE0 | (( code >> 12) & 0x0F)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code >> 6) & 0x3F)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xE0 | (( code >> 12) & 0x0F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 6) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
             }
             else
             {
-               nrv.push_back( static_cast< type>( 0xF0 | (( code >> 18) & 0x07)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code >> 12) & 0x3F)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code >> 6) & 0x3F)));
-               nrv.push_back( static_cast< type>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xF0 | (( code >> 18) & 0x07)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 12) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 6) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
             }
 
             return nrv;
@@ -327,17 +327,17 @@ namespace poly_version
       } // transform
 
 
-      template< typename type>
-      concept sign = sizeof( type) == 1;
+      template< typename unit>
+      concept sign = sizeof( unit) == 1;
 
-      template< typename iterator, typename type>
-      concept source_iterator = std::input_iterator< iterator> && std::same_as< std::iter_value_t< iterator>, type>;
+      template< typename iterator, typename unit>
+      concept source_iterator = std::input_iterator< iterator> && std::same_as< std::iter_value_t< iterator>, unit>;
 
-      template< typename iterator, typename type>
-      concept target_iterator = std::output_iterator< iterator, type>;
+      template< typename iterator, typename unit>
+      concept target_iterator = std::output_iterator< iterator, unit>;
 
 
-      template< sign type, source_iterator< type> iterator>
+      template< sign unit, source_iterator< unit> iterator>
       struct source
       {
          iterator mark;
@@ -403,7 +403,7 @@ namespace poly_version
                // - correctness for single-pass iterators
                // - performance for non-contiguous iterators
 
-               into data; data.reserve( help::size::clip( size));
+               into data; data.reserve( clip::size( size));
                for( std::size_t item{}; item < size; ++item)
                   data.push_back( static_cast< typename into::value_type>( pull()));
                return data;
@@ -426,10 +426,10 @@ namespace poly_version
          }
       };
 
-      template< sign type, source_iterator< type> iterator>
-      struct parser : source< type, iterator>
+      template< sign unit, source_iterator< unit> iterator>
+      struct parser : source< unit, iterator>
       {
-         using base = source< type, iterator>;
+         using base = source< unit, iterator>;
          using base::mark;
          using base::good;
          using base::look;
@@ -464,38 +464,39 @@ namespace poly_version
             leap( [] ( const auto sign) { return is::space( sign);});
          }
 
-         template< std::size_t size>
-         auto unit()
+         template< std::size_t nibs>
+         auto code()
          {
-            std::array< char, size> data;
+            std::array< char, nibs> data;
             for( auto& sign : data) sign = pull();
 
-            help::type::i32 code;
-            const auto result = std::from_chars( data.data(), data.data() + data.size(), code, 16);
+            type::i32 nrv;
+
+            const auto result = std::from_chars( data.data(), data.data() + data.size(), nrv, 16);
 
             if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
                [[unlikely]] halt( "invalid code point");
 
-            return code;
+            return nrv;
          }
 
          auto half()
          {
-            return unit< 2>();
+            return code< 2>(); // \xHH
          }
 
          auto real()
          {
-            return unit< 4>();
+            return code< 4>(); // \uHHHH
          }
 
          auto full()
          {
-            return unit< 8>();
+            return code< 8>(); // \UHHHHHHHH
          }
 
 
-         // c-style escape sequences
+         // unicode escape sequence
          auto code()
          {
             const auto lead = real();
@@ -517,7 +518,7 @@ namespace poly_version
          }
 
          // c-style escape sequences
-         auto cast( const auto sign) -> help::type::i32
+         auto cast( const auto sign) -> type::i32
          {
             switch( sign)
             {
@@ -536,14 +537,14 @@ namespace poly_version
       };
 
 
-      template< sign type, target_iterator< type> iterator>
+      template< sign unit, target_iterator< unit> iterator>
       struct target
       {
          iterator mark;
 
          void push( const sign auto data)
          {
-            *mark++ = static_cast< type>( data);
+            *mark++ = static_cast< unit>( data);
          }
 
          void emit( const std::ranges::contiguous_range auto& data)
@@ -558,10 +559,10 @@ namespace poly_version
       };
 
 
-      template< sign type, target_iterator< type> iterator>
-      struct writer : target< type, iterator>
+      template< sign unit, target_iterator< unit> iterator>
+      struct writer : target< unit, iterator>
       {
-         using base = target< type, iterator>;
+         using base = target< unit, iterator>;
          using base::push;
          using base::emit;
 
@@ -666,11 +667,11 @@ namespace poly_version
             {
                if( chunk.size() == 3)
                {
-                  const auto b1 = std::to_integer< help::type::u32>( chunk[0]);
-                  const auto b2 = std::to_integer< help::type::u32>( chunk[1]);
-                  const auto b3 = std::to_integer< help::type::u32>( chunk[2]);
+                  const auto b1 = std::to_integer< type::u32>( chunk[0]);
+                  const auto b2 = std::to_integer< type::u32>( chunk[1]);
+                  const auto b3 = std::to_integer< type::u32>( chunk[2]);
 
-                  const help::type::u32 triple = ( b1 << 16) | ( b2 << 8) | b3;
+                  const type::u32 triple = ( b1 << 16) | ( b2 << 8) | b3;
 
                   feed( alphabet[ (triple >> 18) & 0x3F]);
                   feed( alphabet[ (triple >> 12) & 0x3F]);
@@ -679,8 +680,8 @@ namespace poly_version
                }
                else
                {
-                  help::type::u32 triple = std::to_integer< help::type::u32>( chunk[0]) << 16;
-                  if( chunk.size() == 2) triple |= std::to_integer< help::type::u32>( chunk[1]) << 8;
+                  type::u32 triple = std::to_integer< type::u32>( chunk[0]) << 16;
+                  if( chunk.size() == 2) triple |= std::to_integer< type::u32>( chunk[1]) << 8;
 
                   feed( alphabet[ (triple >> 18) & 0x3F]);
                   feed( alphabet[ (triple >> 12) & 0x3F]);
@@ -703,20 +704,20 @@ namespace poly_version
       namespace make
       {
          template< template< typename, typename, auto...> class parser, auto... flags>
-         auto source( std::istream& source)
+         auto source( std::istream& value)
          {
             using iterator = std::istreambuf_iterator< std::istream::char_type>;
-            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ source}, iterator{}}};
+            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ value}, iterator{}}};
          }
 
          template< template< typename, typename, auto...> class parser, auto... flags>
-         auto source( const auto& source)
-            requires ( ! std::derived_from< std::remove_cvref_t< decltype( source)>, std::istream>)
+         auto source( const auto& value)
+            requires ( ! std::derived_from< std::remove_cvref_t< decltype( value)>, std::istream>)
          {
-            using type     = std::ranges::range_value_t< decltype( source)>;
-            using iterator = std::ranges::iterator_t< const std::remove_cvref_t< decltype( source)>>;
-            return parser< type, iterator, flags...>{
-               { std::ranges::begin( source), std::ranges::end( source)}};
+            using unit     = std::ranges::range_value_t< decltype( value)>;
+            using iterator = std::ranges::iterator_t< const std::remove_cvref_t< decltype( value)>>;
+            return parser< unit, iterator, flags...>{
+               { std::ranges::begin( value), std::ranges::end( value)}};
          }
 
          // utility for string literals (automatically deduces size and type) (essentially for testing)
@@ -727,19 +728,19 @@ namespace poly_version
          }
 
          template< template< typename, typename, auto...> class writer, auto... flags>
-         auto target( std::ostream& target)
+         auto target( std::ostream& value)
          {
             using iterator = std::ostreambuf_iterator< std::ostream::char_type>;
-            return writer< std::ostream::char_type, iterator, flags...>{ { iterator{ target}}};
+            return writer< std::ostream::char_type, iterator, flags...>{ { iterator{ value}}};
          }
 
          template< template< typename, typename, auto...> class writer, auto... flags>
-         auto target( auto& target)
-            requires ( ! std::derived_from< std::remove_cvref_t< decltype( target)>, std::ostream>)
+         auto target( auto& value)
+            requires ( ! std::derived_from< std::remove_cvref_t< decltype( value)>, std::ostream>)
          {
-            using type = std::remove_cvref_t< decltype( target)>;
-            return writer< typename type::value_type, std::back_insert_iterator< type>, flags...>{
-               { std::back_inserter( target)}};
+            using into = std::remove_cvref_t< decltype( value)>;
+            return writer< typename into::value_type, std::back_insert_iterator< into>, flags...>{
+               { std::back_inserter( value)}};
          }
       } // make
    } // help

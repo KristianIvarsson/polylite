@@ -96,10 +96,10 @@ namespace poly_version
             return std::bit_cast< help::type::f64>( data);
          }
 
-         template< help::sign type, help::source_iterator< type> iterator>
-         struct parser : help::source< type, iterator>
+         template< help::sign unit, help::source_iterator< unit> iterator>
+         struct parser : help::source< unit, iterator>
          {
-            using base = help::source< type, iterator>;
+            using base = help::source< unit, iterator>;
             using base::mark;
             using base::last;
             using base::deny;
@@ -129,7 +129,7 @@ namespace poly_version
             auto array( auto size) -> node::array
             {
                node::array nrv;
-               nrv.reserve( help::size::clip( size));
+               nrv.reserve( help::clip::size( size));
                while( size--) nrv.push_back( spot());
                return nrv;
             }
@@ -153,7 +153,7 @@ namespace poly_version
             auto object( auto size) -> node::object
             {
                node::object nrv;
-               nrv.reserve( help::size::clip( size));
+               nrv.reserve( help::clip::size( size));
                while( size--)
                   nrv.insert( pair());
                return nrv;
@@ -333,10 +333,10 @@ namespace poly_version
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
 
-         template< help::sign type, help::target_iterator< type> iterator, bool packed, bool strict>
-         struct writer : help::target< type, iterator>
+         template< help::sign unit, help::target_iterator< unit> iterator, bool packed, bool strict>
+         struct writer : help::target< unit, iterator>
          {
-            using base = help::target< type, iterator>;
+            using base = help::target< unit, iterator>;
             using base::emit;
             using base::halt;
             using base::push;
