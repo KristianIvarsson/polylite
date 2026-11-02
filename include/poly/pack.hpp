@@ -190,13 +190,8 @@ namespace poly_version
             auto integer( const format root, const format code)
             {
                const auto data = take( root, code);
-               const auto shift = 64 - ( 8u << ( std::to_underlying( code) - std::to_underlying( root)));
-               const auto value = static_cast< help::type::i64>( data << shift) >> shift;
-
-               if( value < std::numeric_limits< node::integer>::min() || value > std::numeric_limits< node::integer>::max())
-                  [[unlikely]] halt( "integer overflow");
-
-               return static_cast< node::integer>( value);
+               const auto move = 64 - ( 8u << ( std::to_underlying( code) - std::to_underlying( root)));
+               return static_cast< help::type::i64>( data << move) >> move;
             }
 
             auto timestamp( const std::size_t size)
