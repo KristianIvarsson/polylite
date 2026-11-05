@@ -328,7 +328,7 @@ namespace poly_version
 
 
       template< typename unit>
-      concept sign = sizeof( unit) == 1;
+      concept byte = sizeof( unit) == 1;
 
       template< typename iterator, typename unit>
       concept source_iterator = std::input_iterator< iterator> && std::same_as< std::iter_value_t< iterator>, unit>;
@@ -337,7 +337,7 @@ namespace poly_version
       concept target_iterator = std::output_iterator< iterator, unit>;
 
 
-      template< sign unit, source_iterator< unit> iterator>
+      template< byte unit, source_iterator< unit> iterator>
       struct source
       {
          iterator mark;
@@ -426,7 +426,7 @@ namespace poly_version
          }
       };
 
-      template< sign unit, source_iterator< unit> iterator>
+      template< byte unit, source_iterator< unit> iterator>
       struct parser : source< unit, iterator>
       {
          using base = source< unit, iterator>;
@@ -537,12 +537,12 @@ namespace poly_version
       };
 
 
-      template< sign unit, target_iterator< unit> iterator>
+      template< byte unit, target_iterator< unit> iterator>
       struct target
       {
          iterator mark;
 
-         void push( const sign auto data)
+         void push( const byte auto data)
          {
             *mark++ = static_cast< unit>( data);
          }
@@ -559,7 +559,7 @@ namespace poly_version
       };
 
 
-      template< sign unit, target_iterator< unit> iterator>
+      template< byte unit, target_iterator< unit> iterator>
       struct writer : target< unit, iterator>
       {
          using base = target< unit, iterator>;

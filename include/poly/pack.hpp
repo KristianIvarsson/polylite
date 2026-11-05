@@ -83,7 +83,7 @@ namespace poly_version
             negative_fixint = 0xE0,
          };
 
-         template< help::sign unit, help::source_iterator< unit> iterator>
+         template< help::byte unit, help::source_iterator< unit> iterator>
          struct parser : help::source< unit, iterator>
          {
             using base = help::source< unit, iterator>;
@@ -289,7 +289,7 @@ namespace poly_version
       namespace detail
       {
 
-         template< help::sign unit, help::target_iterator< unit> iterator, bool strict>
+         template< help::byte unit, help::target_iterator< unit> iterator, bool strict>
          struct writer : help::target< unit, iterator>
          {
             using base = help::target< unit, iterator>;

@@ -96,7 +96,7 @@ namespace poly_version
             return std::bit_cast< help::type::f64>( data);
          }
 
-         template< help::sign unit, help::source_iterator< unit> iterator>
+         template< help::byte unit, help::source_iterator< unit> iterator>
          struct parser : help::source< unit, iterator>
          {
             using base = help::source< unit, iterator>;
@@ -333,7 +333,7 @@ namespace poly_version
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
 
-         template< help::sign unit, help::target_iterator< unit> iterator, bool packed, bool strict>
+         template< help::byte unit, help::target_iterator< unit> iterator, bool packed, bool strict>
          struct writer : help::target< unit, iterator>
          {
             using base = help::target< unit, iterator>;
