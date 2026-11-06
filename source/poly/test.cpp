@@ -1880,6 +1880,23 @@ top: world
             const auto back = cbor::parse( in);
             assert( cbor::write( back) == bytes);
          }
+
+         void pack_streams()
+         {
+            const auto root = sample();
+            const auto bytes = pack::write( root);
+
+            std::ostringstream out;
+            pack::write( root, out);
+            const auto produced = out.str();
+            assert( produced.size() == bytes.size());
+            assert( std::equal( bytes.begin(), bytes.end(), produced.begin(),
+               []( std::byte a, char b) { return a == static_cast< std::byte>( b); }));
+
+            std::istringstream in{ produced};
+            const auto back = pack::parse( in);
+            assert( pack::write( back) == bytes);
+         }
       } // cases
 
       void all()
@@ -1888,6 +1905,7 @@ top: world
          cases::yaml_streams();
          cases::toml_streams();
          cases::cbor_streams();
+         cases::pack_streams();
       }
    } // streams::test
 } // poly_version
@@ -1895,42 +1913,42 @@ top: world
 
 int main( const int argc, const char* const argv[])
 {
-try
-{
-   if( argc > 1)
+   try
    {
-      for( int idx = 1; idx < argc; ++idx)
+      if( argc > 1)
       {
-         const std::string_view path{ argv[ idx]};
-         std::ifstream file{ argv[ idx]};
-         if( ! file)
-            throw std::runtime_error{ std::format( "failed to open file [{}]", argv[ idx])};
+         for( int idx = 1; idx < argc; ++idx)
+         {
+            const std::string_view path{ argv[ idx]};
+            std::ifstream file{ argv[ idx]};
+            if( ! file)
+               throw std::runtime_error{ std::format( "failed to open file [{}]", argv[ idx])};
 
-         if(      path.ends_with( ".json")) poly::json::parse( file);
-         else if( path.ends_with( ".toml")) poly::toml::parse( file);
-         else if( path.ends_with( ".yaml")
-               || path.ends_with( ".yml"))  poly::yaml::parse( file);
-         else throw std::runtime_error{ std::format( "unknown extension for file [{}] (expected .json, .toml, .yaml, .yml)", argv[ idx])};
+            if(      path.ends_with( ".json")) poly::json::parse( file);
+            else if( path.ends_with( ".toml")) poly::toml::parse( file);
+            else if( path.ends_with( ".yaml")
+                  || path.ends_with( ".yml"))  poly::yaml::parse( file);
+            else throw std::runtime_error{ std::format( "unknown extension for file [{}] (expected .json, .toml, .yaml, .yml)", argv[ idx])};
+         }
       }
-   }
-   else
-   {
-      poly::help::test::all();
-      poly::base::test::all();
-      poly::tool::test::all();
-      poly::json::test::all();
-      poly::toml::test::all();
-      poly::yaml::test::all();
-      poly::cbor::test::all();
-      poly::pack::test::all();
-      poly::streams::test::all();
-   }
+      else
+      {
+         poly::help::test::all();
+         poly::base::test::all();
+         poly::tool::test::all();
+         poly::json::test::all();
+         poly::toml::test::all();
+         poly::yaml::test::all();
+         poly::cbor::test::all();
+         poly::pack::test::all();
+         poly::streams::test::all();
+      }
 
-   return 0;
-}
-catch( const std::exception& e)
-{
-   std::println( stderr, "{}", e.what());
-   return 1;
-}
+      return 0;
+   }
+   catch( const std::exception& e)
+   {
+      std::println( stderr, "{}", e.what());
+      return 1;
+   }
 }
