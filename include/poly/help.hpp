@@ -238,6 +238,10 @@ namespace poly_version
                return {};
             };
 
+            if( data.ends_with( 'Z'))
+               if( auto result = parse.template operator()< std::chrono::system_clock::time_point>( "%FT%TZ"))
+                  return *result;
+
             if( auto result = parse.template operator()< node::local_date>( "%F"))
                return *result;
 
