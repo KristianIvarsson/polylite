@@ -296,33 +296,33 @@ namespace poly_version
             return result;
          }            
 
-         auto point( const std::same_as< type::i32> auto code)
+         auto point( const std::same_as< type::i32> auto rune)
          {
             std::string nrv;
 
             using unit = std::string::value_type;
 
-            if( code < 0x80)
+            if( rune < 0x80)
             {
-               nrv.push_back( static_cast< unit>( code));
+               nrv.push_back( static_cast< unit>( rune));
             }
-            else if( code < 0x800)
+            else if( rune < 0x800)
             {
-               nrv.push_back( static_cast< unit>( 0xC0 | (( code >> 6) & 0x1F)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xC0 | (( rune >> 6) & 0x1F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune & 0x3F))));
             }
-            else if( code < 0x10000)
+            else if( rune < 0x10000)
             {
-               nrv.push_back( static_cast< unit>( 0xE0 | (( code >> 12) & 0x0F)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 6) & 0x3F)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xE0 | (( rune >> 12) & 0x0F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune >> 6) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune & 0x3F))));
             }
             else
             {
-               nrv.push_back( static_cast< unit>( 0xF0 | (( code >> 18) & 0x07)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 12) & 0x3F)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code >> 6) & 0x3F)));
-               nrv.push_back( static_cast< unit>( 0x80 | (( code & 0x3F))));
+               nrv.push_back( static_cast< unit>( 0xF0 | (( rune >> 18) & 0x07)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune >> 12) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune >> 6) & 0x3F)));
+               nrv.push_back( static_cast< unit>( 0x80 | (( rune & 0x3F))));
             }
 
             return nrv;

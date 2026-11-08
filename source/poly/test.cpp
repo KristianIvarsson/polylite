@@ -4,6 +4,7 @@
 #include "poly/pack.hpp"
 #include "poly/toml.hpp"
 #include "poly/tool.hpp"
+#include "poly/xml.hpp"
 #include "poly/yaml.hpp"
 
 #include <print>
@@ -1808,6 +1809,240 @@ top: world
       }
    } // pack::test
 
+   namespace xml::plist::test
+   {
+      namespace cases
+      {
+         namespace detail
+         {
+            auto roundtrip( const node& node)
+            {
+               const auto source = compact::write( node);
+               const auto target = compact::write( parse( source));
+               assert( source == target);
+            }
+         } // detail
+
+         void writing()
+         {
+            assert( compact::write( true) == "<true/>");
+            assert( compact::write( false) == "<false/>");
+            assert( compact::write( -42) == "<integer>-42</integer>");
+            assert( compact::write( 3.25) == "<real>3.25</real>");
+            assert( compact::write( "qwerty") == "<string>qwerty</string>");
+            assert( compact::write( node{ node::binary{ std::byte{ 0x01}, std::byte{ 0x02}, std::byte{ 0xFF}}}) == "<data>AQL/</data>");
+
+            assert( compact::write( node{ node::object{}}) == "<dict/>");
+            assert( compact::write( node{ node::array{}}) == "<array/>");
+
+            node source;
+            source[ "a"] = 1;
+            source[ "b"][ 0] = true;
+            assert( compact::write( source) == "<dict><key>a</key><integer>1</integer><key>b</key><array><true/></array></dict>");
+            assert( write( source) == "<dict>\n   <key>a</key>\n   <integer>1</integer>\n   <key>b</key>\n   <array>\n      <true/>\n   </array>\n</dict>");
+         }
+
+         void escaping()
+         {
+            assert( compact::write( "a <&> \"b\" 'c'") == "<string>a &lt;&amp;&gt; \"b\" 'c'</string>");
+            assert( compact::write( "a\r\nb\tc") == "<string>a&#13;\nb\tc</string>");
+
+            node source;
+            source[ "<&>"] = 1;
+            assert( compact::write( source) == "<dict><key>&lt;&amp;&gt;</key><integer>1</integer></dict>");
+
+            // control characters other than tab, line feed and carriage return are not allowed in XML 1.0
+            assert( throws( []{ compact::write( "a\x01" "b"); }));
+            assert( compact::write( "a\x7F" "b") == "<string>a\x7F" "b</string>");
+         }
+
+         void instants()
+         {
+            using namespace std::chrono;
+
+            // zoned times are written as UTC with whole seconds
+            const auto zoned = node::zoned_datetime{ "Europe/Stockholm", local_days{ 2026y/11/6} + 10h + 28min + 34s + 999ms};
+            assert( compact::write( zoned) == "<date>2026-11-06T09:28:34Z</date>");
+
+            const auto parsed = plist::parse( "<date>2026-11-06T09:28:34Z</date>");
+            assert( parsed.as_zoned_datetime().get_sys_time() == sys_days{ 2026y/11/6} + 9h + 28min + 34s);
+
+            // plist dates must be UTC
+            assert( throws( []{ plist::parse( "<date>2026-11-06T09:28:34</date>"); }));
+            assert( throws( []{ plist::parse( "<date>2026-11-06</date>"); }));
+         }
+
+         void strictness()
+         {
+            // strict: nothing and local instants cannot be represented
+            assert( throws( []{ compact::write( nullptr); }));
+            assert( throws( []{ compact::write( help::transform::instant( "2026-11-05").value()); }));
+            assert( throws( []{ compact::write( help::transform::instant( "12:34:56").value()); }));
+            assert( throws( []{ compact::write( help::transform::instant( "2026-11-05T12:34:56").value()); }));
+
+            // gentle: written as strings
+            assert( compact::gentle::write( nullptr) == "<string>null</string>");
+            assert( compact::gentle::write( help::transform::instant( "2026-11-05").value()) == "<string>2026-11-05</string>");
+            assert( compact::gentle::write( help::transform::instant( "12:34:56").value()) == "<string>12:34:56</string>");
+         }
+
+         void whole()
+         {
+            constexpr std::string_view head =
+               "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+               "<plist version=\"1.0\">\n";
+
+            assert( plist::whole( 42) == std::format( "{}<integer>42</integer>\n</plist>", head));
+            assert( compact::whole( 42).ends_with( "<plist version=\"1.0\"><integer>42</integer></plist>"));
+
+            // both forms parse back
+            assert( plist::parse( plist::whole( 42)).as_integer() == 42);
+            assert( plist::parse( compact::whole( 42)).as_integer() == 42);
+         }
+
+         void parsing()
+         {
+            assert( plist::parse( "<true/>").as_boolean() == true);
+            assert( plist::parse( "<false/>").as_boolean() == false);
+            assert( plist::parse( "<true></true>").as_boolean() == true);
+            assert( plist::parse( "<integer>-42</integer>").as_integer() == -42);
+            assert( plist::parse( "<integer>+7</integer>").as_integer() == 7);
+            assert( plist::parse( "<integer>0x1F</integer>").as_integer() == 31);
+            assert( plist::parse( "<real>3.25</real>").as_decimal() == 3.25);
+            assert( plist::parse( "<real>42</real>").as_decimal() == 42.0);
+            assert( plist::parse( "<real>+infinity</real>").as_decimal() == std::numeric_limits< node::decimal>::infinity());
+            assert( plist::parse( "<real>-inf</real>").as_decimal() == -std::numeric_limits< node::decimal>::infinity());
+            assert( std::isnan( plist::parse( "<real>nan</real>").as_decimal()));
+            assert( plist::parse( "<string>qwerty</string>").as_string() == "qwerty");
+            assert( plist::parse( "<string/>").as_string().empty());
+            assert( plist::parse( "<string></string>").as_string().empty());
+            assert( plist::parse( "<data>AQL/</data>").as_binary() == node::binary( { std::byte{ 0x01}, std::byte{ 0x02}, std::byte{ 0xFF}}));
+
+            assert( plist::parse( "<dict/>").as_object().empty());
+            assert( plist::parse( "<array/>").as_array().empty());
+
+            const auto parsed = plist::parse( "<dict><key>a</key><integer>1</integer><key>b</key><array><true/><string>x</string></array></dict>");
+            assert( parsed.at( "a").as_integer() == 1);
+            assert( parsed.at( "b").at( 0).as_boolean() == true);
+            assert( parsed.at( "b").at( 1).as_string() == "x");
+         }
+
+         void unescaping()
+         {
+            assert( plist::parse( "<string>&amp;&lt;&gt;&quot;&apos;</string>").as_string() == "&<>\"'");
+            assert( plist::parse( "<string>&#65;&#x42;&#x1F600;</string>").as_string() == "AB\xF0\x9F\x98\x80");
+
+            // literal line breaks are normalized, a character reference keeps the carriage return
+            assert( plist::parse( "<string>a\r\nb\rc\nd</string>").as_string() == "a\nb\nc\nd");
+            assert( plist::parse( "<string>a&#13;\nb\tc</string>").as_string() == "a\r\nb\tc");
+
+            const auto escaped = plist::parse( "<dict><key>&lt;&amp;&gt;</key><true/></dict>");
+            assert( escaped.at( "<&>").as_boolean() == true);
+
+            assert( throws( []{ plist::parse( "<string>&foo;</string>"); }));
+            assert( throws( []{ plist::parse( "<string>&#0;</string>"); }));
+            assert( throws( []{ plist::parse( "<string>&#xD800;</string>"); }));
+            assert( throws( []{ plist::parse( "<string>&#X41;</string>"); }));
+            assert( throws( []{ plist::parse( "<string>a\x01" "b</string>"); }));
+         }
+
+         void markup()
+         {
+            // declaration, doctype, comments and whitespace around the plist element
+            const auto parsed = plist::parse(
+               "<!-- c -->\n"
+               "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+               "<!-- a > b -->\n"
+               "<plist version=\"1.0\">\n"
+               "   <!-- c -->\n"
+               "   <dict >\n"
+               "      <!-- c -->\n"
+               "      <key>a</key>\n"
+               "      <!-- c -->\n"
+               "      <integer>1</integer>\n"
+               "      <key>b</key>\n"
+               "      <true />\n"
+               "   </dict >\n"
+               "</plist>\n"
+               "<!-- c -->\n");
+            assert( parsed.at( "a").as_integer() == 1);
+            assert( parsed.at( "b").as_boolean() == true);
+         }
+
+         void malformed()
+         {
+            // a value where a key is expected
+            assert( throws( []{ plist::parse( "<dict><string>x</string></dict>"); }));
+            // mismatched closing tag
+            assert( throws( []{ plist::parse( "<array><string>x</integer></array>"); }));
+            assert( throws( []{ plist::parse( "<plist><true/></dict>"); }));
+            // unknown element
+            assert( throws( []{ plist::parse( "<foo/>"); }));
+            // the plist element must contain a value
+            assert( throws( []{ plist::parse( "<plist/>"); }));
+            assert( throws( []{ plist::parse( "<plist></plist>"); }));
+            // invalid values
+            assert( throws( []{ plist::parse( "<integer>1.5</integer>"); }));
+            assert( throws( []{ plist::parse( "<integer>x</integer>"); }));
+            assert( throws( []{ plist::parse( "<real>x</real>"); }));
+            // unterminated input
+            assert( throws( []{ plist::parse( "<array><true/>"); }));
+            assert( throws( []{ plist::parse( "<!-- c"); }));
+            // trailing data
+            assert( throws( []{ plist::parse( "<true/><true/>"); }));
+            assert( throws( []{ plist::parse( "<true/>junk"); }));
+         }
+
+         void roundtrip()
+         {
+            using namespace std::chrono;
+
+            detail::roundtrip( true);
+            detail::roundtrip( false);
+            detail::roundtrip( 42);
+            detail::roundtrip( std::numeric_limits< node::integer>::min());
+            detail::roundtrip( std::numeric_limits< node::integer>::max());
+            detail::roundtrip( 3.14);
+            detail::roundtrip( std::numeric_limits< node::decimal>::infinity());
+            detail::roundtrip( "a <&> \"b\"\r\nc\td");
+            detail::roundtrip( node{ node::binary( 256)});
+            detail::roundtrip( node{ node::zoned_datetime{ "UTC", sys_seconds{ sys_days{ 2026y/11/5} + 21h + 54min + 20s}}});
+
+            node source;
+            source[ "aaa"] = true;
+            source[ "bbb"] = -42;
+            source[ "ccc"] = 3.14;
+            source[ "ddd"] = "qwerty";
+            source[ "eee"][ 0] = 123456;
+            source[ "eee"][ 1] = node::object{};
+            source[ "eee"][ 2] = node::array{};
+            source[ "fff"][ "xxx"] = 123;
+            source[ "fff"][ "yyy"] = 456;
+            detail::roundtrip( source);
+
+            // the elegant and whole forms parse back to the same data
+            assert( compact::write( plist::parse( write( source))) == compact::write( source));
+            assert( compact::write( plist::parse( plist::whole( source))) == compact::write( source));
+         }
+      } // cases
+
+      void all()
+      {
+         cases::writing();
+         cases::escaping();
+         cases::instants();
+         cases::strictness();
+         cases::whole();
+         cases::parsing();
+         cases::unescaping();
+         cases::markup();
+         cases::malformed();
+         cases::roundtrip();
+      }
+   } // xml::plist::test
+
    namespace streams::test
    {
       namespace cases
@@ -1941,6 +2176,7 @@ int main( const int argc, const char* const argv[])
          poly::yaml::test::all();
          poly::cbor::test::all();
          poly::pack::test::all();
+         poly::xml::plist::test::all();
          poly::streams::test::all();
       }
 

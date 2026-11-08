@@ -8,14 +8,192 @@
 
 #include "help.hpp"
 
+#include <tuple>
+#include <string>
+
 namespace poly_version
 {
    namespace xml
    {
       namespace detail
       {
-         constexpr std::size_t spaces = 3;
+         template< help::byte unit, help::source_iterator< unit> iterator>
+         struct parser : help::parser< unit, iterator>
+         {
+            using base = help::parser< unit, iterator>;
+            using base::mark;
+            using base::done;
+            using base::drop;
+            using base::good;
+            using base::halt;
+            using base::look;
+            using base::peek;
+            using base::pull;
+            using base::read;
+            using base::skip;
+            using base::take;
+            using base::test;
 
+            enum class form
+            {
+               done,
+               open,
+               seal,
+               bare,
+               head,
+               kind,
+               note,
+            };
+
+            auto till( const std::string_view stop)
+            {
+               std::string nrv;
+               do
+                  nrv.push_back( pull());
+               while( ! nrv.ends_with( stop));
+               nrv.resize( nrv.size() - stop.size());
+               return nrv;
+            }
+
+            auto till( const help::byte auto stop)
+            {
+               std::string nrv;
+               for( auto sign = pull(); sign != stop; sign = pull())
+                  nrv.push_back( sign);
+               return nrv;
+            }
+
+            auto next() -> std::tuple< form, std::string>
+            {
+               skip();
+
+               if( ! good())
+                  return { form::done, {}};
+
+               test( '<', take());
+
+               const auto sign = pull();
+
+               if( sign == '?')
+                  return { form::head, help::trim( till( "?>"))};
+               
+               if( sign == '!')
+               {
+                  if( peek() == '-')
+                  {
+                     drop(); // '-'
+                     test( '-', pull());
+                     return { form::note, till( "-->")};
+                  }
+
+                  for( const auto data : std::string_view{ "DOCTYPE"}) test( data, pull());
+                  return { form::kind, help::trim( till( '>'))};
+               }
+
+               if( sign == '/')
+                  return { form::seal, help::trim( till( '>'))};
+
+               std::string data = sign + till( '>');
+
+               if( data.ends_with( '/'))
+                  return data.pop_back(), std::tuple{ form::bare, help::trim( std::move( data))};
+
+               return { form::open, help::trim( std::move( data))};
+            }
+
+            auto sift()
+            {
+               while( true)
+                  if( auto item = next(); std::get< form>( item) != form::note)
+                     return item;
+            }
+
+            static auto word( const std::string_view data) -> std::string_view
+            {
+               const auto last = std::ranges::find_if( data, []( const auto sign){ return help::is::space( sign);});
+               return data.substr( 0, last - std::begin( data));
+            }
+
+            auto want( const form wish)
+            {
+               auto [type, data] = sift();
+
+               if( type != wish) [[unlikely]] halt( "unexpected type");
+
+               return std::move( data);
+            }
+
+            void want( const form wish, const auto name)
+            {
+               if( word( want( wish)) != name) [[unlikely]] halt( "unexpected name");
+            }
+
+            auto cast( std::string_view data) -> std::string
+            {
+               if( data == "amp")  return "&";
+               if( data == "lt")   return "<";
+               if( data == "gt")   return ">";
+               if( data == "quot") return "\"";
+               if( data == "apos") return "'";
+
+               if( data.starts_with( '#'))
+               {
+                  data = data.substr( 1);
+                  const bool hexa = data.starts_with( 'x');
+                  data = data.substr( hexa);
+
+                  help::type::i32 code{};
+                  const auto [ last, error] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
+
+                  auto scan = [] ( const help::type::i32 rune)
+                     {
+                        return rune == 0x9 || rune == 0xA || rune == 0xD
+                           || ( rune >= 0x20    && rune <= 0xD7FF)
+                           || ( rune >= 0xE000  && rune <= 0xFFFD)
+                           || ( rune >= 0x10000 && rune <= 0x10FFFF);
+                     };
+
+                  if( error == std::errc{} && last == data.data() + data.size() && scan( code))
+                     return help::transform::point( code);
+               }
+
+               [[unlikely]] halt( "invalid entity");
+            }
+
+            auto text()
+            {
+               std::string nrv;
+
+               while( good() && look() != '<')
+               {
+                  switch( const auto sign = take())
+                  {
+                  case '&':
+                     nrv.append( cast( till( ';')));
+                     break;
+
+                  case '\r':
+                     if( peek() != '\n')
+                        nrv.push_back( '\n');
+                     break;
+
+                  case '\t':
+                  case '\n':
+                     nrv.push_back( sign);
+                     break;
+
+                  default:
+                     if( help::is::in::range< 0x0, 0x1F>( sign))
+                        [[unlikely]] halt( "invalid character");
+                     nrv.push_back( sign);
+                  }
+               }
+
+               return nrv;
+            }
+         };
+
+         constexpr std::size_t spaces = 3;
          template< help::byte unit, help::target_iterator< unit> iterator, std::size_t spaces>
          struct writer : help::writer< unit, iterator>
          {
@@ -126,8 +304,167 @@ namespace poly_version
                constexpr std::string_view no       { "false"};
 
                constexpr std::string_view name     { "key"};
+
+               constexpr std::string_view root     { "plist"};
             }// types
 
+         } // detail
+
+
+         namespace detail
+         {
+            template< help::byte unit, help::source_iterator< unit> iterator>
+            struct parser : xml::detail::parser< unit, iterator>
+            {
+               using base = xml::detail::parser< unit, iterator>;
+               using base::halt;
+               using base::word;
+               using base::sift;
+               using base::text;
+               using base::want;
+
+               using typename base::form;
+
+               auto operator()()
+               {
+                  auto [ type, data] = sift();
+
+                  // skipping potential declaration and doctype
+                  while( type == form::head || type == form::kind)
+                     std::tie( type, data) = sift();
+
+                  const auto root = type == form::open && word( data) == types::root;
+
+                  if( root)
+                     std::tie( type, data) = sift();
+
+                  auto nrv = spot( type, data);
+
+                  if( root)
+                     want( form::seal, types::root);
+
+                  want( form::done);
+
+                  return nrv;
+               }
+
+            private:
+
+               auto leaf( const std::string_view name, const bool bare) -> std::string
+               {
+                  if( bare)
+                     return {};
+
+                  auto data = text();
+                  want( form::seal, name);
+                  return data;
+               }
+
+               node spot( const form type, const std::string_view data)
+               {
+                  if( type != form::open && type != form::bare)
+                     [[unlikely]] halt( "expected element");
+
+                  const auto name = word( data);
+                  const bool bare = type == form::bare;
+
+                  if( name == types::object)  return bare ? node::object{} : object();
+                  if( name == types::array)   return bare ? node::array{}  : array();
+                  if( name == types::yes)     return leaf( name, bare), true;
+                  if( name == types::no)      return leaf( name, bare), false;
+                  if( name == types::string)  return leaf( name, bare);
+                  if( name == types::integer) return integer( leaf( name, bare));
+                  if( name == types::decimal) return decimal( leaf( name, bare));
+                  if( name == types::instant) return instant( leaf( name, bare));
+                  if( name == types::binary)  return binary( leaf( name, bare));
+
+                  [[unlikely]] halt( "unknown element");
+               }
+
+               auto object()
+               {
+                  node::object nrv;
+
+                  while( true)
+                  {
+                     auto [type, data] = sift();
+
+                     if( type == form::seal && word( data) == types::object)
+                        break;
+
+                     if( type != form::open || word( data) != types::name)
+                        [[unlikely]] halt( "unexpected element");
+
+                     auto name = text();
+                     want( form::seal, types::name);
+                     std::tie( type, data) = sift();
+                     nrv.emplace( std::move( name), spot( type, data));
+                  }
+
+                  return nrv;
+               }
+
+               auto array()
+               {
+                  node::array nrv;
+
+                  while( true)
+                  {
+                     auto [type, data] = sift();
+
+                     if( type == form::seal && word( data) == types::array)
+                        break;
+
+                     nrv.push_back( spot( type, data));
+                  }
+
+                  return nrv;
+               }
+
+               auto integer( const std::string_view data)
+               {
+                  if( auto result = help::transform::number( data); result && result->is_integer())
+                     return std::move( *result);
+
+                  [[unlikely]] halt( "unexpected data");
+               }
+
+               auto decimal( const std::string_view data)
+               {
+                  if( auto result = help::transform::number( data); result && result->is_numeric())
+                     return result->is_integer() ? node{ static_cast< node::decimal>( result->as_integer())} : std::move( *result);
+
+                  [[unlikely]] halt( "unexpected data");
+               }
+
+               auto instant( const std::string_view data)
+               {
+                  if( auto result = help::transform::instant( data))
+                     if( std::holds_alternative< node::zoned_datetime>( *result))
+                        return std::move( *result);
+
+                  [[unlikely]] halt( "unexpected data");
+               }
+
+               auto binary( const std::string_view data)
+               {
+                  if( auto result = help::transform::binary( data); result)
+                     return std::move( *result);
+
+                  [[unlikely]] halt( "unexpected data");
+               }
+               
+            };
+
+         } // detail
+
+         auto parse( auto&& source)
+         {
+            return help::make::source< detail::parser>( source)();
+         }
+
+         namespace detail
+         {
 
             template< help::byte unit, help::target_iterator< unit> iterator, std::size_t spaces, bool strict>
             struct writer : xml::detail::writer< unit, iterator, spaces>
