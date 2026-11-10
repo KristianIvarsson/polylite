@@ -22,6 +22,7 @@ namespace poly_version
          struct parser : help::parser< unit, iterator>
          {
             using base = help::parser< unit, iterator>;
+            using base::deny;
             using base::drop;
             using base::good;
             using base::halt;
@@ -37,6 +38,7 @@ namespace poly_version
                hint,
                kind,
                note,
+               lump,
                open,
                seal,
                bare,
@@ -84,6 +86,12 @@ namespace poly_version
                      return { form::note, till( "-->")};
                   }
 
+                  if( peek() == '[')
+                  {
+                     for( const auto data : std::string_view{ "[CDATA["}) test( data, pull());
+                     return { form::lump, till( "]]>")};
+                  }
+
                   for( const auto data : std::string_view{ "DOCTYPE"}) test( data, pull());
                   return { form::kind, help::trim( till( '>'))};
                }
@@ -102,8 +110,19 @@ namespace poly_version
             auto sift()
             {
                while( true)
-                  if( auto item = next(); std::get< form>( item) != form::hint && std::get< form>( item) != form::note)
+               {
+                  auto item = next();
+
+                  const auto type = std::get< form>( item);
+
+                  if( type != form::hint && type != form::note)
+                  {
+                     if( type == form::lump)
+                        [[unlikely]] deny( "CDATA");
+
                      return item;
+                  }
+               }
             }
 
             static auto word( const std::string_view data) -> std::string_view

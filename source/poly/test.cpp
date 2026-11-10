@@ -2034,6 +2034,8 @@ top: world
             // trailing data
             assert( throws( []{ plist::parse( "<true/><true/>"); }));
             assert( throws( []{ plist::parse( "<true/>junk"); }));
+            // CDATA sections are not supported yet
+            assert( throws( []{ plist::parse( "<string><![CDATA[x]]></string>"); }));
          }
 
          void roundtrip()
