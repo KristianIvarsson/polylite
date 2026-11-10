@@ -10,6 +10,7 @@
 
 #include <tuple>
 #include <string>
+#include <optional>
 
 namespace poly_version
 {
@@ -21,28 +22,25 @@ namespace poly_version
          struct parser : help::parser< unit, iterator>
          {
             using base = help::parser< unit, iterator>;
-            using base::mark;
-            using base::done;
             using base::drop;
             using base::good;
             using base::halt;
             using base::look;
             using base::peek;
             using base::pull;
-            using base::read;
             using base::skip;
             using base::take;
             using base::test;
 
             enum class form
             {
-               done,
+               hint,
+               kind,
+               note,
                open,
                seal,
                bare,
-               head,
-               kind,
-               note,
+               done,
             };
 
             auto till( const std::string_view stop)
@@ -75,7 +73,7 @@ namespace poly_version
                const auto sign = pull();
 
                if( sign == '?')
-                  return { form::head, help::trim( till( "?>"))};
+                  return { form::hint, help::trim( till( "?>"))};
                
                if( sign == '!')
                {
@@ -104,7 +102,7 @@ namespace poly_version
             auto sift()
             {
                while( true)
-                  if( auto item = next(); std::get< form>( item) != form::note)
+                  if( auto item = next(); std::get< form>( item) != form::hint && std::get< form>( item) != form::note)
                      return item;
             }
 
@@ -191,6 +189,69 @@ namespace poly_version
 
                return nrv;
             }
+
+            //! @return the raw value of the attribute, or nullopt if absent or malformed
+            static auto slot( std::string_view data, const std::string_view name) -> std::optional< std::string_view>
+            {
+               auto part = [ &data]( const std::string_view signs) -> std::optional< std::string_view>
+               {
+                  const auto spot = data.find_first_of( signs);
+                  if( spot == std::string_view::npos)
+                     return std::nullopt;
+
+                  const auto nrv = data.substr( 0, spot);
+                  data.remove_prefix( spot + 1);
+                  return nrv;
+               };
+
+               data.remove_prefix( word( data).size());
+
+               while( true)
+               {
+                  auto view = part( "=");
+                  if( ! view)
+                     return std::nullopt;
+
+                  while( ! view->empty() && help::is::space( view->front())) view->remove_prefix( 1);
+                  while( ! view->empty() && help::is::space( view->back())) view->remove_suffix( 1);
+
+                  if( ! part( "\"'"))
+                     return std::nullopt;
+
+                  // value ends at the same kind of sign that opened it
+                  const auto crop = part( { data.data() - 1, 1});
+                  if( ! crop || view == name)
+                     return crop;
+               }
+            }
+
+            auto head()
+            {
+               auto [ type, data] = next();
+
+               if( type == form::hint && word( data) == "xml")
+               {
+                  auto equal = [] ( const std::string_view lhs, const std::string_view rhs)
+                  {
+                     return std::ranges::equal( lhs, rhs, [] ( const auto first, const auto other) 
+                     { 
+                        return help::to::lower( first) == help::to::lower( other); 
+                     });
+                  };
+
+                  if( const auto value = slot( data, "version"); value && ! equal( *value, "1.0"))
+                     [[unlikely]] halt( "unsupported xml version");
+
+                  if( const auto value = slot( data, "encoding"); value && ! equal( *value, "UTF-8"))
+                     [[unlikely]] halt( "unsupported xml encoding");
+               }
+
+               if( type == form::hint || type == form::note)
+                  std::tie( type, data) = sift();               
+
+               return std::make_tuple( type, std::move( data));
+            }
+
          };
 
          constexpr std::size_t spaces = 3;
@@ -318,8 +379,10 @@ namespace poly_version
             {
                using base = xml::detail::parser< unit, iterator>;
                using base::halt;
+               using base::head;
                using base::word;
                using base::sift;
+               using base::slot;
                using base::text;
                using base::want;
 
@@ -327,13 +390,17 @@ namespace poly_version
 
                auto operator()()
                {
-                  auto [ type, data] = sift();
+                  auto [ type, data] = head();
 
-                  // skipping potential declaration and doctype
-                  while( type == form::head || type == form::kind)
+                  // skipping potential doctype
+                  if( type == form::kind)
                      std::tie( type, data) = sift();
 
                   const auto root = type == form::open && word( data) == types::root;
+
+                  if( root)
+                     if( const auto value = slot( data, "version"); value && value != "1.0")
+                        [[unlikely]] halt( "unsupported plist version");
 
                   if( root)
                      std::tie( type, data) = sift();

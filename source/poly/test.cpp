@@ -1951,8 +1951,8 @@ top: world
          {
             // declaration, doctype, comments and whitespace around the plist element
             const auto parsed = plist::parse(
-               "<!-- c -->\n"
                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+               "<!-- c -->\n"
                "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
                "<!-- a > b -->\n"
                "<plist version=\"1.0\">\n"
@@ -1969,6 +1969,47 @@ top: world
                "<!-- c -->\n");
             assert( parsed.at( "a").as_integer() == 1);
             assert( parsed.at( "b").as_boolean() == true);
+         }
+
+         void prolog()
+         {
+            // the declaration is optional and so are its version and encoding
+            assert( plist::parse( "<?xml version=\"1.0\" encoding=\"UTF-8\"?><true/>").as_boolean());
+            assert( plist::parse( "<?xml version=\"1.0\"?><true/>").as_boolean());
+            assert( plist::parse( "<?xml encoding=\"UTF-8\"?><true/>").as_boolean());
+            assert( plist::parse( "<?xml version='1.0' encoding='UTF-8'?><true/>").as_boolean());
+
+            // encoding names are case-insensitive
+            assert( plist::parse( "<?xml version=\"1.0\" encoding=\"utf-8\"?><true/>").as_boolean());
+
+            // only XML 1.0 in UTF-8 is supported
+            assert( throws( []{ plist::parse( "<?xml version=\"1.1\"?><true/>"); }));
+            assert( throws( []{ plist::parse( "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><true/>"); }));
+            assert( throws( []{ plist::parse( "<?xml version=\"1.0\" encoding=\"UTF8\"?><true/>"); }));
+
+            // the plist version is optional, but only 1.0 is supported
+            assert( plist::parse( "<plist><true/></plist>").as_boolean());
+            assert( plist::parse( "<plist version=\"1.0\"><true/></plist>").as_boolean());
+            assert( throws( []{ plist::parse( "<plist version=\"2.0\"><true/></plist>"); }));
+
+            // comments and processing instructions may precede the doctype and the root without a declaration
+            assert( plist::parse( "<!-- c --><true/>").as_boolean());
+            assert( plist::parse( "<?pi x?><true/>").as_boolean());
+            assert( plist::parse( "<!-- c --><!DOCTYPE plist><true/>").as_boolean());
+
+            // processing instructions are ignored everywhere
+            const auto parsed = plist::parse(
+               "<?xml version=\"1.0\"?>"
+               "<?pi x?>"
+               "<!DOCTYPE plist>"
+               "<?pi x?>"
+               "<plist>"
+               "<?pi x?>"
+               "<dict><?pi x?><key>a</key><?pi x?><array><?pi x?><true/><?pi x?></array></dict>"
+               "<?pi x?>"
+               "</plist>"
+               "<?pi x?>");
+            assert( parsed.at( "a").at( 0).as_boolean());
          }
 
          void malformed()
@@ -2038,6 +2079,7 @@ top: world
          cases::parsing();
          cases::unescaping();
          cases::markup();
+         cases::prolog();
          cases::malformed();
          cases::roundtrip();
       }
