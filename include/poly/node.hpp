@@ -34,6 +34,13 @@ namespace poly_version
       static_assert( std::numeric_limits< double>::is_iec559 && sizeof( double) == sizeof( std::uint64_t));
       using decimal = double;
       #endif
+
+      using instant = std::variant< 
+         std::chrono::local_time< std::chrono::days>, 
+         std::chrono::hh_mm_ss< std::chrono::system_clock::duration>, 
+         std::chrono::local_time< std::chrono::system_clock::duration>, 
+         std::chrono::zoned_time< std::chrono::system_clock::duration>>;
+
    } // detail
 
    struct node;
@@ -43,13 +50,7 @@ namespace poly_version
       detail::boolean, 
       detail::integer, 
       detail::decimal, 
-      std::variant
-      < 
-         std::chrono::local_time< std::chrono::days>, 
-         std::chrono::hh_mm_ss< std::chrono::system_clock::duration>, 
-         std::chrono::local_time< std::chrono::system_clock::duration>, 
-         std::chrono::zoned_time< std::chrono::system_clock::duration>
-      >,
+      detail::instant,
       std::string, 
       std::vector< std::byte>, 
       std::vector< node>, 
@@ -168,7 +169,7 @@ namespace poly_version
       {
          if( not to_array())
             *this = node::array{};
-         
+
          while( std::cmp_less_equal( as_array().size(), lookup))
             as_array().emplace_back();
 
@@ -195,8 +196,8 @@ namespace poly_version
       constexpr bool is_array() const noexcept { return to_array(); }
       constexpr bool is_object() const noexcept { return to_object(); }
 
-      constexpr bool is_local_time() const noexcept { return to_local_time(); }
       constexpr bool is_local_date() const noexcept { return to_local_date(); }
+      constexpr bool is_local_time() const noexcept { return to_local_time(); }
       constexpr bool is_local_datetime() const noexcept { return to_local_datetime(); }
       constexpr bool is_zoned_datetime() const noexcept { return to_zoned_datetime(); }
 
