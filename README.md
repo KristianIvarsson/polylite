@@ -11,7 +11,7 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
 
 ### Note
 
@@ -29,7 +29,15 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), TOML and YAML are support
 
 #### PACK
 - `zoned_datetime` is written and parsed as UTC, since the timestamp extension has no zone offset
+- `zoned_datetime` is written without fractions, since the specification mandates that
 - `local_date`, `local_time` and `local_datetime` inside `instant` are not native MSGPACK types but are written as strings in *gentle* mode
+
+#### PLIST
+#### PLIST
+- `nothing` (_null_) is not a native type
+- `zoned_datetime` is written as UTC without fractions, since `<date>` only allows `YYYY-MM-DDTHH:MM:SSZ`
+- `local_date`, `local_time` and `local_datetime` inside `instant` are not native PLIST types but are written as strings in *gentle* mode
+- `write()` produces only the value, while `whole()` also adds the XML declaration, the DOCTYPE and the `<plist>` element
 
 #### TOML
 - `nothing` (_null_) is not a native type
@@ -57,6 +65,15 @@ The following are detected and rejected with an error:
 - Integer values outside `node::integer` range
 - Extension types other than _timestamp_ (due to the nature of poly::node)
 - Map keys that aren't strings (due to the nature of poly::node::object)
+
+#### PLIST
+- The DOCTYPE is accepted but ignored
+
+The following are detected and rejected with an error:
+- CDATA sections
+- Comments and processing instructions inside text (e.g. `<string>a<!-- c -->b</string>`)
+- XML versions other than 1.0 and encodings other than UTF-8
+- PLIST versions other than 1.0
 
 #### YAML
 - The `%YAML` and `%TAG` directives are accepted but ignored
@@ -143,8 +160,8 @@ auto cbor = poly::cbor::write( node);
 ```
 
 ```cpp
-// same as above (i.e. elegant)
-auto json = poly::json::v4_3_0::elegant::strict::write( node);
+// same as above (i.e. elegant) but with explicit version
+auto json = poly::json::v5_1_0::elegant::strict::write( node);
 ```
 
 ```cpp
@@ -165,6 +182,16 @@ auto json = poly::json::gentle::write( node);
 ```cpp
 // same as above (i.e. elegant and gentle)
 auto json = poly::json::elegant::gentle::write( node);
+```
+
+```cpp
+// write to a string (default for plist)
+auto xml = poly::xml::plist::write( node);
+```
+
+```cpp
+// same as above but with xml declaration, doctype and plist root element
+auto xml = poly::xml::plist::whole( node);
 ```
 
 #### Access
