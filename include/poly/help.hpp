@@ -344,8 +344,10 @@ namespace poly_version
       template< byte unit, source_iterator< unit> iterator>
       struct source
       {
+         using sentinel = std::conditional_t< std::same_as< iterator, std::istreambuf_iterator< unit>>, std::default_sentinel_t, iterator>;
+
          iterator mark;
-         iterator last;
+         [[no_unique_address]] sentinel last;
 
          bool good() const
          {
@@ -421,7 +423,7 @@ namespace poly_version
 
          [[noreturn]] void halt( const std::string_view message) const
          {
-            throw std::runtime_error{ std::format( "{} with {} bytes left to parse", message, std::distance( mark, last))};
+            throw std::runtime_error{ std::format( "{} with {} bytes left to parse", message, std::ranges::distance( mark, last))};
          }
 
          [[noreturn]] void deny( const std::string_view message) const
@@ -711,7 +713,7 @@ namespace poly_version
          auto source( std::istream& value)
          {
             using iterator = std::istreambuf_iterator< std::istream::char_type>;
-            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ value}, iterator{}}};
+            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ value}, std::default_sentinel}};
          }
 
          template< template< typename, typename, auto...> class parser, auto... flags>

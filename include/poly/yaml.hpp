@@ -174,7 +174,7 @@ namespace poly_version
                using typename base::name;
                using typename base::nill;
 
-               flow( iterator& head, iterator tail) : base{ head, tail}, keep{ head} {}
+               flow( iterator& head, auto tail) : base{ head, tail}, keep{ head} {}
                ~flow() { keep = mark; }
 
                auto spot() -> node
