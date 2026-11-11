@@ -293,13 +293,11 @@ namespace poly_version
 
             node simple()
             {
-               const auto data = read( []( const auto sign) 
-                  { 
-                     return help::is::lower( sign); 
-                  });
-            
-               if( auto result = help::transform::simple( data))
-                  return std::move( *result);
+               switch( pull())
+               {
+               case 't': test( "rue");  return true;
+               case 'f': test( "alse"); return false;
+               }
 
                [[unlikely]] halt( "unexpected data");
             }

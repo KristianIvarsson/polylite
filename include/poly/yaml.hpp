@@ -227,7 +227,7 @@ namespace poly_version
 
                      if( peep() == '}') break;
 
-                     test( ',', pull());
+                     test( ',');
                   }
 
                   ++mark; // '}'
@@ -247,7 +247,7 @@ namespace poly_version
 
                      if( peep() == ']') break;
                      
-                     test( ',', pull());
+                     test( ',');
                   }
 
                   ++mark; // ']'
@@ -588,7 +588,7 @@ namespace poly_version
                   ++mark; // '!'
 
                   // only support core tags
-                  test( '!', pull());
+                  test( '!');
 
                   const auto tag = read( []( const auto sign) { return help::is::lower( sign); });
 

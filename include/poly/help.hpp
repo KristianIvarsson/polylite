@@ -420,6 +420,17 @@ namespace poly_version
             if( want != pick) [[unlikely]] halt( "unexpected sign");
          }
 
+         void test( const char want)
+         {
+            test( want, pull());
+         }
+
+         void test( const std::string_view want)
+         {
+            for( const auto sign : want)
+               test( sign);
+         }
+
          [[noreturn]] void halt( const std::string_view message) const
          {
             throw std::runtime_error{ std::format( "{} with {} bytes left to parse", message, std::ranges::distance( mark, last))};
@@ -512,7 +523,7 @@ namespace poly_version
             if( lead > 0xDBFF)
                [[unlikely]] halt( "invalid 1st surrogate");
 
-            test( '\\', pull()); test( 'u', pull());
+            test( '\\'); test( 'u');
 
             const auto tail = real();
 

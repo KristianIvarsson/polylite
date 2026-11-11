@@ -154,19 +154,12 @@ namespace poly_version
 
             auto simple() -> node
             {
-               const auto data = read( []( const auto sign) 
-                  { 
-                     return help::is::lower( sign); 
-                  });
-
-               if( data == "true")
-                  return true;
-
-               if( data == "false")
-                  return false;
-
-               if( data == "null")
-                  return nullptr;
+               switch( pull())
+               {
+               case 't': test( "rue");  return true;
+               case 'f': test( "alse"); return false;
+               case 'n': test( "ull");  return nullptr;
+               }
 
                [[unlikely]] halt( "unexpected data");
             }

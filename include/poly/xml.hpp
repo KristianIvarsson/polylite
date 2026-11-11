@@ -79,21 +79,13 @@ namespace poly_version
                
                if( sign == '!')
                {
-                  if( peek() == '-')
+                  switch( pull())
                   {
-                     drop(); // '-'
-                     test( '-', pull());
-                     return { form::note, till( "-->")};
+                  case '-': test( '-');      return { form::note, till( "-->")};
+                  case '[': test( "CDATA["); return { form::lump, till( "]]>")};
+                  case 'D': test( "OCTYPE"); return { form::kind, help::trim( till( '>'))};
+                  default: [[unlikely]] halt( "unexpected data");
                   }
-
-                  if( peek() == '[')
-                  {
-                     for( const auto data : std::string_view{ "[CDATA["}) test( data, pull());
-                     return { form::lump, till( "]]>")};
-                  }
-
-                  for( const auto data : std::string_view{ "DOCTYPE"}) test( data, pull());
-                  return { form::kind, help::trim( till( '>'))};
                }
 
                if( sign == '/')
