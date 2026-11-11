@@ -28,6 +28,7 @@ namespace poly_version
             using base::cast;
             using base::done;
             using base::halt;
+            using base::leap;
             using base::peek;
             using base::pull;
             using base::read;
@@ -173,32 +174,46 @@ namespace poly_version
             auto number() -> node
             {
                bool decimal = false;
-               const auto data = read( [ &decimal]( const auto sign)
+
+               const auto data = [ &]
+               {
+                  auto stop = [ &decimal]( const auto sign)
                   {
                      switch( sign)
                      case '.': case 'e': case 'E': return decimal = true;
                      return help::is::digit( sign) || sign == '-' || sign == '+';
-                  });
+                  };
+
+                  if constexpr( std::contiguous_iterator< iterator>)
+                  {
+                     const auto head = mark;
+                     leap( stop);
+                     return std::string_view{ 
+                        reinterpret_cast< const char*>( std::to_address( head)), 
+                        reinterpret_cast< const char*>( std::to_address( mark))};
+                  }
+                  else
+                  {
+                     return read( stop);
+                  }
+               }();
 
                const auto start = data.data();
                const auto cease = data.data() + data.size();
 
-               if( decimal)
+               auto make = [ &] ( auto value)
                {
-                  node::decimal value;
-                  const auto result = std::from_chars( start, cease, value);
-                  if( result.ec == std::errc{} && result.ptr == cease)
+                  const auto [ ptr, ec] = std::from_chars( start, cease, value);
+                  if( ec == std::errc{} && ptr == cease)
                      return value;
-               }
-               else
-               {
-                  node::integer value;
-                  const auto result = std::from_chars( start, cease, value);
-                  if( result.ec == std::errc{} && result.ptr == cease)
-                     return value;
-               }
 
-               [[unlikely]] halt( "unexpected data");
+                  [[unlikely]] halt( "unexpected data");
+               };
+
+               if( decimal)
+                  return make( node::decimal{});
+               else
+                  return make( node::integer{});
             }
          };
 

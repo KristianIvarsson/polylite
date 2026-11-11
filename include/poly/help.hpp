@@ -196,8 +196,7 @@ namespace poly_version
                }();
 
                std::make_unsigned_t< node::integer> value;
-               const auto result = std::from_chars( start, cease, value, base);
-               if( result.ec == std::errc{} && result.ptr == cease)
+               if( const auto [ptr, ec] = std::from_chars( start, cease, value, base); ptr == cease && ec == std::errc{})
                {
                   constexpr auto max = static_cast< std::make_unsigned_t< node::integer>>( std::numeric_limits< node::integer>::max());
                   if( negative)

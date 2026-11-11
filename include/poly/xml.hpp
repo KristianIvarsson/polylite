@@ -160,7 +160,7 @@ namespace poly_version
                   data = data.substr( hexa);
 
                   help::type::i32 code{};
-                  const auto [ last, error] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
+                  const auto [ ptr, ec] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
 
                   auto scan = [] ( const help::type::i32 rune)
                      {
@@ -170,7 +170,7 @@ namespace poly_version
                            || ( rune >= 0x10000 && rune <= 0x10FFFF);
                      };
 
-                  if( error == std::errc{} && last == data.data() + data.size() && scan( code))
+                  if( ptr == data.data() + data.size() && ec == std::errc{} && scan( code))
                      return help::transform::point( code);
                }
 
