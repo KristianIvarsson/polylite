@@ -24,7 +24,7 @@ namespace poly_version
       {
          constexpr auto bare = [] ( const auto sign)
          {
-            return help::is::alnum( sign) || sign == '_' || sign == '-' || sign == '.';
+            return help::is::alnum( sign) || help::is::some< '_', '-', '.'>( sign);
          };
 
          namespace parser
@@ -258,7 +258,7 @@ namespace poly_version
 
                bool more( const std::string& data) const
                {
-                  return good() and not ( look() == ',' || look() == '}' || look() == ']' || ( look() == '#' && data.ends_with( ' ')));
+                  return good() and not ( help::is::some< ',', '}', ']'>( look()) || ( look() == '#' && data.ends_with( ' ')));
                }
 
                info absent()
@@ -545,7 +545,7 @@ namespace poly_version
 
                bool idle() const
                {
-                  return peek() == '\n' || peek() == '#';
+                  return help::is::some< '\n', '#'>( peek());
                }
 
                info alias()
@@ -596,7 +596,7 @@ namespace poly_version
                   tidy();
 
                   if( tag == "str")
-                     if( peek() != '"' && peek() != '\'')
+                     if( help::is::none< '"', '\''>( peek()))
                         return node{ help::trim( scalar())};
    
                   auto item = scan();
@@ -639,7 +639,7 @@ namespace poly_version
                info styled()
                {
                   const auto style = take();
-                  const auto chomp = peek() == '+' || peek() == '-' ? take() : '\0';
+                  const auto chomp = help::is::some< '+', '-'>( peek()) ? take() : '\0';
 
                   std::string text;
                   size root{};
@@ -654,7 +654,7 @@ namespace poly_version
                      if( dent < root && peek() != '\n')
                         break;
 
-                     const auto line = read( [] ( const auto sign) { return sign != '\n'; });
+                     const auto line = read( help::till::line);
 
                      if( line.empty())
                      {

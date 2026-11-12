@@ -69,18 +69,6 @@ namespace poly_version
          return ( std::holds_alternative< types>( data) || ... );
       }
 
-
-      namespace till
-      {
-
-         //! true while sign is none of the stop(s)
-         template< char... stop>
-         constexpr auto none = []( const auto sign) { return ( ( sign != stop) && ...); };
-
-         constexpr auto quot = none< '"', '\\'>;
-         constexpr auto apos = none< '\''>;
-      } // till
-
       //! for performance (only)
       namespace is
       {
@@ -92,6 +80,20 @@ namespace poly_version
                return sign >= lower && sign <= upper;
             }
          } // in
+
+         //! sign is one of the signs
+         template< auto... signs>
+         bool some( const auto sign)
+         {
+            return ( ( sign == signs) || ...);
+         }
+
+         //! sign is none of the signs
+         template< auto... signs>
+         bool none( const auto sign)
+         {
+            return ( ( sign != signs) && ...);
+         }
 
          bool space( const auto sign)
          {
@@ -145,7 +147,14 @@ namespace poly_version
          {
             return is::lower( sign) ? sign - ( 'a' - 'A') : sign;
          }
-      } // to         
+      } // to
+      
+      namespace till
+      {
+         constexpr auto quot = []( const auto sign) { return is::none< '"', '\\'>( sign); };
+         constexpr auto apos = []( const auto sign) { return is::none< '\''>( sign); };
+         constexpr auto line = []( const auto sign) { return is::none< '\n'>( sign); };         
+      } // till
 
       auto trim( auto data)
       {
@@ -497,7 +506,7 @@ namespace poly_version
          //! rest of the line
          void rest()
          {
-            leap( [] ( const auto sign) { return sign != '\n';});
+            leap( till::line);
             if( good()) ++mark; // '\n'
          }
 

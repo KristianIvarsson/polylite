@@ -21,7 +21,7 @@ namespace poly_version
       {
          constexpr auto bare = [] ( const auto sign)
          {
-            return help::is::alnum( sign) || sign == '_' || sign == '-';
+            return help::is::alnum( sign) || help::is::some< '_', '-'>( sign);
          };
 
          template< help::byte unit, help::source_iterator< unit> iterator>
@@ -306,9 +306,7 @@ namespace poly_version
             {
                auto data = read( []( const auto sign)
                   {
-                     switch( sign)
-                     case '.': case '+': case '-': case '_': case ':': return true;
-                     return help::is::alnum( sign);
+                     return help::is::alnum( sign) || help::is::some< '.', '+', '-', '_', ':'>( sign);
                   });
 
                std::erase( data, '_');

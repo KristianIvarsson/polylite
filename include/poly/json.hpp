@@ -174,9 +174,9 @@ namespace poly_version
                {
                   auto stop = [ &decimal]( const auto sign)
                   {
-                     switch( sign)
-                     case '.': case 'e': case 'E': return decimal = true;
-                     return help::is::digit( sign) || sign == '-' || sign == '+';
+                     if( help::is::some< '.', 'e', 'E'>( sign))
+                        return decimal = true;
+                     return help::is::digit( sign) || help::is::some< '+', '-'>( sign);
                   };
 
                   if constexpr( std::contiguous_iterator< iterator>)

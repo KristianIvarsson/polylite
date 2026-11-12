@@ -159,10 +159,10 @@ namespace poly_version
 
                   auto scan = [] ( const help::type::i32 rune)
                      {
-                        return rune == 0x9 || rune == 0xA || rune == 0xD
-                           || ( rune >= 0x20    && rune <= 0xD7FF)
-                           || ( rune >= 0xE000  && rune <= 0xFFFD)
-                           || ( rune >= 0x10000 && rune <= 0x10FFFF);
+                        return help::is::some< 0x9, 0xA, 0xD>( rune)
+                           || help::is::in::range< 0x20, 0xD7FF>( rune)
+                           || help::is::in::range< 0xE000, 0xFFFD>( rune)
+                           || help::is::in::range< 0x10000, 0x10FFFF>( rune);
                      };
 
                   if( ptr == data.data() + data.size() && ec == std::errc{} && scan( code))
