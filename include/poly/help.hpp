@@ -97,7 +97,12 @@ namespace poly_version
 
          bool space( const auto sign)
          {
-            return in::range< '\t', '\r'>( sign) || sign == ' ';
+            return sign == ' ' || in::range< '\t', '\r'>( sign);
+         }
+
+         bool inert( const auto sign)
+         {
+            return in::range< '\0', ' '>( sign);
          }
 
          bool digit( const auto sign)
