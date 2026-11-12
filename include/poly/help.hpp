@@ -169,15 +169,6 @@ namespace poly_version
          return data;
       }
 
-      namespace clip
-      {
-         //! helper to prevent evil size
-         inline constexpr auto size( const std::size_t size)
-         {
-            return std::min( size, std::size_t{ 1024});
-         }
-      } // clip
-
       namespace transform
       {
          inline auto simple( std::string_view data) -> std::optional< node>
@@ -374,6 +365,16 @@ namespace poly_version
          iterator mark;
          [[no_unique_address]] sentinel last;
 
+
+         //! helper to prevent evil size
+         auto clip( const std::size_t size)
+         {
+            if constexpr( std::sized_sentinel_for< sentinel, iterator>)
+               return std::min( size, static_cast< std::size_t>( std::ranges::distance( mark, last)));
+            else
+               return std::min( size, static_cast< std::size_t>( 1024));
+         }
+
          bool good() const
          {
             return mark != last;
@@ -423,9 +424,9 @@ namespace poly_version
                if( std::ranges::advance( mark, size, last))
                   pull(); // provoke an error
 
-               return std::ranges::subrange( save, mark)
-                  | std::views::transform( []( auto byte) { return static_cast< typename into::value_type>( byte); })
-                  | std::ranges::to< into>();
+               using type = typename into::value_type;
+               const auto head = reinterpret_cast< const type*>( std::to_address( save));
+               return into{ head, head + size};
             }
             else
             {
@@ -434,7 +435,7 @@ namespace poly_version
                // - correctness for single-pass iterators
                // - performance for non-contiguous iterators
 
-               into data; data.reserve( clip::size( size));
+               into data; data.reserve( clip( size));
                for( std::size_t item{}; item < size; ++item)
                   data.push_back( static_cast< typename into::value_type>( pull()));
                return data;

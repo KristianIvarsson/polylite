@@ -87,6 +87,7 @@ namespace poly_version
          struct parser : help::source< unit, iterator>
          {
             using base = help::source< unit, iterator>;
+            using base::clip;
             using base::deny;
             using base::done;
             using base::halt;
@@ -256,7 +257,7 @@ namespace poly_version
             auto array( std::size_t size) -> node::array
             {
                node::array nrv;
-               nrv.reserve( help::clip::size( size));
+               nrv.reserve( clip( size));
                while( size--)
                   nrv.push_back( spot());
                return nrv;
@@ -265,7 +266,7 @@ namespace poly_version
             auto object( std::size_t size) -> node::object
             {
                node::object nrv;
-               nrv.reserve( help::clip::size( size));
+               nrv.reserve( clip( size));
                while( size--)
                {
                   auto data = spot();
