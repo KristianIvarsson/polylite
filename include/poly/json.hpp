@@ -140,6 +140,8 @@ namespace poly_version
 
                while( true)
                {
+                  read( help::till::quot, nrv);
+
                   const auto sign = pull();
 
                   if( sign == '"')

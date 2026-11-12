@@ -221,7 +221,6 @@ namespace poly_version
                node::array nrv;
 
                if( peep() != ']')
-               {
                   while( true)
                   {
                      nrv.emplace_back( spot());
@@ -232,11 +231,8 @@ namespace poly_version
                         break;
                      }
                   }
-               }
                else
-               {
                   ++mark; // ']'
-               }
 
                return nrv;
             }
@@ -253,6 +249,8 @@ namespace poly_version
 
                while( true)
                {
+                  read( help::till::quot, nrv);
+
                   const auto sign = pull();
 
                   if( sign == '"')
@@ -281,6 +279,8 @@ namespace poly_version
 
                while( true)
                {
+                  read( help::till::apos, nrv);
+
                   const auto sign = pull();
 
                   if( sign == '\'')

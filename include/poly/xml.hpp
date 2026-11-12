@@ -29,6 +29,7 @@ namespace poly_version
             using base::look;
             using base::peek;
             using base::pull;
+            using base::read;
             using base::skip;
             using base::take;
             using base::test;
@@ -49,7 +50,10 @@ namespace poly_version
             {
                std::string nrv;
                do
+               {
+                  read( [ back = stop.back()]( const auto sign) { return sign != back; }, nrv);
                   nrv.push_back( pull());
+               }
                while( ! nrv.ends_with( stop));
                nrv.resize( nrv.size() - stop.size());
                return nrv;
@@ -57,9 +61,8 @@ namespace poly_version
 
             auto till( const help::byte auto stop)
             {
-               std::string nrv;
-               for( auto sign = pull(); sign != stop; sign = pull())
-                  nrv.push_back( sign);
+               auto nrv = read( [ stop]( const auto sign) { return sign != stop; });
+               test( stop);
                return nrv;
             }
 
@@ -468,7 +471,7 @@ namespace poly_version
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::object)
-                        break;
+                        return nrv;
 
                      if( type != form::open || word( data) != types::name)
                         [[unlikely]] halt( "unexpected element");
@@ -478,8 +481,6 @@ namespace poly_version
                      std::tie( type, data) = sift();
                      nrv.emplace( std::move( name), spot( type, data));
                   }
-
-                  return nrv;
                }
 
                auto array()
@@ -491,12 +492,10 @@ namespace poly_version
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::array)
-                        break;
+                        return nrv;
 
                      nrv.push_back( spot( type, data));
                   }
-
-                  return nrv;
                }
 
                auto integer( const std::string_view data)

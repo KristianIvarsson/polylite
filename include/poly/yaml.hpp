@@ -40,8 +40,11 @@ namespace poly_version
                using base::mark;
                using base::peek;
                using base::pull;
+               using base::read;
                using base::rest;
                using base::skip;
+               using base::take;
+               using base::test;
 
             protected:
 
@@ -75,17 +78,18 @@ namespace poly_version
 
                   while( true)
                   {
+                     read( help::till::quot, nrv);
+
                      const auto sign = pull();
 
-                     if( sign == '"') break;
+                     if( sign == '"')
+                        return nrv;
 
                      if( sign != '\\') [[likely]]
                         nrv.push_back( sign);
                      else
                         nrv.append( help::transform::point( cast( pull())));
                   }
-
-                  return nrv;
                }
 
                auto single()
@@ -96,18 +100,15 @@ namespace poly_version
 
                   while( true)
                   {
-                     const auto sign = pull();
+                     read( help::till::apos, nrv);
 
-                     if( sign == '\'')
-                     {
-                        if( peek() != '\'') break;
-                        else ++mark;
-                     }
+                     test( '\'');
 
-                     nrv.push_back( sign);
+                     if( peek() != '\'')
+                        return nrv;
+
+                     nrv.push_back( take()); // '\''
                   }
-
-                  return nrv;
                }
 
                auto cast( const auto sign) -> std::int32_t

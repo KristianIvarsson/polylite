@@ -69,6 +69,18 @@ namespace poly_version
          return ( std::holds_alternative< types>( data) || ... );
       }
 
+
+      namespace till
+      {
+
+         //! true while sign is none of the stop(s)
+         template< char... stop>
+         constexpr auto none = []( const auto sign) { return ( ( sign != stop) && ...); };
+
+         constexpr auto quot = none< '"', '\\'>;
+         constexpr auto apos = none< '\''>;
+      } // till
+
       //! for performance (only)
       namespace is
       {
@@ -455,10 +467,25 @@ namespace poly_version
          using base::halt;
          using base::deny;
 
+         void read( auto&& till, std::string& into)
+         {
+            if constexpr( std::contiguous_iterator< iterator>)
+            {
+               const auto head = mark;
+               leap( till);
+               into.append( reinterpret_cast< const char*>( std::to_address( head)), static_cast< std::size_t>( mark - head));
+            }
+            else
+            {
+               while( good() && till( look()))
+                  into.push_back( take());
+            }
+         }
+
          auto read( auto&& till)
          {
             std::string nrv;
-            while( good() && till( look())) nrv.push_back( take());
+            read( till, nrv);
             return nrv;
          }
 
