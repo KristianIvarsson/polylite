@@ -159,12 +159,14 @@ namespace poly_version
             struct flow : core< unit, iterator>
             {
                using base = parser::core< unit, iterator>;
+               using base::book;
                using base::cusp;
                using base::good;
                using base::halt;
-               using base::mark;
                using base::look;
+               using base::mark;
                using base::peep;
+               using base::pile;
                using base::pull;
                using base::take;
                using base::test;
@@ -215,7 +217,7 @@ namespace poly_version
                {
                   ++mark; // '{'
 
-                  node::object nrv;
+                  const auto from = book.base();
 
                   while( peep() != '}')
                   {
@@ -224,7 +226,7 @@ namespace poly_version
                      if( ! std::holds_alternative< name>( data))
                         [[unlikely]] halt( "expected key");
 
-                     if( ! nrv.emplace( std::get< name>( std::move( data)), spot()).second)
+                     if( ! book.push( from, std::get< name>( std::move( data)), spot()).second)
                         [[unlikely]] halt( "duplicate key");
 
                      if( peep() == '}') break;
@@ -234,18 +236,18 @@ namespace poly_version
 
                   ++mark; // '}'
 
-                  return nrv;
+                  return book.seal( from);
                }
 
                auto array() -> node::array
                {
                   ++mark; // '['
 
-                  node::array nrv;
+                  const auto from = pile.base();
 
                   while( peep() != ']')
                   {
-                     nrv.emplace_back( spot());
+                     pile.push( spot());
 
                      if( peep() == ']') break;
                      
@@ -254,7 +256,7 @@ namespace poly_version
 
                   ++mark; // ']'
 
-                  return nrv;
+                  return pile.seal( from);
                }
 
                bool more( const std::string& data) const
@@ -283,21 +285,23 @@ namespace poly_version
             struct block : core< unit, iterator>
             {
                using base = parser::core< unit, iterator>;
-               using base::mark;
-               using base::last;
+               using base::book;
+               using base::cusp;
+               using base::deny;
                using base::good;
-               using base::pull;
-               using base::peek;
+               using base::halt;
+               using base::last;
+               using base::leap;
                using base::look;
+               using base::mark;
+               using base::peek;
+               using base::peep;
+               using base::pile;
+               using base::pull;
+               using base::read;
+               using base::rest;
                using base::take;
                using base::test;
-               using base::read;
-               using base::leap;
-               using base::rest;
-               using base::halt;
-               using base::deny;
-               using base::cusp;
-               using base::peep;
                using base::tidy;
                using base::quoted;
                using base::single;
@@ -465,16 +469,16 @@ namespace poly_version
 
                   if( help::hold< dash>( item))
                   {
-                     node::array array;
+                     const auto from = pile.base();
 
                      do
-                        array.emplace_back( *spot( dent + 1 + step()));
+                        pile.push( *spot( dent + 1 + step()));
                      while( dent >= root && peek() == '-' && help::hold< dash>( scan()));
 
-                     return { array};
+                     return pile.seal( from);
                   }
 
-                  node::object object;
+                  const auto from = book.base();
 
                   while( good())
                   {
@@ -487,7 +491,7 @@ namespace poly_version
                      if( edge( item))
                         break;
 
-                     if( ! object.emplace( std::get< name>( std::move( item)), bind( dent)).second)
+                     if( ! book.push( from, std::get< name>( std::move( item)), bind( dent)).second)
                         [[unlikely]] halt( "duplicate key");
 
                      if( dent < root)
@@ -501,7 +505,7 @@ namespace poly_version
                      item = scan();
                   }
 
-                  return { object};
+                  return book.seal( from);
                }
 
                bool more( const std::string& data) const
@@ -628,11 +632,11 @@ namespace poly_version
                      
                      if( data->is_string() && tag == "timestamp")
                         if( auto result = help::transform::instant( help::trim( data->as_string())))
-                           return *result;
+                           return std::move( *result);
                      
                      if( data->is_string() && tag == "binary")
                         if( auto result = help::transform::binary( help::trim( data->as_string())))
-                           return *result;
+                           return std::move( *result);
                   }
 
                   [[unlikely]] halt( std::format( "!!{} is invalid", tag));

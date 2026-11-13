@@ -477,6 +477,48 @@ namespace poly_version
          }
       };
 
+      template< typename into>
+      class heap
+      {
+      private:
+
+         std::vector< typename into::value_type> data;
+
+      public:
+
+         //! the current base, to seal from later
+         [[nodiscard]] auto base() const
+         {
+            return data.size();
+         }
+
+         //! pushes item
+         void push( auto&&... parameters)
+         {
+            data.emplace_back( std::forward< decltype( parameters)>( parameters)...);
+         }
+
+         //! pushes item unless an element since from already has the same name
+         auto push( const typename into::size_type from, auto&& name, auto&& item)
+            requires requires { &into::value_type::first; }
+         {
+            if( const auto found = std::ranges::find( data.begin() + from, data.end(), name, &into::value_type::first); found != data.end())
+               return std::pair{ found, false};
+
+            data.emplace_back( std::forward< decltype( name)>( name), std::forward< decltype( item)>( item));
+
+            return std::pair{ std::prev( data.end()), true};
+         }
+
+         //! moves everything since from into an into of exact size
+         [[nodiscard]] auto seal( const typename into::size_type from) -> into
+         {
+            into nrv( std::make_move_iterator( data.begin() + from), std::make_move_iterator( data.end()));
+            data.erase( data.begin() + from, data.end());
+            return nrv;
+         }
+      };
+
       template< byte unit, source_iterator< unit> iterator>
       struct parser : source< unit, iterator>
       {
@@ -489,6 +531,12 @@ namespace poly_version
          using base::test;
          using base::halt;
          using base::deny;
+
+         //! @{ scratch stacks
+         //! collects elements of arrays/objects to seal into exact size
+         heap< node::array> pile{};
+         heap< node::object> book{};
+         //! @}
 
          void read( auto&& till, std::string& into)
          {

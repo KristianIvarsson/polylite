@@ -22,12 +22,14 @@ namespace poly_version
          struct parser : help::parser< unit, iterator>
          {
             using base = help::parser< unit, iterator>;
+            using base::book;
             using base::deny;
             using base::drop;
             using base::good;
             using base::halt;
             using base::look;
             using base::peek;
+            using base::pile;
             using base::pull;
             using base::read;
             using base::skip;
@@ -392,13 +394,15 @@ namespace poly_version
             struct parser : xml::detail::parser< unit, iterator>
             {
                using base = xml::detail::parser< unit, iterator>;
+               using base::book;
                using base::halt;
                using base::head;
-               using base::word;
+               using base::pile;
                using base::sift;
                using base::slot;
                using base::text;
                using base::want;
+               using base::word;
 
                using typename base::form;
 
@@ -464,14 +468,14 @@ namespace poly_version
 
                auto object()
                {
-                  node::object nrv;
+                  const auto from = book.base();
 
                   while( true)
                   {
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::object)
-                        return nrv;
+                        return book.seal( from);
 
                      if( type != form::open || word( data) != types::name)
                         [[unlikely]] halt( "unexpected element");
@@ -479,22 +483,22 @@ namespace poly_version
                      auto name = text();
                      want( form::seal, types::name);
                      std::tie( type, data) = sift();
-                     nrv.emplace( std::move( name), spot( type, data));
+                     book.push( from, std::move( name), spot( type, data));
                   }
                }
 
                auto array()
                {
-                  node::array nrv;
+                  const auto from = pile.base();
 
                   while( true)
                   {
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::array)
-                        return nrv;
+                        return pile.seal( from);
 
-                     nrv.push_back( spot( type, data));
+                     pile.push( spot( type, data));
                   }
                }
 

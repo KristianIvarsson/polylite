@@ -25,11 +25,13 @@ namespace poly_version
          {
             using base = help::parser< unit, iterator>;
             using base::mark;
+            using base::book;
             using base::cast;
             using base::done;
             using base::halt;
             using base::leap;
             using base::peek;
+            using base::pile;
             using base::pull;
             using base::read;
             using base::skip;
@@ -76,7 +78,7 @@ namespace poly_version
             {
                ++mark; // '{'
 
-               node::object nrv;
+               const auto from = book.base();
 
                if( peep() != '}')
                {
@@ -88,7 +90,7 @@ namespace poly_version
 
                      test( ':', pick());
 
-                     nrv.emplace( std::move( name), spot());
+                     book.push( from, std::move( name), spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -102,20 +104,20 @@ namespace poly_version
                   ++mark; // '}'
                }
 
-               return nrv;
+               return book.seal( from);
             }
 
             auto array() -> node::array
             {
                ++mark; // '['
 
-               node::array nrv;
+               const auto from = pile.base();
 
                if( peep() != ']')
                {
                   while( true)
                   {
-                     nrv.emplace_back( spot());
+                     pile.push( spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -129,7 +131,7 @@ namespace poly_version
                   ++mark; // ']'
                }
 
-               return nrv;
+               return pile.seal( from);
             }
 
             auto string() -> node::string

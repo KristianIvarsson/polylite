@@ -29,13 +29,15 @@ namespace poly_version
          {
             using base = help::parser< unit, iterator>;
             using base::mark;
+            using base::book;
             using base::done;
             using base::drop;
             using base::full;
             using base::good;
             using base::halt;
-            using base::pull;
             using base::peek;
+            using base::pile;
+            using base::pull;
             using base::read;
             using base::rest;
             using base::skip;
@@ -187,21 +189,25 @@ namespace poly_version
             {
                ++mark; // '{'
 
-               node root = node::object{};
+               const auto from = book.base();
 
                if( peep() != '}')
                {
                   while( true)
                   {
-                     auto where = &root;
-
-                     for( auto&& name : keys())
-                        where = &(*where)[ std::move( name)];
+                     auto keys = this->keys();
 
                      test( '=', pick());
 
+                     auto value = spot();
+
+                     auto where = &book.push( from, std::move( keys.front()), node{}).first->second;
+
+                     for( auto&& name : keys | std::views::drop( 1))
+                        where = &(*where)[ std::move( name)];
+
                      if( where->is_nothing())
-                        *where = spot();
+                        *where = std::move( value);
                      else
                         [[unlikely]] halt( "duplicate key");
 
@@ -217,19 +223,19 @@ namespace poly_version
                   ++mark; // '}'
                }
 
-               return std::move( root).as_object();
+               return book.seal( from);
             }
 
             auto array() -> node::array
             {
                ++mark; // '['
 
-               node::array nrv;
+               const auto from = pile.base();
 
                if( peep() != ']')
                   while( true)
                   {
-                     nrv.emplace_back( spot());
+                     pile.push( spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -240,7 +246,7 @@ namespace poly_version
                else
                   ++mark; // ']'
 
-               return nrv;
+               return pile.seal( from);
             }
 
             auto basic() -> node::string
