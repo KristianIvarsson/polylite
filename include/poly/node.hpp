@@ -79,20 +79,20 @@ namespace poly_version
       //! @}
 
       //! @{ access
-      constexpr auto& as_nothing( this auto&& self) { return std::get< nothing>( self); }
-      constexpr auto& as_boolean( this auto&& self) { return std::get< boolean>( self); }
-      constexpr auto& as_integer( this auto&& self) { return std::get< integer>( self); }
-      constexpr auto& as_decimal( this auto&& self) { return std::get< decimal>( self); }
-      constexpr auto& as_instant( this auto&& self) { return std::get< instant>( self); }
-      constexpr auto& as_string( this auto&& self) { return std::get< string>( self); }
-      constexpr auto& as_binary( this auto&& self) { return std::get< binary>( self); }
-      constexpr auto& as_array( this auto&& self) { return std::get< array>( self); }
-      constexpr auto& as_object( this auto&& self) { return std::get< object>( self); }
+      constexpr decltype( auto) as_nothing( this auto&& self) { return std::get< nothing>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_boolean( this auto&& self) { return std::get< boolean>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_integer( this auto&& self) { return std::get< integer>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_decimal( this auto&& self) { return std::get< decimal>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_instant( this auto&& self) { return std::get< instant>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_string( this auto&& self) { return std::get< string>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_binary( this auto&& self) { return std::get< binary>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_array( this auto&& self) { return std::get< array>( std::forward< decltype( self)>( self)); }
+      constexpr decltype( auto) as_object( this auto&& self) { return std::get< object>( std::forward< decltype( self)>( self)); }
 
-      constexpr auto& as_local_date( this auto&& self) { return std::get< local_date>( self.as_instant()); }
-      constexpr auto& as_local_time( this auto&& self) { return std::get< local_time>( self.as_instant()); }
-      constexpr auto& as_local_datetime( this auto&& self) { return std::get< local_datetime>( self.as_instant()); }
-      constexpr auto& as_zoned_datetime( this auto&& self) { return std::get< zoned_datetime>( self.as_instant()); }
+      constexpr decltype( auto) as_local_date( this auto&& self) { return std::get< local_date>( std::forward< decltype( self)>( self).as_instant()); }
+      constexpr decltype( auto) as_local_time( this auto&& self) { return std::get< local_time>( std::forward< decltype( self)>( self).as_instant()); }
+      constexpr decltype( auto) as_local_datetime( this auto&& self) { return std::get< local_datetime>( std::forward< decltype( self)>( self).as_instant()); }
+      constexpr decltype( auto) as_zoned_datetime( this auto&& self) { return std::get< zoned_datetime>( std::forward< decltype( self)>( self).as_instant()); }
 
       auto& at( this auto& self, const auto& lookup) requires std::is_convertible_v< decltype( lookup), array::size_type>
       {
