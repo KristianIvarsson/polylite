@@ -65,7 +65,10 @@ namespace poly_version
                      for( auto&& name : std::move( keys))
                         where = &(*where)[ std::move( name)];
 
-                     *where = spot();
+                     if( where->is_nothing())
+                        *where = spot();
+                     else
+                        [[unlikely]] halt( "duplicate key");
 
                      where = afore;
                   }
@@ -197,7 +200,10 @@ namespace poly_version
 
                      test( '=', pick());
 
-                     *where = spot();
+                     if( where->is_nothing())
+                        *where = spot();
+                     else
+                        [[unlikely]] halt( "duplicate key");
 
                      if( const auto sign = pick(); sign != ',')
                      {

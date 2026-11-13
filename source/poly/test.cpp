@@ -670,6 +670,40 @@ earth = "\U0001F30D"
             }
          }
 
+         void duplicate_key()
+         {
+            // repeated keys are invalid
+            assert( throws( []{ toml::parse( "a = 1\na = 2\n"); }));
+            assert( throws( []{ toml::parse( "x.y = 1\nx.y = 2\n"); }));
+            assert( throws( []{ toml::parse( "[t]\nk = 1\nk = 2\n"); }));
+            assert( throws( []{ toml::parse( "a = { b = 1, b = 2 }\n"); }));
+
+            // similar but valid
+            {
+               const auto table = toml::parse( "x.y = 1\nx.z = 2\n");
+               assert( table.at( "x").at( "y").as_integer() == 1);
+               assert( table.at( "x").at( "z").as_integer() == 2);
+            }
+
+            {
+               const auto table = toml::parse( "[t]\nk = 1\n[u]\nk = 2\n");
+               assert( table.at( "t").at( "k").as_integer() == 1);
+               assert( table.at( "u").at( "k").as_integer() == 2);
+            }
+
+            {
+               const auto table = toml::parse( "[[t]]\nk = 1\n[[t]]\nk = 2\n");
+               assert( table.at( "t").at( 0).at( "k").as_integer() == 1);
+               assert( table.at( "t").at( 1).at( "k").as_integer() == 2);
+            }
+
+            {
+               const auto table = toml::parse( "a = { b.c = 1, b.d = 2 }\n");
+               assert( table.at( "a").at( "b").at( "c").as_integer() == 1);
+               assert( table.at( "a").at( "b").at( "d").as_integer() == 2);
+            }
+         }
+
       } // cases
 
       void all()
@@ -681,6 +715,7 @@ earth = "\U0001F30D"
          cases::strict_gentle();
          cases::binary();
          cases::empty_inline_table();
+         cases::duplicate_key();
       }
    } // toml::test
 
@@ -1384,6 +1419,27 @@ top: world
             }
          }
 
+         void duplicate_key()
+         {
+            // repeated keys are invalid
+            assert( throws( []{ yaml::parse( "a: 1\na: 2\n"); }));
+            assert( throws( []{ yaml::parse( "x:\n  y: 1\n  y: 2\n"); }));
+            assert( throws( []{ yaml::parse( "{a: 1, a: 2}\n"); }));
+
+            // similar but valid
+            {
+               const auto map = yaml::parse( "x:\n  y: 1\nz:\n  y: 2\n");
+               assert( map.at( "x").at( "y").as_integer() == 1);
+               assert( map.at( "z").at( "y").as_integer() == 2);
+            }
+
+            {
+               const auto list = yaml::parse( "- a: 1\n- a: 2\n");
+               assert( list.at( 0).at( "a").as_integer() == 1);
+               assert( list.at( 1).at( "a").as_integer() == 2);
+            }
+         }
+
       } // cases
 
       void all()
@@ -1397,6 +1453,7 @@ top: world
          cases::timestamp();
          cases::strict_gentle();
          cases::binary();
+         cases::duplicate_key();
       }
 
    } // yaml::test
