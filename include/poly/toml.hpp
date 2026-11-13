@@ -184,7 +184,7 @@ namespace poly_version
             {
                ++mark; // '{'
 
-               node root;
+               node root = node::object{};
 
                if( peep() != '}')
                {

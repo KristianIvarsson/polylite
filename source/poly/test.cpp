@@ -638,6 +638,38 @@ earth = "\U0001F30D"
               assert( decoded && *decoded == hello); }
          }
 
+         void empty_inline_table()
+         {
+            // empty inline table
+            {
+               const auto table = toml::parse( "a = {}\n");
+               assert( table.at( "a").is_object());
+               assert( table.at( "a").as_object().empty());
+            }
+
+            // empty inline table with whitespace
+            {
+               const auto table = toml::parse( "a = {   }\n");
+               assert( table.at( "a").is_object());
+               assert( table.at( "a").as_object().empty());
+            }
+
+            // empty inline table nested in an inline table
+            {
+               const auto table = toml::parse( "a = { b = {} }\n");
+               assert( table.at( "a").at( "b").is_object());
+               assert( table.at( "a").at( "b").as_object().empty());
+            }
+
+            // empty inline table in an array
+            {
+               const auto table = toml::parse( "a = [ {}, { x = 1 } ]\n");
+               assert( table.at( "a").as_array().size() == 2);
+               assert( table.at( "a").at( 0).as_object().empty());
+               assert( table.at( "a").at( 1).at( "x").as_integer() == 1);
+            }
+         }
+
       } // cases
 
       void all()
@@ -648,6 +680,7 @@ earth = "\U0001F30D"
          cases::write();
          cases::strict_gentle();
          cases::binary();
+         cases::empty_inline_table();
       }
    } // toml::test
 
