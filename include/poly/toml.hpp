@@ -156,12 +156,18 @@ namespace poly_version
                return nrv;
             }
 
-            void tidy() 
+            void tidy()
             {
                skip();
 
                if( peek() == '#')
                   rest(), tidy();
+            }
+
+            void feed()
+            {
+               if( peek() == '\r') drop();
+               if( peek() == '\n') drop();
             }
 
             char pick()
@@ -243,13 +249,10 @@ namespace poly_version
                return nrv;
             }
 
-            auto basic() -> node::string
+            auto multi_basic() -> node::string
             {
-               if( ++mark, peek() == '"')
-                  if( ++mark, peek() != '"')
-                     return {};
-
-               const auto same = ! ( peek() == '"' ? drop(), tidy(), true : false);
+               drop(); // '"'
+               feed();
 
                std::string nrv;
 
@@ -257,20 +260,85 @@ namespace poly_version
                {
                   read( help::till::quot, nrv);
 
-                  const auto sign = pull();
-
-                  if( sign == '"')
-                     if( same || ( peek() != '"' && [&nrv] { return nrv.ends_with( R"("")") ? nrv.erase( nrv.size() - 2), true : false; }()))
+                  if( pull() == '"')
+                  {
+                     if( peek() != '"' && nrv.ends_with( R"("")"))
+                     {
+                        nrv.erase( nrv.size() - 2);
                         return nrv;
+                     }
 
-                  if( sign != '\\') [[likely]]
-                     nrv.push_back( sign);
-                  else  
-                     if( peek() != '\n' && same)
-                        nrv.append( help::transform::point( cast( pull())));
+                     nrv.push_back( '"');
+                  }
+                  else
+                  {
+                     if( help::is::white( peek()))
+                        skip();
                      else
-                        tidy();
+                        nrv.append( help::transform::point( cast( pull())));
+                  }
                }
+            }
+
+            auto unary_basic() -> node::string
+            {
+               std::string nrv;
+
+               while( true)
+               {
+                  read( help::till::quot, nrv);
+
+                  if( pull() == '"')
+                     return nrv;
+
+                  nrv.append( help::transform::point( cast( pull())));
+               }
+            }
+
+            auto basic() -> node::string
+            {
+               if( ++mark, peek() == '"')
+                  if( ++mark, peek() != '"')
+                     return {};
+
+               if( peek() == '"')
+                  return multi_basic();
+               else
+                  return unary_basic();
+            }
+
+            auto multi_literal() -> node::string
+            {
+               drop(); // '\''
+               feed();
+
+               std::string nrv;
+
+               while( true)
+               {
+                  read( help::till::apos, nrv);
+
+                  pull(); // '\''
+
+                  if( peek() != '\'' && nrv.ends_with( R"('')"))
+                  {
+                     nrv.erase( nrv.size() - 2);
+                     return nrv;
+                  }
+
+                  nrv.push_back( '\'');
+               }
+            }
+
+            auto unary_literal() -> node::string
+            {
+               std::string nrv;
+
+               read( help::till::apos, nrv);
+
+               pull(); // '\''
+
+               return nrv;
             }
 
             auto literal() -> node::string
@@ -279,22 +347,10 @@ namespace poly_version
                   if( ++mark, peek() != '\'')
                      return {};
 
-               const auto same = ! ( peek() == '\'' ? drop(), tidy(), true : false); 
-
-               std::string nrv;
-
-               while( true)
-               {
-                  read( help::till::apos, nrv);
-
-                  const auto sign = pull();
-
-                  if( sign == '\'')
-                     if( same || ( peek() != '\'' && [&nrv] { return nrv.ends_with( R"('')") ? nrv.erase( nrv.size() - 2), true : false; }()))
-                        return nrv;
-
-                  nrv.push_back( sign);
-               }
+               if( peek() == '\'')
+                  return multi_literal();
+               else
+                  return unary_literal();
             }
 
             node simple()
