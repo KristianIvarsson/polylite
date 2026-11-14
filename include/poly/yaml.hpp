@@ -146,7 +146,7 @@ namespace poly_version
 
                bool cusp() const
                {
-                  return ! good() || help::is::space( look());
+                  return ! good() || help::is::white( look());
                }
             };
 
@@ -345,7 +345,7 @@ namespace poly_version
                   auto part = [this]
                   {
                      tidy();
-                     return read( [] ( const auto sign) { return ! help::is::space( sign); });
+                     return read( [] ( const auto sign) { return ! help::is::white( sign); });
                   };
 
                   while( peep() == '%')

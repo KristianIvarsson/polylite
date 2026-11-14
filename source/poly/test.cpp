@@ -51,6 +51,23 @@ namespace poly_version
             assert( ! help::is::space( '!'));
          }
 
+         void white()
+         {
+            // whitespace in JSON, TOML, YAML and XML
+            assert( help::is::white( ' '));
+            assert( help::is::white( '\t'));
+            assert( help::is::white( '\n'));
+            assert( help::is::white( '\r'));
+
+            // std::isspace characters that are not
+            assert( ! help::is::white( '\v'));
+            assert( ! help::is::white( '\f'));
+
+            // non-space characters
+            assert( ! help::is::white( 'a'));
+            assert( ! help::is::white( '\0'));
+         }
+
          void classify()
          {
             assert( help::is::digit( '0'));
@@ -89,6 +106,7 @@ namespace poly_version
       void all()
       {
          cases::space();
+         cases::white();
          cases::classify();
       }
    } // help::test
@@ -301,6 +319,13 @@ namespace poly_version
             assert( write( parse( binary)) == text);
          }
 
+         void whitespace()
+         {
+            // vertical tab and form feed are not whitespace
+            assert( throws( []{ parse( "[1,\v2]"); }));
+            assert( throws( []{ parse( "[1,\f2]"); }));
+         }
+
       } // cases
 
       void all()
@@ -311,6 +336,7 @@ namespace poly_version
          cases::strict_gentle();
          cases::binary();
          cases::containers();
+         cases::whitespace();
       }
    } // json::test
 
@@ -704,6 +730,13 @@ earth = "\U0001F30D"
             }
          }
 
+         void whitespace()
+         {
+            // vertical tab and form feed are not whitespace
+            assert( throws( []{ toml::parse( "a =\v1\n"); }));
+            assert( throws( []{ toml::parse( "a =\f1\n"); }));
+         }
+
       } // cases
 
       void all()
@@ -716,6 +749,7 @@ earth = "\U0001F30D"
          cases::binary();
          cases::empty_inline_table();
          cases::duplicate_key();
+         cases::whitespace();
       }
    } // toml::test
 

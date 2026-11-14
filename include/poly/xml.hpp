@@ -122,7 +122,7 @@ namespace poly_version
 
             static auto word( const std::string_view data) -> std::string_view
             {
-               const auto last = std::ranges::find_if( data, []( const auto sign){ return help::is::space( sign);});
+               const auto last = std::ranges::find_if( data, []( const auto sign){ return help::is::white( sign);});
                return data.substr( 0, last - std::begin( data));
             }
 
@@ -226,8 +226,8 @@ namespace poly_version
                   if( ! view)
                      return std::nullopt;
 
-                  while( ! view->empty() && help::is::space( view->front())) view->remove_prefix( 1);
-                  while( ! view->empty() && help::is::space( view->back())) view->remove_suffix( 1);
+                  while( ! view->empty() && help::is::white( view->front())) view->remove_prefix( 1);
+                  while( ! view->empty() && help::is::white( view->back())) view->remove_suffix( 1);
 
                   if( ! part( "\"'"))
                      return std::nullopt;

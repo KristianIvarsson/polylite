@@ -291,7 +291,7 @@ namespace poly_version
 
             for( const auto sign : data)
             {
-               if( ! is::space( sign) && sign != '=')
+               if( ! is::white( sign) && sign != '=')
                {
                   const auto spot = [sign]
                   {
