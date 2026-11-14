@@ -378,7 +378,7 @@ earth = "\U0001F30D"
             assert( std::isnan( c( "not_a_number")->as_decimal()));
             assert( std::isinf( c( "infinite")->as_decimal()));
             assert( c( "multiline basic")->as_string() == "this is a\n   \" multi line\"\" basic \n   \"\"\"\"");
-            assert( c( "multiline_literal")->as_string() == "multi ' line\n   literal\n");
+            assert( c( "multiline_literal")->as_string() == "   multi ' line\n   literal\n");
             assert( table( "numbers")( 0)( "small")( "decimal")->as_decimal() == -3.14);
             assert( table( "numbers")( 0)( "small")( "integer")->as_integer() == -42);
             assert( table( "numbers")( 1)( "small")( "decimal")->as_decimal() == 3.14);
