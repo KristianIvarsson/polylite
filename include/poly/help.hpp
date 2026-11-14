@@ -95,14 +95,21 @@ namespace poly_version
             return ( ( sign != signs) && ...);
          }
 
-         bool space( const auto sign)
+         bool white( const auto sign)
          {
-            return sign == ' ' || in::range< '\t', '\r'>( sign);
-         }
+            return is::some< ' ', '\n', '\r', '\t'>( sign);
+         }         
 
          bool inert( const auto sign)
          {
             return in::range< '\0', ' '>( sign);
+         }
+
+
+         //! @{ somehow as the standard
+         bool space( const auto sign)
+         {
+            return sign == ' ' || in::range< '\t', '\r'>( sign);
          }
 
          bool digit( const auto sign)
@@ -139,6 +146,7 @@ namespace poly_version
          {
             return in::range< 0x0, 0x1F>( sign) || sign == 0x7F;
          }
+         //! @}
       } // is
 
       namespace to
@@ -163,7 +171,7 @@ namespace poly_version
 
       auto trim( auto data)
       {
-         auto white = [] ( const auto sign) { return is::space( sign); };
+         auto white = [] ( const auto sign) { return is::white( sign); };
          data.erase( std::ranges::find_if_not( data | std::views::reverse, white).base(), data.end());
          data.erase( data.begin(), std::ranges::find_if_not( data, white));
          return data;
@@ -519,7 +527,7 @@ namespace poly_version
          //! skip whitespace
          void skip()
          {
-            leap( [] ( const auto sign) { return is::space( sign);});
+            leap( [] ( const auto sign) { return is::white( sign);});
          }
 
          template< std::size_t nibs>
