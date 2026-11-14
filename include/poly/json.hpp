@@ -142,15 +142,10 @@ namespace poly_version
                {
                   read( help::till::quot, nrv);
 
-                  const auto sign = pull();
-
-                  if( sign == '"')
+                  if( pull() == '"')
                      return nrv;
 
-                  if( sign != '\\') [[likely]]
-                     nrv.push_back( sign);
-                  else
-                     nrv.append( help::transform::point( cast( pull())));
+                  nrv.append( help::transform::point( cast( pull())));
                }
             }
 

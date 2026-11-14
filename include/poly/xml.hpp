@@ -62,7 +62,7 @@ namespace poly_version
             auto till( const help::byte auto stop)
             {
                auto nrv = read( [ stop]( const auto sign) { return sign != stop; });
-               test( stop);
+               pull(); // stop
                return nrv;
             }
 
