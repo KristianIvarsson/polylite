@@ -404,10 +404,11 @@ namespace poly_version
             std::string do_grouping() const override { return "\3"; }
          };
 
-         template< help::byte unit, help::target_iterator< unit> iterator, bool posh, bool firm>
-         struct writer : help::writer< unit, iterator>
+         template< help::byte unit, pipe::target output, bool posh, bool firm>
+         struct writer : help::writer< unit, output>
          {
-            using base = help::writer< unit, iterator>;
+            using base = help::writer< unit, output>;
+            using base::base;
             using base::cast;
             using base::flat;
             using base::halt;

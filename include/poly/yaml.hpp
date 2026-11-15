@@ -718,10 +718,11 @@ namespace poly_version
          namespace writer
          {
 
-            template< help::byte unit, help::target_iterator< unit> iterator, bool strict>
-            struct core : help::writer< unit, iterator>
+            template< help::byte unit, pipe::target output, bool strict>
+            struct core : help::writer< unit, output>
             {
-               using base = help::writer< unit, iterator>;
+               using base = help::writer< unit, output>;
+               using base::base;
                using base::push;
                using base::copy;
                using base::cast;
@@ -794,10 +795,11 @@ namespace poly_version
                }
             };
 
-            template< help::byte unit, help::target_iterator< unit> iterator, bool strict>
-            struct flow : core< unit, iterator, strict>
+            template< help::byte unit, pipe::target output, bool strict>
+            struct flow : core< unit, output, strict>
             {
-               using base = writer::core< unit, iterator, strict>;
+               using base = writer::core< unit, output, strict>;
+               using base::base;
                using base::push;
                using base::copy;
                using base::cast;
@@ -845,11 +847,12 @@ namespace poly_version
                }
             };
 
-            template< help::byte unit, help::target_iterator< unit> iterator, std::size_t spaces, bool strict>
-            struct block : core< unit, iterator, strict>
+            template< help::byte unit, pipe::target output, std::size_t spaces, bool strict>
+            struct block : core< unit, output, strict>
             {
-               using base = writer::core< unit, iterator, strict>;
-               using base::mark;
+               using base = writer::core< unit, output, strict>;
+               using base::base;
+               using base::sink;
                using base::push;
                using base::copy;
                using base::wrap;
@@ -883,7 +886,7 @@ namespace poly_version
                      else
                      {
                         push( ' ');
-                        std::visit( flow< unit, iterator, strict>{ mark}, data);
+                        std::visit( flow< unit, output&, strict>{ sink}, data);
                      }
                   }
                }
@@ -910,7 +913,7 @@ namespace poly_version
                         }
                      }
                   else
-                     flow< unit, iterator, strict>{ mark}( node);
+                     flow< unit, output&, strict>{ sink}( node);
                }
 
                void operator() ( const node::binary& node)

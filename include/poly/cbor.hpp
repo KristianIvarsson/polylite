@@ -334,10 +334,11 @@ namespace poly_version
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
 
-         template< help::byte unit, help::target_iterator< unit> iterator, bool packed, bool strict>
-         struct writer : help::target< unit, iterator>
+         template< help::byte unit, pipe::target output, bool packed, bool strict>
+         struct writer : help::target< unit, output>
          {
-            using base = help::target< unit, iterator>;
+            using base = help::target< unit, output>;
+            using base::base;
             using base::emit;
             using base::halt;
             using base::push;
@@ -448,7 +449,7 @@ namespace poly_version
             void time( const auto data)
             {
                std::string string;
-               help::writer< char, std::back_insert_iterator< std::string>>{ std::back_inserter( string)}.time( data);
+               help::writer< char, pipe::write::memory< char, std::string>>( string).time( data);
                (*this)( string);
             }
 

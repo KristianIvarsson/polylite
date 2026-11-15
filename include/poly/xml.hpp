@@ -270,10 +270,11 @@ namespace poly_version
          };
 
          constexpr std::size_t spaces = 3;
-         template< help::byte unit, help::target_iterator< unit> iterator, std::size_t spaces>
-         struct writer : help::writer< unit, iterator>
+         template< help::byte unit, pipe::target output, std::size_t spaces>
+         struct writer : help::writer< unit, output>
          {
-            using base = help::writer< unit, iterator>;
+            using base = help::writer< unit, output>;
+            using base::base;
             using base::copy;
             using base::emit;
             using base::halt;
@@ -545,10 +546,11 @@ namespace poly_version
          namespace detail
          {
 
-            template< help::byte unit, help::target_iterator< unit> iterator, std::size_t spaces, bool strict>
-            struct writer : xml::detail::writer< unit, iterator, spaces>
+            template< help::byte unit, pipe::target output, std::size_t spaces, bool strict>
+            struct writer : xml::detail::writer< unit, output, spaces>
             {
-               using base = xml::detail::writer< unit, iterator, spaces>;
+               using base = xml::detail::writer< unit, output, spaces>;
+               using base::base;
                using base::cast;
                using base::copy;
                using base::emit;

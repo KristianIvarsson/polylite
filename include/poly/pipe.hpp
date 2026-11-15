@@ -14,7 +14,10 @@
 #include <cstring>
 #include <utility>
 #include <istream>
+#include <ostream>
+#include <concepts>
 #include <algorithm>
+#include <string_view>
 
 namespace poly_version
 {
@@ -26,6 +29,10 @@ namespace poly_version
       //! something the parsers can read from
       template< typename type>
       concept source = requires( type& origin) { origin.good(); origin.data(); origin.tell(); origin.hint(); };
+
+      //! something the writers can write to
+      template< typename type>
+      concept target = requires( type& output) { output.push( std::byte{}); output.copy( std::span< std::byte>{}); };
       
       
       //! the size of the buffer for sources that need that
@@ -179,6 +186,65 @@ namespace poly_version
             }
          };
       } // parse
+
+      namespace write
+      {
+         //! container target, i.e. appends directly to the container
+         template< byte unit, typename container>
+         class memory : pinned
+         {
+         private:
+
+            container& into;
+
+         public:
+
+            explicit memory( container& target) : into{ target} {}
+
+            void push( const byte auto sign) { into.push_back( static_cast< unit>( sign)); }
+
+            void copy( const std::ranges::contiguous_range auto& data)
+               requires byte< std::ranges::range_value_t< decltype( data)>>
+            {
+               const auto lead = reinterpret_cast< const unit*>( std::ranges::data( data));
+               into.insert( into.end(), lead, lead + std::ranges::size( data));
+            }
+         };
+
+         template< std::ranges::range container>
+         memory( container&) -> memory< std::ranges::range_value_t< container>, container>;
+
+         //! writes to an ostream (that has a buffer of its own)
+         template< byte unit>
+         class stream : pinned
+         {
+         private:
+
+            using traits = std::basic_ostream< unit>::traits_type;
+
+            std::basic_ostream< unit>& into;
+
+         public:
+
+            explicit stream( std::basic_ostream< unit>& target) : into{ target} {}
+
+            void push( const byte auto sign)
+            {
+               if( traits::eq_int_type( into.rdbuf()->sputc( static_cast< unit>( sign)), traits::eof()))
+                  into.setstate( std::ios::badbit);
+            }
+
+            void copy( const std::ranges::contiguous_range auto& data)
+               requires byte< std::ranges::range_value_t< decltype( data)>>
+            {
+               const auto size = static_cast< std::streamsize>( std::ranges::size( data));
+               const auto sent = into.rdbuf()->sputn( reinterpret_cast< const unit*>( std::ranges::data( data)), size);
+
+               if( sent != size)
+                  into.setstate( std::ios::badbit);
+            }
+         };
+      } // write
 
    } // pipe
 } // poly_version

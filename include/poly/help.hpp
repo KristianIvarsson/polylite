@@ -357,9 +357,6 @@ namespace poly_version
 
       using pipe::byte;
 
-      template< typename iterator, typename unit>
-      concept target_iterator = std::output_iterator< iterator, unit>;
-
 
       template< byte unit, pipe::source origin>
       struct source
@@ -500,7 +497,7 @@ namespace poly_version
             {
                auto [ head, tail] = feed.data();
                const auto lead = head;
-               head = std::find_if_not( head, tail, [ &]( const unit sign) { return till( static_cast< char>( sign)); });
+               head = std::find_if_not( head, tail, [&]( const unit sign) { return till( static_cast< char>( sign)); });
                into.append( reinterpret_cast< const char*>( lead), static_cast< std::size_t>( head - lead));
             }
             while( mark == last && good());
@@ -518,7 +515,7 @@ namespace poly_version
             do
             {
                auto [ head, tail] = feed.data();
-               head = std::find_if_not( head, tail, [ &]( const unit sign) { return till( static_cast< char>( sign)); });
+               head = std::find_if_not( head, tail, [&]( const unit sign) { return till( static_cast< char>( sign)); });
             }
             while( mark == last && good());
          }
@@ -587,7 +584,7 @@ namespace poly_version
          }
 
          // c-style escape sequences
-         auto cast( const auto sign) -> type::i32
+         auto cast( const byte auto sign) -> type::i32
          {
             switch( sign)
             {
@@ -606,19 +603,21 @@ namespace poly_version
       };
 
 
-      template< byte unit, target_iterator< unit> iterator>
+      template< byte unit, pipe::target output>
       struct target
       {
-         iterator mark;
+         output sink;
+
+         explicit target( auto& origin) : sink{ origin} {}
 
          void push( const byte auto data)
          {
-            *mark++ = static_cast< unit>( data);
+            sink.push( data);
          }
 
          void emit( const std::ranges::contiguous_range auto& data)
          {
-            for( const auto sign : data) push( sign);
+            sink.copy( data);
          }
 
          [[noreturn]] static void halt( const auto& what)
@@ -628,10 +627,11 @@ namespace poly_version
       };
 
 
-      template< byte unit, target_iterator< unit> iterator>
-      struct writer : target< unit, iterator>
+      template< byte unit, pipe::target output>
+      struct writer : target< unit, output>
       {
-         using base = target< unit, iterator>;
+         using base = target< unit, output>;
+         using base::base;
          using base::push;
          using base::emit;
 
@@ -650,7 +650,7 @@ namespace poly_version
             push( '\n'); fill( size);
          }
 
-         void cast( const auto sign)
+         void cast( const byte auto sign)
          {
             copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( sign)));
          }
@@ -802,20 +802,17 @@ namespace poly_version
             return source< parser, flags...>( std::string_view{ string, size - 1});
          }
 
-         template< template< typename, typename, auto...> class writer, auto... flags>
-         auto target( std::ostream& value)
+         template< template< typename, typename, auto...> class writer, auto... flags, typename unit>
+         auto target( std::basic_ostream< unit>& value)
          {
-            using iterator = std::ostreambuf_iterator< std::ostream::char_type>;
-            return writer< std::ostream::char_type, iterator, flags...>{ { iterator{ value}}};
+            return writer< unit, pipe::write::stream< unit>, flags...>( value);
          }
 
          template< template< typename, typename, auto...> class writer, auto... flags>
-         auto target( auto& value)
-            requires ( ! std::derived_from< std::remove_cvref_t< decltype( value)>, std::ostream>)
+         auto target( std::ranges::range auto& value)
          {
             using into = std::remove_cvref_t< decltype( value)>;
-            return writer< typename into::value_type, std::back_insert_iterator< into>, flags...>{
-               { std::back_inserter( value)}};
+            return writer< std::ranges::range_value_t< into>, pipe::write::memory< std::ranges::range_value_t< into>, into>, flags...>( value);
          }
       } // make
    } // help
