@@ -642,42 +642,36 @@ namespace poly_version
 
          void fill( std::size_t size)
          {
-            while( size--) push( ' ');
+            static constexpr std::string_view hole{ "                                "};
+            while( size > hole.size()) emit( hole), size -= hole.size();
+            emit( hole.substr( 0, size));
          }
 
-         void fold( std::size_t size)
+         void fold( const std::size_t size)
          {
             push( '\n'); fill( size);
          }
 
-         void cast( const byte auto sign)
+         void cast( const std::string_view data)
          {
-            copy( std::format( R"(\u{:04x})", static_cast< unsigned char>( sign)));
-         }
+            auto stop = std::ranges::find_if( data, [] ( const auto sign) { return is::some< '\\', '\"'>( sign) || is::cntrl( sign); });
 
-         void cast( const std::string& data)
-         {
-            for( const auto sign : data)
-            {
-               if( is::cntrl( sign))
-               {
-                  switch( sign)
-                  {
-                  case '\b': copy( R"(\b)"); break;
-                  case '\t': copy( R"(\t)"); break;
-                  case '\n': copy( R"(\n)"); break;
-                  case '\f': copy( R"(\f)"); break;
-                  case '\r': copy( R"(\r)"); break;
-                  default: cast( sign);
-                  }
-               }
-               else [[likely]]
-               {
-                  switch( sign)
-                  case '\\': case '\"': push( '\\');
-                  push( sign);
-               }
-            }
+            if( stop == std::end( data)) [[likely]]
+               return emit( data);
+
+            emit( std::string_view{ std::begin( data), stop});
+
+            push( '\\');
+
+            if( const auto sign = *stop++; is::cntrl( sign))
+               if( is::some< '\b', '\t', '\n', '\f', '\r'>( sign))
+                  push( "btnvfr"[ sign - '\b']);
+               else
+                  emit( std::format( "u{:04x}", static_cast< unsigned char>( sign)));
+            else
+               push( sign);
+
+            cast( std::string_view{ stop, std::end( data)});
          }
 
          void time( const node::local_time data)
