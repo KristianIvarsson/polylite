@@ -8,8 +8,8 @@
 
 #include "tale.hpp"
 #include "node.hpp"
+#include "pipe.hpp"
 
-#include <array>
 #include <chrono>
 #include <format>
 #include <limits>
@@ -355,40 +355,33 @@ namespace poly_version
       } // transform
 
 
-      template< typename unit>
-      concept byte = sizeof( unit) == 1;
-
-      template< typename iterator, typename unit>
-      concept source_iterator = std::input_iterator< iterator> && std::same_as< std::iter_value_t< iterator>, unit>;
+      using pipe::byte;
 
       template< typename iterator, typename unit>
       concept target_iterator = std::output_iterator< iterator, unit>;
 
 
-      template< byte unit, source_iterator< unit> iterator>
+      template< byte unit, pipe::source origin>
       struct source
       {
-         using sentinel = std::conditional_t< std::same_as< iterator, std::istreambuf_iterator< unit>>, std::default_sentinel_t, iterator>;
+         origin feed;
+         const unit*& mark;
+         const unit* const& last;
 
-         iterator mark;
-         [[no_unique_address]] sentinel last;
-
+         explicit source( auto& input) : feed{ input}, mark{ std::get< 0>( feed.data())}, last{ std::get< 1>( feed.data())} {}
 
          //! helper to prevent evil size
-         auto clip( const std::size_t size)
+         auto clip( const std::size_t size) const
          {
-            if constexpr( std::sized_sentinel_for< sentinel, iterator>)
-               return std::min( size, static_cast< std::size_t>( std::ranges::distance( mark, last)));
-            else
-               return std::min( size, static_cast< std::size_t>( 1024));
+            return std::min( size, feed.hint());
          }
 
-         bool good() const
+         bool good()
          {
-            return mark != last;
+            return feed.good();
          }
 
-         void done() const
+         void done()
          {
             if( good()) [[unlikely]] halt( "expected end of stream");
          }
@@ -408,7 +401,7 @@ namespace poly_version
             return static_cast< char>( *mark++);
          }
 
-         char peek() const
+         char peek()
          {
             if( good()) [[likely]] return look();
             return static_cast< char>( std::char_traits< char>::eof());
@@ -420,34 +413,41 @@ namespace poly_version
             halt( "unexpected end");
          }
 
-         template< typename into>
-         auto grab( const std::size_t size) -> into
+         auto chop( const std::size_t size) -> std::string_view
          {
-            if constexpr( std::contiguous_iterator< iterator>)
+            auto [ head, tail] = feed.data( size);
+
+            if( static_cast< std::size_t>( tail - head) < size)
+               [[unlikely]] halt( "unexpected end");
+
+            const auto lead = reinterpret_cast< const char*>( head);
+            head += size;
+            return { lead, size};
+         }         
+
+         template< typename into>
+         auto grab( std::size_t size) -> into
+         {
+            using type = typename into::value_type;
+
+            into nrv;
+            nrv.reserve( clip( size));
+
+            while( size)
             {
-               // const auto left = static_cast< std::size_t>( std::ranges::distance( mark, last));
-               // if( size > left) [[unlikely]] halt( "unexpected end");
+               auto [ head, tail] = feed.data( size);
 
-               auto save = mark;
-               if( std::ranges::advance( mark, size, last))
-                  pull(); // provoke an error
+               if( head == tail)
+                  [[unlikely]] halt( "unexpected end");
 
-               using type = typename into::value_type;
-               const auto head = reinterpret_cast< const type*>( std::to_address( save));
-               return into{ head, head + size};
+               const auto part = std::min( size, static_cast< std::size_t>( tail - head));
+               const auto lead = reinterpret_cast< const type*>( head);
+               nrv.insert( nrv.end(), lead, lead + part);
+               head += part;
+               size -= part;
             }
-            else
-            {
-               //
-               // fallback for non-contiguous iterators
-               // - correctness for single-pass iterators
-               // - performance for non-contiguous iterators
 
-               into data; data.reserve( clip( size));
-               for( std::size_t item{}; item < size; ++item)
-                  data.push_back( static_cast< typename into::value_type>( pull()));
-               return data;
-            }
+            return nrv;
          }
 
          void test( const char want, const char pick) const
@@ -462,13 +462,13 @@ namespace poly_version
 
          void test( const std::string_view want)
          {
-            for( const auto sign : want)
-               test( sign);
+            if( chop( want.size()) != want)
+               [[unlikely]] halt( "unexpected data");
          }
 
          [[noreturn]] void halt( const std::string_view message) const
          {
-            throw std::runtime_error{ std::format( "{} with {} bytes left to parse", message, std::ranges::distance( mark, last))};
+            throw std::runtime_error{ std::format( "{} at byte {}", message, feed.tell())};
          }
 
          [[noreturn]] void deny( const std::string_view message) const
@@ -477,32 +477,33 @@ namespace poly_version
          }
       };
 
-      template< byte unit, source_iterator< unit> iterator>
-      struct parser : source< unit, iterator>
+      template< byte unit, pipe::source origin>
+      struct parser : source< unit, origin>
       {
-         using base = source< unit, iterator>;
-         using base::mark;
-         using base::good;
-         using base::look;
-         using base::take;
-         using base::pull;
-         using base::test;
-         using base::halt;
+         using base = source< unit, origin>;
+         using base::base;
+         using base::chop;
          using base::deny;
+         using base::feed;
+         using base::good;
+         using base::halt;
+         using base::last;
+         using base::mark;
+         using base::look;
+         using base::pull;
+         using base::take;
+         using base::test;
 
          void read( auto&& till, std::string& into)
          {
-            if constexpr( std::contiguous_iterator< iterator>)
+            do
             {
-               const auto head = mark;
-               leap( till);
-               into.append( reinterpret_cast< const char*>( std::to_address( head)), static_cast< std::size_t>( mark - head));
+               auto [ head, tail] = feed.data();
+               const auto lead = head;
+               head = std::find_if_not( head, tail, [ &]( const unit sign) { return till( static_cast< char>( sign)); });
+               into.append( reinterpret_cast< const char*>( lead), static_cast< std::size_t>( head - lead));
             }
-            else
-            {
-               while( good() && till( look()))
-                  into.push_back( take());
-            }
+            while( mark == last && good());
          }
 
          auto read( auto&& till)
@@ -514,7 +515,12 @@ namespace poly_version
 
          auto leap( auto&& till)
          {
-            while( good() && till( look())) ++mark;
+            do
+            {
+               auto [ head, tail] = feed.data();
+               head = std::find_if_not( head, tail, [ &]( const unit sign) { return till( static_cast< char>( sign)); });
+            }
+            while( mark == last && good());
          }
 
          //! rest of the line
@@ -533,14 +539,11 @@ namespace poly_version
          template< std::size_t nibs>
          auto code()
          {
-            std::array< char, nibs> data;
-            for( auto& sign : data) sign = pull();
+            const auto data = chop( nibs);
 
             type::i32 nrv;
 
-            const auto result = std::from_chars( data.data(), data.data() + data.size(), nrv, 16);
-
-            if( result.ec != std::errc{} || result.ptr != (data.data() + data.size()))
+            if( const auto [ stop, code] = std::from_chars( data.data(), data.data() + data.size(), nrv, 16); code != std::errc{} || stop != data.data() + data.size())
                [[unlikely]] halt( "invalid code point");
 
             return nrv;
@@ -573,7 +576,7 @@ namespace poly_version
             if( lead > 0xDBFF)
                [[unlikely]] halt( "invalid 1st surrogate");
 
-            test( '\\'); test( 'u');
+            test( "\\u");
 
             const auto tail = real();
 
@@ -770,20 +773,26 @@ namespace poly_version
       namespace make
       {
          template< template< typename, typename, auto...> class parser, auto... flags>
-         auto source( std::istream& value)
+         auto source( const std::ranges::contiguous_range auto& value)
          {
-            using iterator = std::istreambuf_iterator< std::istream::char_type>;
-            return parser< std::istream::char_type, iterator, flags...>{ { iterator{ value}, std::default_sentinel}};
+            using unit = std::ranges::range_value_t< decltype( value)>;
+            return parser< unit, pipe::parse::memory< unit>, flags...>( value);
+         }
+
+         template< template< typename, typename, auto...> class parser, auto... flags, typename unit>
+         auto source( std::basic_istream< unit>& value)
+         {
+            return parser< unit, pipe::parse::stream< unit>, flags...>( value);
          }
 
          template< template< typename, typename, auto...> class parser, auto... flags>
-         auto source( const auto& value)
-            requires ( ! std::derived_from< std::remove_cvref_t< decltype( value)>, std::istream>)
+         auto source( const std::ranges::input_range auto& value)
+            requires ( ! std::ranges::contiguous_range< decltype( value)>)
          {
-            using unit     = std::ranges::range_value_t< decltype( value)>;
-            using iterator = std::ranges::iterator_t< const std::remove_cvref_t< decltype( value)>>;
-            return parser< unit, iterator, flags...>{
-               { std::ranges::begin( value), std::ranges::end( value)}};
+            using range = std::remove_cvref_t< decltype( value)>;
+            using unit  = std::ranges::range_value_t< range>;
+            using cursor = pipe::parse::cursor< unit, std::ranges::iterator_t< const range>, std::ranges::sentinel_t< const range>>;
+            return parser< unit, cursor, flags...>( value);
          }
 
          // utility for string literals (automatically deduces size and type) (essentially for testing)

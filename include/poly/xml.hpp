@@ -18,10 +18,11 @@ namespace poly_version
    {
       namespace detail
       {
-         template< help::byte unit, help::source_iterator< unit> iterator>
-         struct parser : help::parser< unit, iterator>
+         template< help::byte unit, pipe::source origin>
+         struct parser : help::parser< unit, origin>
          {
-            using base = help::parser< unit, iterator>;
+            using base = help::parser< unit, origin>;
+            using base::base;
             using base::deny;
             using base::drop;
             using base::good;
@@ -388,10 +389,11 @@ namespace poly_version
 
          namespace detail
          {
-            template< help::byte unit, help::source_iterator< unit> iterator>
-            struct parser : xml::detail::parser< unit, iterator>
+            template< help::byte unit, pipe::source origin>
+            struct parser : xml::detail::parser< unit, origin>
             {
-               using base = xml::detail::parser< unit, iterator>;
+               using base = xml::detail::parser< unit, origin>;
+               using base::base;
                using base::halt;
                using base::head;
                using base::word;

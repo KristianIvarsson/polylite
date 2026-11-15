@@ -29,10 +29,11 @@ namespace poly_version
 
          namespace parser
          {
-            template< help::byte unit, help::source_iterator< unit> iterator>
-            struct core : help::parser< unit, iterator>
+            template< help::byte unit, pipe::source origin>
+            struct core : help::parser< unit, origin>
             {
-               using base = help::parser< unit, iterator>;
+               using base = help::parser< unit, origin>;
+               using base::base;
                using base::full;
                using base::half;
                using base::good;
@@ -144,16 +145,17 @@ namespace poly_version
                   return node{ std::move( data)};
                }
 
-               bool cusp() const
+               bool cusp()
                {
                   return ! good() || help::is::white( look());
                }
             };
 
-            template< help::byte unit, help::source_iterator< unit> iterator>
-            struct flow : core< unit, iterator>
+            template< help::byte unit, pipe::source origin>
+            struct flow : core< unit, origin>
             {
-               using base = parser::core< unit, iterator>;
+               using base = parser::core< unit, origin>;
+               using base::base;
                using base::cusp;
                using base::good;
                using base::halt;
@@ -170,9 +172,6 @@ namespace poly_version
                using typename base::name;
                using typename base::nill;
 
-               flow( iterator& head, auto tail) : base{ head, tail}, keep{ head} {}
-               ~flow() { keep = mark; }
-
                auto spot() -> node
                {
                   auto data = scan();
@@ -184,8 +183,6 @@ namespace poly_version
                }
 
             private:
-
-               iterator& keep;
 
                info decide( auto data)
                {
@@ -252,7 +249,7 @@ namespace poly_version
                   return nrv;
                }
 
-               bool more( const std::string& data) const
+               bool more( const std::string& data)
                {
                   return good() and not ( help::is::some< ',', '}', ']'>( look()) || ( look() == '#' && data.ends_with( ' ')));
                }
@@ -274,10 +271,11 @@ namespace poly_version
 
             };
 
-            template< help::byte unit, help::source_iterator< unit> iterator>
-            struct block : core< unit, iterator>
+            template< help::byte unit, pipe::source origin>
+            struct block : core< unit, origin>
             {
-               using base = parser::core< unit, iterator>;
+               using base = parser::core< unit, origin>;
+               using base::base;
                using base::mark;
                using base::last;
                using base::good;
@@ -377,7 +375,7 @@ namespace poly_version
                   switch( peek())
                   {
                   case '{': case '[':
-                     return info{ parser::flow< unit, iterator>{ mark, last}.spot()};
+                     return info{ parser::flow< unit, origin&>{ this->feed}.spot()};
                   case '*':
                      return alias();
                   case '&':
@@ -499,7 +497,7 @@ namespace poly_version
                   return { object};
                }
 
-               bool more( const std::string& data) const
+               bool more( const std::string& data)
                {
                   return good() and not ( look() == '\n' || ( look() == '#' && data.ends_with( ' ')));                  
                }
@@ -540,7 +538,7 @@ namespace poly_version
                   return resolve( help::trim( std::move( data)));
                }
 
-               bool idle() const
+               bool idle()
                {
                   return help::is::some< '\n', '#'>( peek());
                }

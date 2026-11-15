@@ -96,10 +96,11 @@ namespace poly_version
             return std::bit_cast< help::type::f64>( data);
          }
 
-         template< help::byte unit, help::source_iterator< unit> iterator>
-         struct parser : help::source< unit, iterator>
+         template< help::byte unit, pipe::source origin>
+         struct parser : help::source< unit, origin>
          {
-            using base = help::source< unit, iterator>;
+            using base = help::source< unit, origin>;
+            using base::base;
             using base::clip;
             using base::deny;
             using base::done;

@@ -24,10 +24,11 @@ namespace poly_version
             return help::is::alnum( sign) || help::is::some< '_', '-'>( sign);
          };
 
-         template< help::byte unit, help::source_iterator< unit> iterator>
-         struct parser : help::parser< unit, iterator>
+         template< help::byte unit, pipe::source origin>
+         struct parser : help::parser< unit, origin>
          {
-            using base = help::parser< unit, iterator>;
+            using base = help::parser< unit, origin>;
+            using base::base;
             using base::mark;
             using base::done;
             using base::drop;
@@ -164,7 +165,7 @@ namespace poly_version
                   rest(), tidy();
             }
 
-            void feed()
+            void snip()
             {
                if( peek() == '\r') drop();
                if( peek() == '\n') drop();
@@ -252,7 +253,7 @@ namespace poly_version
             auto multi_basic() -> node::string
             {
                drop(); // '"'
-               feed();
+               snip();
 
                std::string nrv;
 
@@ -310,7 +311,7 @@ namespace poly_version
             auto multi_literal() -> node::string
             {
                drop(); // '\''
-               feed();
+               snip();
 
                std::string nrv;
 

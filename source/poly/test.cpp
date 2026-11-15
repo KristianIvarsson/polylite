@@ -7,11 +7,14 @@
 #include "poly/xml.hpp"
 #include "poly/yaml.hpp"
 
+#include <list>
+#include <deque>
 #include <print>
 #include <cassert>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <forward_list>
 
 namespace poly_version
 {
@@ -317,6 +320,46 @@ namespace poly_version
             std::vector< std::byte> binary;
             write( parse( text), binary);
             assert( write( parse( binary)) == text);
+
+            // non contiguous containers as source
+            const std::deque< char> deque{ text.begin(), text.end()};
+            assert( write( parse( deque)) == text);
+
+            const std::list< char> list{ text.begin(), text.end()};
+            assert( write( parse( list)) == text);
+
+            const std::forward_list< char> forward{ text.begin(), text.end()};
+            assert( write( parse( forward)) == text);
+
+            const std::deque< std::byte> blobs{ bytes.begin(), bytes.end()};
+            assert( write( parse( blobs)) == text);
+         }
+
+         void sources()
+         {
+            // larger than the internal buffer, so that strings and numbers cross its edges
+            node source = node::array{};
+            for( std::size_t index = 0; index < 1000; ++index)
+            {
+               source[ index][ "text"] = std::string( index % 50, 'x') + "\"\\\n\u00e5";
+               source[ index][ "decimal"] = static_cast< node::decimal>( index) * 3.25;
+               source[ index][ "integer"] = -static_cast< node::integer>( index) * 1234567;
+            }
+
+            const auto text = write( source);
+            assert( text.size() > pipe::gage);
+
+            std::istringstream stream{ text};
+            assert( write( parse( stream)) == text);
+
+            const std::deque< char> deque{ text.begin(), text.end()};
+            assert( write( parse( deque)) == text);
+
+            const std::list< char> list{ text.begin(), text.end()};
+            assert( write( parse( list)) == text);
+
+            const std::forward_list< char> forward{ text.begin(), text.end()};
+            assert( write( parse( forward)) == text);
          }
 
          void whitespace()
@@ -336,6 +379,7 @@ namespace poly_version
          cases::strict_gentle();
          cases::binary();
          cases::containers();
+         cases::sources();
          cases::whitespace();
       }
    } // json::test
@@ -1683,6 +1727,25 @@ top: world
                // uint64 holding 2^63, which does not fit in a long
                assert( throws( []{ cbor::parse( bytes({ 0x1B, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})); }));
             }
+
+            void sources()
+            {
+               // strings and binaries larger than the internal buffer of non contiguous sources
+               node source;
+               source[ "text"] = std::string( pipe::gage * 3, 'x');
+               source[ "blob"] = node::binary( pipe::gage * 2 + 1, std::byte{ 0x2A});
+
+               const auto data = cbor::write( source);
+
+               const std::deque< std::byte> deque{ data.begin(), data.end()};
+               assert( cbor::write( cbor::parse( deque)) == data);
+
+               const std::list< std::byte> list{ data.begin(), data.end()};
+               assert( cbor::write( cbor::parse( list)) == data);
+
+               const std::forward_list< std::byte> forward{ data.begin(), data.end()};
+               assert( cbor::write( cbor::parse( forward)) == data);
+            }
          } // cases
 
          void all()
@@ -1697,6 +1760,7 @@ top: world
             cases::instants();
             cases::roundtrip();
             cases::parsing();
+            cases::sources();
          }
       } // cbor::test
 
@@ -1915,6 +1979,25 @@ top: world
             // gentle: local_time is written as text, A1 74 A8 "12:34:56"
             assert( pack::gentle::write( source) == detail::bytes({ 0x81, 0xA1, 0x74, 0xA8, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
          }
+
+         void sources()
+         {
+            // strings and binaries larger than the internal buffer of non contiguous sources
+            node source;
+            source[ "text"] = std::string( pipe::gage * 3, 'x');
+            source[ "blob"] = node::binary( pipe::gage * 2 + 1, std::byte{ 0x2A});
+
+            const auto data = pack::write( source);
+
+            const std::deque< std::byte> deque{ data.begin(), data.end()};
+            assert( pack::write( pack::parse( deque)) == data);
+
+            const std::list< std::byte> list{ data.begin(), data.end()};
+            assert( pack::write( pack::parse( list)) == data);
+
+            const std::forward_list< std::byte> forward{ data.begin(), data.end()};
+            assert( pack::write( pack::parse( forward)) == data);
+         }
       } // cases
 
       void all()
@@ -1930,6 +2013,7 @@ top: world
          cases::strictness();
          cases::roundtrip();
          cases::parsing();
+         cases::sources();
       }
    } // pack::test
 

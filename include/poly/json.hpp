@@ -20,15 +20,16 @@ namespace poly_version
    {
       namespace detail
       {
-         template< help::byte unit, help::source_iterator< unit> iterator>
-         struct parser : help::parser< unit, iterator>
+         template< help::byte unit, pipe::source origin>
+         struct parser : help::parser< unit, origin>
          {
-            using base = help::parser< unit, iterator>;
+            using base = help::parser< unit, origin>;
+            using base::base;
             using base::mark;
             using base::cast;
             using base::done;
+            using base::feed;
             using base::halt;
-            using base::leap;
             using base::peek;
             using base::pull;
             using base::read;
@@ -163,47 +164,24 @@ namespace poly_version
 
             auto number() -> node
             {
-               bool decimal = false;
+               auto [ head, tail] = feed.data( 128);
 
-               const auto data = [ &]
-               {
-                  auto stop = [ &decimal]( const auto sign)
-                  {
-                     if( help::is::some< '.', 'e', 'E'>( sign))
-                        return decimal = true;
-                     return help::is::digit( sign) || help::is::some< '+', '-'>( sign);
-                  };
+               const auto first = reinterpret_cast< const char*>( head);
+               const auto final = reinterpret_cast< const char*>( tail);
 
-                  if constexpr( std::contiguous_iterator< iterator>)
-                  {
-                     const auto head = mark;
-                     leap( stop);
-                     return std::string_view{ 
-                        reinterpret_cast< const char*>( std::to_address( head)), 
-                        reinterpret_cast< const char*>( std::to_address( mark))};
-                  }
-                  else
-                  {
-                     return read( stop);
-                  }
-               }();
+               node::integer integer{};
 
-               const auto start = data.data();
-               const auto cease = data.data() + data.size();
+               if( const auto [ stop, code] = std::from_chars( first, final, integer); code == std::errc{})
+                  if( stop == final || help::is::none< '.', 'e', 'E'>( *stop))
+                     return head += stop - first, integer;
 
-               auto make = [ &] ( auto value)
-               {
-                  const auto [ ptr, ec] = std::from_chars( start, cease, value);
-                  if( ec == std::errc{} && ptr == cease)
-                     return value;
+               node::decimal decimal{};
 
-                  [[unlikely]] halt( "unexpected data");
-               };
+               if( const auto [ stop, code] = std::from_chars( first, final, decimal); code == std::errc{})
+                  if( std::isfinite( decimal))
+                     return head += stop - first, decimal;
 
-               if( decimal)
-                  return make( node::decimal{});
-               else
-                  return make( node::integer{});
+               [[unlikely]] halt( "unexpected data");
             }
          };
 

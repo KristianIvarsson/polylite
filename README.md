@@ -26,13 +26,13 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 #### JSON
 - `instant` (_time_) is not a native type
 - `binary` is not a native type
+- integers outside `node::integer` range are parsed as `decimal` (possibly losing precision)
 
 #### PACK
 - `zoned_datetime` is written and parsed as UTC, since the timestamp extension has no zone offset
 - `zoned_datetime` is written without fractions, since the specification mandates that
 - `local_date`, `local_time` and `local_datetime` inside `instant` are not native MSGPACK types but are written as strings in *gentle* mode
 
-#### PLIST
 #### PLIST
 - `nothing` (_null_) is not a native type
 - `zoned_datetime` is written as UTC without fractions, since `<date>` only allows `YYYY-MM-DDTHH:MM:SSZ`
@@ -59,6 +59,9 @@ The following are detected and rejected with an error:
 - Tagged items using indefinite-length encoding
 - Nested indefinite-length string chunks (RFC 8949 §3.2.3 violation)
 - Indefinite-length string chunks whose major type doesn't match the outer string
+
+#### JSON
+- Numbers longer than 128 characters may be rejected with an error when parsed from a stream or a non-contiguous container (e.g. `std::istream`, `std::deque` or `std::list`)
 
 #### PACK
 The following are detected and rejected with an error:
