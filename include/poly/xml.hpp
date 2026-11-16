@@ -7,6 +7,8 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/load.hpp"
+#include "core/save.hpp"
 
 #include <tuple>
 #include <string>
@@ -18,10 +20,10 @@ namespace poly_version
    {
       namespace detail
       {
-         template< help::byte unit, pipe::source origin>
-         struct parser : help::parser< unit, origin>
+         template< core::type::byte unit, core::load::pipe::source origin>
+         struct parser : core::load::parser< unit, origin>
          {
-            using base = help::parser< unit, origin>;
+            using base = core::load::parser< unit, origin>;
             using base::base;
             using base::deny;
             using base::drop;
@@ -60,7 +62,7 @@ namespace poly_version
                return nrv;
             }
 
-            auto till( const help::byte auto stop)
+            auto till( const core::type::byte auto stop)
             {
                auto nrv = read( [ stop]( const auto sign) { return sign != stop; });
                pull(); // stop
@@ -79,7 +81,7 @@ namespace poly_version
                const auto sign = pull();
 
                if( sign == '?')
-                  return { form::hint, help::trim( till( "?>"))};
+                  return { form::hint, core::help::trim( till( "?>"))};
                
                if( sign == '!')
                {
@@ -87,20 +89,20 @@ namespace poly_version
                   {
                   case '-': test( '-');      return { form::note, till( "-->")};
                   case '[': test( "CDATA["); return { form::lump, till( "]]>")};
-                  case 'D': test( "OCTYPE"); return { form::kind, help::trim( till( '>'))};
+                  case 'D': test( "OCTYPE"); return { form::kind, core::help::trim( till( '>'))};
                   default: [[unlikely]] halt( "unexpected data");
                   }
                }
 
                if( sign == '/')
-                  return { form::seal, help::trim( till( '>'))};
+                  return { form::seal, core::help::trim( till( '>'))};
 
                std::string data = sign + till( '>');
 
                if( data.ends_with( '/'))
-                  return data.pop_back(), std::tuple{ form::bare, help::trim( std::move( data))};
+                  return data.pop_back(), std::tuple{ form::bare, core::help::trim( std::move( data))};
 
-               return { form::open, help::trim( std::move( data))};
+               return { form::open, core::help::trim( std::move( data))};
             }
 
             auto sift()
@@ -123,7 +125,7 @@ namespace poly_version
 
             static auto word( const std::string_view data) -> std::string_view
             {
-               const auto last = std::ranges::find_if( data, []( const auto sign){ return help::is::white( sign);});
+               const auto last = std::ranges::find_if( data, []( const auto sign){ return core::help::is::white( sign);});
                return data.substr( 0, last - std::begin( data));
             }
 
@@ -155,19 +157,19 @@ namespace poly_version
                   const bool hexa = data.starts_with( 'x');
                   data = data.substr( hexa);
 
-                  help::type::i32 code{};
+                  core::type::i32 code{};
                   const auto [ ptr, ec] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
 
-                  auto scan = [] ( const help::type::i32 rune)
+                  auto scan = [] ( const core::type::i32 rune)
                      {
-                        return help::is::some< '\t', '\n', '\r'>( rune)
-                           || help::is::in::range< 0x20, 0xD7FF>( rune)
-                           || help::is::in::range< 0xE000, 0xFFFD>( rune)
-                           || help::is::in::range< 0x10000, 0x10FFFF>( rune);
+                        return core::help::is::some< '\t', '\n', '\r'>( rune)
+                           || core::help::is::in::range< 0x20, 0xD7FF>( rune)
+                           || core::help::is::in::range< 0xE000, 0xFFFD>( rune)
+                           || core::help::is::in::range< 0x10000, 0x10FFFF>( rune);
                      };
 
                   if( ptr == data.data() + data.size() && ec == std::errc{} && scan( code))
-                     return help::transform::point( code);
+                     return core::help::transform::point( code);
                }
 
                [[unlikely]] halt( "invalid entity");
@@ -196,7 +198,7 @@ namespace poly_version
                      break;
 
                   default:
-                     if( help::is::in::range< 0x0, 0x1F>( sign))
+                     if( core::help::is::in::range< 0x0, 0x1F>( sign))
                         [[unlikely]] halt( "invalid character");
                      nrv.push_back( sign);
                   }
@@ -227,8 +229,8 @@ namespace poly_version
                   if( ! view)
                      return std::nullopt;
 
-                  while( ! view->empty() && help::is::white( view->front())) view->remove_prefix( 1);
-                  while( ! view->empty() && help::is::white( view->back())) view->remove_suffix( 1);
+                  while( ! view->empty() && core::help::is::white( view->front())) view->remove_prefix( 1);
+                  while( ! view->empty() && core::help::is::white( view->back())) view->remove_suffix( 1);
 
                   if( ! part( "\"'"))
                      return std::nullopt;
@@ -250,7 +252,7 @@ namespace poly_version
                   {
                      return std::ranges::equal( lhs, rhs, [] ( const auto first, const auto other) 
                      { 
-                        return help::to::lower( first) == help::to::lower( other); 
+                        return core::help::to::lower( first) == core::help::to::lower( other); 
                      });
                   };
 
@@ -270,10 +272,10 @@ namespace poly_version
          };
 
          constexpr std::size_t spaces = 3;
-         template< help::byte unit, pipe::target output, std::size_t spaces>
-         struct writer : help::writer< unit, output>
+         template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
+         struct writer : core::save::writer< unit, output>
          {
-            using base = help::writer< unit, output>;
+            using base = core::save::writer< unit, output>;
             using base::base;
             using base::copy;
             using base::emit;
@@ -326,7 +328,7 @@ namespace poly_version
             {
                for( const auto sign : data)
                {
-                  if( help::is::in::range< 0x0, 0x1F>( sign))
+                  if( core::help::is::in::range< 0x0, 0x1F>( sign))
                      switch( sign)
                      {
                      case '\t': case '\n': case '\r':
@@ -390,7 +392,7 @@ namespace poly_version
 
          namespace detail
          {
-            template< help::byte unit, pipe::source origin>
+            template< core::type::byte unit, core::load::pipe::source origin>
             struct parser : xml::detail::parser< unit, origin>
             {
                using base = xml::detail::parser< unit, origin>;
@@ -503,7 +505,7 @@ namespace poly_version
 
                auto integer( const std::string_view data)
                {
-                  if( auto result = help::transform::number( data); result && result->is_integer())
+                  if( auto result = core::help::transform::number( data); result && result->is_integer())
                      return std::move( *result);
 
                   [[unlikely]] halt( "unexpected data");
@@ -511,7 +513,7 @@ namespace poly_version
 
                auto decimal( const std::string_view data)
                {
-                  if( auto result = help::transform::number( data); result && result->is_numeric())
+                  if( auto result = core::help::transform::number( data); result && result->is_numeric())
                      return result->is_integer() ? node{ static_cast< node::decimal>( result->as_integer())} : std::move( *result);
 
                   [[unlikely]] halt( "unexpected data");
@@ -519,7 +521,7 @@ namespace poly_version
 
                auto instant( const std::string_view data)
                {
-                  if( auto result = help::transform::instant( data))
+                  if( auto result = core::help::transform::instant( data))
                      if( std::holds_alternative< node::zoned_datetime>( *result))
                         return std::move( *result);
 
@@ -528,7 +530,7 @@ namespace poly_version
 
                auto binary( const std::string_view data)
                {
-                  if( auto result = help::transform::binary( data); result)
+                  if( auto result = core::help::transform::binary( data); result)
                      return std::move( *result);
 
                   [[unlikely]] halt( "unexpected data");
@@ -540,13 +542,13 @@ namespace poly_version
 
          auto parse( auto&& source)
          {
-            return help::make::source< detail::parser>( source)();
+            return core::load::make::source< detail::parser>( source)();
          }
 
          namespace detail
          {
 
-            template< help::byte unit, pipe::target output, std::size_t spaces, bool strict>
+            template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces, bool strict>
             struct writer : xml::detail::writer< unit, output, spaces>
             {
                using base = xml::detail::writer< unit, output, spaces>;
@@ -698,7 +700,7 @@ namespace poly_version
             template< std::size_t spaces, bool strict, bool complete>
             void write( const node& root, auto&& target)
             {
-               auto sink = help::make::target< writer, spaces, strict>( target);
+               auto sink = core::save::make::target< writer, spaces, strict>( target);
 
                if constexpr( complete)
                {

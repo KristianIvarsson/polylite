@@ -7,6 +7,8 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/load.hpp"
+#include "core/save.hpp"
 
 #include <bit>
 #include <cmath>
@@ -24,7 +26,7 @@ namespace poly_version
    {
       namespace detail
       {
-         enum class major : help::type::u08
+         enum class major : core::type::u08
          {
             positive = 0,  // unsigned integer
             negative = 1,  // negative integer
@@ -36,7 +38,7 @@ namespace poly_version
             simple   = 7,  // float / simple / break / floating point
          };
 
-         enum class simple : help::type::u08
+         enum class simple : core::type::u08
          {
             no       = 20, // false
             yes      = 21, // true
@@ -49,7 +51,7 @@ namespace poly_version
             stop     = 31, // break
          };
 
-         enum class chrono : help::type::u64
+         enum class chrono : core::type::u64
          {
             when = 0,      // standard date/time string  (RFC 8949)
             tick = 1,      // epoch-based date/time      (RFC 8949)
@@ -57,15 +59,15 @@ namespace poly_version
             date = 1004,   // RFC 3339 full-date string  (RFC 8943)
          };         
 
-         constexpr auto mask = help::type::u08{ 0x1F};
+         constexpr auto mask = core::type::u08{ 0x1F};
 
-         constexpr auto half( const help::type::u16 data) -> node::decimal
+         constexpr auto half( const core::type::u16 data) -> node::decimal
          {
             struct layout
             {
-               help::type::u16 mantissa : 10;
-               help::type::u16 exponent :  5;
-               help::type::u16 sign     :  1;
+               core::type::u16 mantissa : 10;
+               core::type::u16 exponent :  5;
+               core::type::u16 sign     :  1;
             };
 
             const auto bits = std::bit_cast< layout>( data);            
@@ -86,20 +88,20 @@ namespace poly_version
             return bits.sign ? -result : +result;
          }
 
-         constexpr auto real( const help::type::u32 data) -> node::decimal
+         constexpr auto real( const core::type::u32 data) -> node::decimal
          {
-            return std::bit_cast< help::type::f32>( data);
+            return std::bit_cast< core::type::f32>( data);
          }
 
-         constexpr auto full( const help::type::u64 data) -> node::decimal
+         constexpr auto full( const core::type::u64 data) -> node::decimal
          {
-            return std::bit_cast< help::type::f64>( data);
+            return std::bit_cast< core::type::f64>( data);
          }
 
-         template< help::byte unit, pipe::source origin>
-         struct parser : help::source< unit, origin>
+         template< core::type::byte unit, core::load::pipe::source origin>
+         struct parser : core::load::source< unit, origin>
          {
-            using base = help::source< unit, origin>;
+            using base = core::load::source< unit, origin>;
             using base::base;
             using base::clip;
             using base::deny;
@@ -170,7 +172,7 @@ namespace poly_version
 
             auto when( const node& data) -> node::instant
             {
-               return help::transform::instant( std::get< node::string>( data)).value();
+               return core::help::transform::instant( std::get< node::string>( data)).value();
             }
 
             auto tick( const node& data) -> node::instant
@@ -200,9 +202,9 @@ namespace poly_version
                deny( "tag");
             }
 
-            auto integer( const help::type::u64 data)
+            auto integer( const core::type::u64 data)
             {
-               if( data > static_cast< help::type::u64>( std::numeric_limits< node::integer>::max()))
+               if( data > static_cast< core::type::u64>( std::numeric_limits< node::integer>::max()))
                   [[unlikely]] halt( "integer overflow");
                return static_cast< node::integer>( data);
             }
@@ -247,32 +249,32 @@ namespace poly_version
             }
 
             template< std::size_t size>
-            auto take() -> help::type::u64
+            auto take() -> core::type::u64
             {
-               help::type::u64 data{};
+               core::type::u64 data{};
                for( std::size_t item{}; item < size; ++item)
-                  data = ( data << 8) | static_cast< help::type::u08>( pull());
+                  data = ( data << 8) | static_cast< core::type::u08>( pull());
                return data;
             }
 
             auto next() -> std::tuple< major, simple>
             {
-               const auto byte = static_cast< help::type::u08>( pull());
+               const auto byte = static_cast< core::type::u08>( pull());
                
                return { static_cast< major>( byte >> 5), static_cast< simple>( byte & mask)};
             }
 
-            auto load( const simple info) -> help::type::u64
+            auto load( const simple info) -> core::type::u64
             {
                if( info < simple::byte) 
                   return std::to_underlying( info); // inline
 
                switch( info)
                {
-               case simple::byte: return take< sizeof( help::type::u08)>();
-               case simple::half: return take< sizeof( help::type::u16)>();
-               case simple::real: return take< sizeof( help::type::u32)>();
-               case simple::full: return take< sizeof( help::type::u64)>();
+               case simple::byte: return take< sizeof( core::type::u08)>();
+               case simple::half: return take< sizeof( core::type::u16)>();
+               case simple::real: return take< sizeof( core::type::u32)>();
+               case simple::full: return take< sizeof( core::type::u64)>();
                default: break; // -Wswitch
                }
 
@@ -315,9 +317,9 @@ namespace poly_version
                   case simple::yes:  return true;
                   case simple::null:
                   case simple::none: return nullptr;
-                  case simple::half: return half( static_cast< help::type::u16>( data));
-                  case simple::real: return real( static_cast< help::type::u32>( data));
-                  case simple::full: return full( static_cast< help::type::u64>( data));
+                  case simple::half: return half( static_cast< core::type::u16>( data));
+                  case simple::real: return real( static_cast< core::type::u32>( data));
+                  case simple::full: return full( static_cast< core::type::u64>( data));
                   default: break; // -Wswitch
                   }
                }
@@ -328,16 +330,16 @@ namespace poly_version
 
          };
 
-         constexpr auto head( major kind, simple info) -> help::type::u08
+         constexpr auto head( major kind, simple info) -> core::type::u08
          {
-            constexpr help::type::u08 bits{ 5};
+            constexpr core::type::u08 bits{ 5};
             return ( std::to_underlying( kind) << bits) | ( std::to_underlying( info) & mask);
          }
 
-         template< help::byte unit, pipe::target output, bool packed, bool strict>
-         struct writer : help::target< unit, output>
+         template< core::type::byte unit, core::save::pipe::target output, bool packed, bool strict>
+         struct writer : core::save::target< unit, output>
          {
-            using base = help::target< unit, output>;
+            using base = core::save::target< unit, output>;
             using base::base;
             using base::emit;
             using base::halt;
@@ -356,14 +358,14 @@ namespace poly_version
             void operator() ( const node::integer node)
             {
                if( node < 0)
-                  pack( major::negative, ~static_cast< help::type::u64>( node));
+                  pack( major::negative, ~static_cast< core::type::u64>( node));
                else
-                  pack( major::positive,  static_cast< help::type::u64>( node));
+                  pack( major::positive,  static_cast< core::type::u64>( node));
             }
 
             void operator() ( const node::decimal node)
             {
-               full( major::simple, std::bit_cast< help::type::u64>( node));
+               full( major::simple, std::bit_cast< core::type::u64>( node));
             }
 
             void operator() ( const node::instant& node)
@@ -449,25 +451,25 @@ namespace poly_version
             void time( const auto data)
             {
                std::string string;
-               help::writer< char, pipe::write::memory< char, std::string>>( string).time( data);
+               core::save::writer< char, core::save::pipe::memory< char, std::string>>( string).time( data);
                (*this)( string);
             }
 
-            void full( major kind, help::type::u64 data)
+            void full( major kind, core::type::u64 data)
             {
                push( head( kind, simple::full));
 
-               push( static_cast< help::type::u08>( data >> 56));
-               push( static_cast< help::type::u08>( data >> 48));
-               push( static_cast< help::type::u08>( data >> 40));
-               push( static_cast< help::type::u08>( data >> 32));
-               push( static_cast< help::type::u08>( data >> 24));
-               push( static_cast< help::type::u08>( data >> 16));
-               push( static_cast< help::type::u08>( data >>  8));
-               push( static_cast< help::type::u08>( data));
+               push( static_cast< core::type::u08>( data >> 56));
+               push( static_cast< core::type::u08>( data >> 48));
+               push( static_cast< core::type::u08>( data >> 40));
+               push( static_cast< core::type::u08>( data >> 32));
+               push( static_cast< core::type::u08>( data >> 24));
+               push( static_cast< core::type::u08>( data >> 16));
+               push( static_cast< core::type::u08>( data >>  8));
+               push( static_cast< core::type::u08>( data));
             }
 
-            void pack( major kind, help::type::u64 data)
+            void pack( major kind, core::type::u64 data)
             {
                constexpr auto edge = std::to_underlying( simple::byte);
 
@@ -475,24 +477,24 @@ namespace poly_version
                {
                   push( head( kind, static_cast< simple>( data)));
                }
-               else if( data <= std::numeric_limits< help::type::u08>::max())
+               else if( data <= std::numeric_limits< core::type::u08>::max())
                {
                   push( head( kind, simple::byte));
-                  push( static_cast< help::type::u08>( data));
+                  push( static_cast< core::type::u08>( data));
                }
-               else if( data <= std::numeric_limits< help::type::u16>::max())
+               else if( data <= std::numeric_limits< core::type::u16>::max())
                {
                   push( head( kind, simple::half));
-                  push( static_cast< help::type::u08>( data >> 8));
-                  push( static_cast< help::type::u08>( data));
+                  push( static_cast< core::type::u08>( data >> 8));
+                  push( static_cast< core::type::u08>( data));
                }
-               else if( data <= std::numeric_limits< help::type::u32>::max())
+               else if( data <= std::numeric_limits< core::type::u32>::max())
                {
                   push( head( kind, simple::real));
-                  push( static_cast< help::type::u08>( data >> 24));
-                  push( static_cast< help::type::u08>( data >> 16));
-                  push( static_cast< help::type::u08>( data >>  8));
-                  push( static_cast< help::type::u08>( data));
+                  push( static_cast< core::type::u08>( data >> 24));
+                  push( static_cast< core::type::u08>( data >> 16));
+                  push( static_cast< core::type::u08>( data >>  8));
+                  push( static_cast< core::type::u08>( data));
                }
                else
                {
@@ -504,7 +506,7 @@ namespace poly_version
          template< bool packed, bool strict>
          auto write( const node& root, auto&& target)
          {
-            std::visit( help::make::target< writer, packed, strict>( target), root);
+            std::visit( core::save::make::target< writer, packed, strict>( target), root);
          }
 
          // the default write function
@@ -520,7 +522,7 @@ namespace poly_version
 
       auto parse( auto&& source)
       {
-         return help::make::source< detail::parser>( source)();
+         return core::load::make::source< detail::parser>( source)();
       }
 
       inline namespace compact

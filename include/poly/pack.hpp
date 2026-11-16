@@ -7,6 +7,8 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/load.hpp"
+#include "core/save.hpp"
 
 #include <bit>
 #include <cmath>
@@ -26,13 +28,13 @@ namespace poly_version
          {
             namespace timestamp
             {
-               constexpr help::type::u08 type{ 0xFF};
+               constexpr core::type::u08 type{ 0xFF};
                constexpr auto split{ 34};
             } // timestamp
          } // extension
 
 
-         enum class format : help::type::u08
+         enum class format : core::type::u08
          {
             // base values: the low bits hold the length or value
             fixmap          = 0x80,
@@ -83,10 +85,10 @@ namespace poly_version
             negative_fixint = 0xE0,
          };
 
-         template< help::byte unit, pipe::source origin>
-         struct parser : help::source< unit, origin>
+         template< core::type::byte unit, core::load::pipe::source origin>
+         struct parser : core::load::source< unit, origin>
          {
-            using base = help::source< unit, origin>;
+            using base = core::load::source< unit, origin>;
             using base::base;
             using base::clip;
             using base::deny;
@@ -111,8 +113,8 @@ namespace poly_version
 
             auto take( std::size_t size)
             {
-               help::type::u64 data{};
-               while( size--) data = ( data << 8) | static_cast< help::type::u08>( pull());
+               core::type::u64 data{};
+               while( size--) data = ( data << 8) | static_cast< core::type::u08>( pull());
                return data;
             }
 
@@ -140,11 +142,11 @@ namespace poly_version
                case format::float64:
                   return full( format::float8fake, code);
                case format::fixext4: 
-                  return timestamp( sizeof( help::type::u32));
+                  return timestamp( sizeof( core::type::u32));
                case format::fixext8:
-                  return timestamp( sizeof( help::type::u64));
+                  return timestamp( sizeof( core::type::u64));
                case format::ext8:
-                  return timestamp( static_cast< help::type::u08>( pull()));
+                  return timestamp( static_cast< core::type::u08>( pull()));
                case format::bin8: case format::bin16: case format::bin32:
                   return binary( natural( format::bin8, code));
                case format::str8: case format::str16: case format::str32:
@@ -163,10 +165,10 @@ namespace poly_version
 
             auto spot() -> node
             {
-               const auto byte = static_cast< help::type::u08>( pull());
+               const auto byte = static_cast< core::type::u08>( pull());
 
                if( byte >= std::to_underlying( format::negative_fixint))
-                  return static_cast< help::type::i08>( byte);
+                  return static_cast< core::type::i08>( byte);
                if( byte >= std::to_underlying( format::nil))
                   return spot( static_cast< format>( byte));
                if( byte >= std::to_underlying( format::fixstr))
@@ -176,14 +178,14 @@ namespace poly_version
                if( byte >= std::to_underlying( format::fixmap))
                   return object( byte & 0x0F);
 
-               return static_cast< help::type::i08>( byte);
+               return static_cast< core::type::i08>( byte);
             }
 
             auto natural( const format root, const format code)
             {
                const auto data = take( root, code);
 
-               if( data > static_cast< help::type::u64>( std::numeric_limits< node::integer>::max()))
+               if( data > static_cast< core::type::u64>( std::numeric_limits< node::integer>::max()))
                   [[unlikely]] halt( "integer overflow");
                
                return static_cast< node::integer>( data);
@@ -193,7 +195,7 @@ namespace poly_version
             {
                const auto data = take( root, code);
                const auto move = 64 - ( 8u << ( std::to_underlying( code) - std::to_underlying( root)));
-               return static_cast< help::type::i64>( data << move) >> move;
+               return static_cast< core::type::i64>( data << move) >> move;
             }
 
             auto timestamp( const std::size_t size)
@@ -201,32 +203,32 @@ namespace poly_version
                if( static_cast< decltype( extension::timestamp::type)>( pull()) != extension::timestamp::type)
                   [[unlikely]] halt( "unexpected extension");
 
-               auto moment = []( const help::type::u64 seconds, const help::type::u64 details) -> node::zoned_datetime
+               auto moment = []( const core::type::u64 seconds, const core::type::u64 details) -> node::zoned_datetime
                {
                   const auto time = 
-                     std::chrono::sys_seconds{ std::chrono::seconds{ static_cast< help::type::i64>( seconds)}} +
+                     std::chrono::sys_seconds{ std::chrono::seconds{ static_cast< core::type::i64>( seconds)}} +
                      std::chrono::nanoseconds{ details};
                   return { std::chrono::time_point_cast< std::chrono::system_clock::duration>( time)};
                };
 
                switch( size)
                {
-                  case sizeof( help::type::u32):
+                  case sizeof( core::type::u32):
                   {
-                     const auto seconds = take( sizeof( help::type::u32));
+                     const auto seconds = take( sizeof( core::type::u32));
                      return moment( seconds, {});
                   }
-                  case sizeof( help::type::u64):
+                  case sizeof( core::type::u64):
                   {
-                     const auto stuffed = take( sizeof( help::type::u64));
-                     const auto seconds = stuffed & ( ( help::type::u64{ 1} << extension::timestamp::split) - 1);
+                     const auto stuffed = take( sizeof( core::type::u64));
+                     const auto seconds = stuffed & ( ( core::type::u64{ 1} << extension::timestamp::split) - 1);
                      const auto details = stuffed >> extension::timestamp::split;
                      return moment( seconds, details);
                   }
-                  case sizeof( help::type::u32) + sizeof( help::type::u64):
+                  case sizeof( core::type::u32) + sizeof( core::type::u64):
                   {
-                     const auto details = take( sizeof( help::type::u32));
-                     const auto seconds = take( sizeof( help::type::u64));
+                     const auto details = take( sizeof( core::type::u32));
+                     const auto seconds = take( sizeof( core::type::u64));
                      return moment( seconds, details);
                   }
                   default:
@@ -237,12 +239,12 @@ namespace poly_version
 
             auto real( const format root, const format code)
             {
-               return static_cast< node::decimal>( std::bit_cast< help::type::f32>( static_cast< help::type::u32>( take( root, code))));
+               return static_cast< node::decimal>( std::bit_cast< core::type::f32>( static_cast< core::type::u32>( take( root, code))));
             }
 
             auto full( const format root, const format code)
             {
-               return static_cast< node::decimal>( std::bit_cast< help::type::f64>( static_cast< help::type::u64>( take( root, code))));
+               return static_cast< node::decimal>( std::bit_cast< core::type::f64>( static_cast< core::type::u64>( take( root, code))));
             }
 
             auto binary( const std::size_t size) -> node::binary
@@ -285,16 +287,16 @@ namespace poly_version
 
       auto parse( auto&& source)
       {
-         return help::make::source< detail::parser>( source)();
+         return core::load::make::source< detail::parser>( source)();
       }
 
       namespace detail
       {
 
-         template< help::byte unit, pipe::target output, bool strict>
-         struct writer : help::target< unit, output>
+         template< core::type::byte unit, core::save::pipe::target output, bool strict>
+         struct writer : core::save::target< unit, output>
          {
-            using base = help::target< unit, output>;
+            using base = core::save::target< unit, output>;
             using base::base;
             using base::emit;
             using base::halt;
@@ -313,20 +315,20 @@ namespace poly_version
             void operator() ( const node::integer node)
             {
                if( node < 0)
-                  negative( static_cast< help::type::u64>( node));
+                  negative( static_cast< core::type::u64>( node));
                else
-                  positive( static_cast< help::type::u64>( node));
+                  positive( static_cast< core::type::u64>( node));
             }
 
             void operator() ( const node::decimal node)
             {
-               using real = help::type::f32;
-               using full = help::type::f64;
+               using real = core::type::f32;
+               using full = core::type::f64;
 
                if( std::fabs( node) > std::numeric_limits< real>::max() || static_cast< real>( node) != static_cast< full>( node))
-                  feed( format::float8fake, std::bit_cast< help::type::u64>( static_cast< full>( node)), sizeof( help::type::u64));
+                  feed( format::float8fake, std::bit_cast< core::type::u64>( static_cast< full>( node)), sizeof( core::type::u64));
                else
-                  feed( format::float8fake, std::bit_cast< help::type::u32>( static_cast< real>( node)), sizeof( help::type::u32));
+                  feed( format::float8fake, std::bit_cast< core::type::u32>( static_cast< real>( node)), sizeof( core::type::u32));
             }
 
             void operator() ( const node::instant& node)
@@ -344,7 +346,7 @@ namespace poly_version
                if( bits > 5)
                   feed( format::str8, size, need( bits));
                else
-                  push( static_cast< help::type::u08>( std::to_underlying( format::fixstr) | size));
+                  push( static_cast< core::type::u08>( std::to_underlying( format::fixstr) | size));
 
                emit( node);
             }
@@ -371,7 +373,7 @@ namespace poly_version
                if( bits > 4)
                   feed( format::map8fake, size, need< 2>( bits));
                else
-                  push( static_cast< help::type::u08>( std::to_underlying( format::fixmap) | size));
+                  push( static_cast< core::type::u08>( std::to_underlying( format::fixmap) | size));
 
                for( const auto& [name, data] : node)
                {
@@ -390,7 +392,7 @@ namespace poly_version
                if( bits > 4)
                   feed( format::array8fake, size, need< 2>( bits));
                else
-                  push( static_cast< help::type::u08>( std::to_underlying( format::fixarray) | size));
+                  push( static_cast< core::type::u08>( std::to_underlying( format::fixarray) | size));
 
                for( const auto& item : node)
                   std::visit( *this, item);
@@ -418,19 +420,19 @@ namespace poly_version
             {
                const auto elapsed = data.get_sys_time().time_since_epoch();
                const auto rounded = std::chrono::floor< std::chrono::seconds>( elapsed);
-               const auto details = static_cast< help::type::u64>( std::chrono::duration_cast< std::chrono::nanoseconds>( elapsed - rounded).count());
-               const auto seconds = static_cast< help::type::u64>( rounded.count());
+               const auto details = static_cast< core::type::u64>( std::chrono::duration_cast< std::chrono::nanoseconds>( elapsed - rounded).count());
+               const auto seconds = static_cast< core::type::u64>( rounded.count());
 
                const auto stuffed = details << extension::timestamp::split | seconds;
 
-               if( std::bit_width( stuffed) <= std::numeric_limits< help::type::u32>::digits)
+               if( std::bit_width( stuffed) <= std::numeric_limits< core::type::u32>::digits)
                {
                   //
                   // Timestamp32: nanoseconds is zero, seconds is non-negative and fits in 32 bits
 
                   push( format::fixext4);
                   push( extension::timestamp::type);
-                  feed( seconds, sizeof( help::type::u32));
+                  feed( seconds, sizeof( core::type::u32));
                }
                else 
                if( std::bit_width( seconds) <= extension::timestamp::split)
@@ -440,7 +442,7 @@ namespace poly_version
 
                   push( format::fixext8);
                   push( extension::timestamp::type);
-                  feed( stuffed, sizeof( help::type::u64));
+                  feed( stuffed, sizeof( core::type::u64));
                }
                else
                {
@@ -448,10 +450,10 @@ namespace poly_version
                   // Timestamp96: 4-byte nanoseconds, then 8-byte seconds as two's complement
 
                   push( format::ext8);
-                  push( help::type::u08{ sizeof( help::type::u32) + sizeof( help::type::u64)});
+                  push( core::type::u08{ sizeof( core::type::u32) + sizeof( core::type::u64)});
                   push( extension::timestamp::type);
-                  feed( details, sizeof( help::type::u32));
-                  feed( seconds, sizeof( help::type::u64));
+                  feed( details, sizeof( core::type::u32));
+                  feed( seconds, sizeof( core::type::u64));
                }
             }
 
@@ -460,7 +462,7 @@ namespace poly_version
             void time( const auto& data)
             {
                std::string string;
-               help::writer< char, pipe::write::memory< char, std::string>>( string).time( data);
+               core::save::writer< char, core::save::pipe::memory< char, std::string>>( string).time( data);
                (*this)( string);
             }
 
@@ -471,41 +473,41 @@ namespace poly_version
                return std::clamp( std::bit_ceil( static_cast< std::size_t>( ( bits + 7) / 8)), min, max);
             }
 
-            void feed( const help::type::u64 data, std::size_t size)
+            void feed( const core::type::u64 data, std::size_t size)
             {
-               while( size--) push( static_cast< help::type::u08>( data >> ( size * 8)));
+               while( size--) push( static_cast< core::type::u08>( data >> ( size * 8)));
             }            
 
             //! @param root is the base tag
-            void feed( const format root, const help::type::u64 data, const std::size_t size)
+            void feed( const format root, const core::type::u64 data, const std::size_t size)
             {
-               push( static_cast< help::type::u08>( std::to_underlying( root) + std::countr_zero( size)));
+               push( static_cast< core::type::u08>( std::to_underlying( root) + std::countr_zero( size)));
                feed( data, size);
             }            
 
-            void negative( const help::type::u64 data)
+            void negative( const core::type::u64 data)
             {
                const auto bits = std::bit_width( ~data) + 1;
                if( bits > 6)
                   feed( format::sint8, data, need( bits));
                else
-                  push( static_cast< help::type::u08>( data));
+                  push( static_cast< core::type::u08>( data));
             }
 
-            void positive( const help::type::u64 data)
+            void positive( const core::type::u64 data)
             {
                const auto bits = std::bit_width( data);
                if( bits > 7)
                   feed( format::uint8, data, need( bits));
                else
-                  push( static_cast< help::type::u08>( data));
+                  push( static_cast< core::type::u08>( data));
             }
          };
 
          template< bool strict>
          auto write( const node& root, auto&& target)
          {
-            std::visit( help::make::target< writer, strict>( target), root);
+            std::visit( core::save::make::target< writer, strict>( target), root);
          }
 
          // the default write function

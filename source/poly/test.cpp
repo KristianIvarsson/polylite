@@ -33,76 +33,76 @@ namespace poly_version
    static_assert( std::is_trivially_copyable_v< poly::node::local_datetime>);
    static_assert( std::is_trivially_copyable_v< poly::node::zoned_datetime>);
 
-   namespace help::test
+   namespace core::help::test
    {
       namespace cases
       {
          void space()
          {
             // all std::isspace characters
-            assert( help::is::space( ' '));
-            assert( help::is::space( '\t'));
-            assert( help::is::space( '\n'));
-            assert( help::is::space( '\v'));
-            assert( help::is::space( '\f'));
-            assert( help::is::space( '\r'));
+            assert( core::help::is::space( ' '));
+            assert( core::help::is::space( '\t'));
+            assert( core::help::is::space( '\n'));
+            assert( core::help::is::space( '\v'));
+            assert( core::help::is::space( '\f'));
+            assert( core::help::is::space( '\r'));
 
             // non-space characters
-            assert( ! help::is::space( 'a'));
-            assert( ! help::is::space( '0'));
-            assert( ! help::is::space( '\0'));
-            assert( ! help::is::space( '!'));
+            assert( ! core::help::is::space( 'a'));
+            assert( ! core::help::is::space( '0'));
+            assert( ! core::help::is::space( '\0'));
+            assert( ! core::help::is::space( '!'));
          }
 
          void white()
          {
             // whitespace in JSON, TOML, YAML and XML
-            assert( help::is::white( ' '));
-            assert( help::is::white( '\t'));
-            assert( help::is::white( '\n'));
-            assert( help::is::white( '\r'));
+            assert( core::help::is::white( ' '));
+            assert( core::help::is::white( '\t'));
+            assert( core::help::is::white( '\n'));
+            assert( core::help::is::white( '\r'));
 
             // std::isspace characters that are not
-            assert( ! help::is::white( '\v'));
-            assert( ! help::is::white( '\f'));
+            assert( ! core::help::is::white( '\v'));
+            assert( ! core::help::is::white( '\f'));
 
             // non-space characters
-            assert( ! help::is::white( 'a'));
-            assert( ! help::is::white( '\0'));
+            assert( ! core::help::is::white( 'a'));
+            assert( ! core::help::is::white( '\0'));
          }
 
          void classify()
          {
-            assert( help::is::digit( '0'));
-            assert( help::is::digit( '9'));
-            assert( ! help::is::digit( 'a'));
+            assert( core::help::is::digit( '0'));
+            assert( core::help::is::digit( '9'));
+            assert( ! core::help::is::digit( 'a'));
 
-            assert( help::is::lower( 'a'));
-            assert( help::is::lower( 'z'));
-            assert( ! help::is::lower( 'A'));
+            assert( core::help::is::lower( 'a'));
+            assert( core::help::is::lower( 'z'));
+            assert( ! core::help::is::lower( 'A'));
 
-            assert( help::is::upper( 'A'));
-            assert( help::is::upper( 'Z'));
-            assert( ! help::is::upper( 'a'));
+            assert( core::help::is::upper( 'A'));
+            assert( core::help::is::upper( 'Z'));
+            assert( ! core::help::is::upper( 'a'));
 
-            assert( help::is::alpha( 'a'));
-            assert( help::is::alpha( 'Z'));
-            assert( ! help::is::alpha( '0'));
+            assert( core::help::is::alpha( 'a'));
+            assert( core::help::is::alpha( 'Z'));
+            assert( ! core::help::is::alpha( '0'));
 
-            assert( help::is::alnum( 'a'));
-            assert( help::is::alnum( '9'));
-            assert( ! help::is::alnum( '_'));
+            assert( core::help::is::alnum( 'a'));
+            assert( core::help::is::alnum( '9'));
+            assert( ! core::help::is::alnum( '_'));
 
-            assert( help::is::xdigit( '0'));
-            assert( help::is::xdigit( 'f'));
-            assert( help::is::xdigit( 'F'));
-            assert( ! help::is::xdigit( 'g'));
+            assert( core::help::is::xdigit( '0'));
+            assert( core::help::is::xdigit( 'f'));
+            assert( core::help::is::xdigit( 'F'));
+            assert( ! core::help::is::xdigit( 'g'));
 
-            assert( help::is::cntrl( '\0'));
-            assert( help::is::cntrl( '\n'));
-            assert( help::is::cntrl( 0x7F));
-            assert( ! help::is::cntrl( ' '));
-            assert( ! help::is::cntrl( 'a'));
+            assert( core::help::is::cntrl( '\0'));
+            assert( core::help::is::cntrl( '\n'));
+            assert( core::help::is::cntrl( 0x7F));
+            assert( ! core::help::is::cntrl( ' '));
+            assert( ! core::help::is::cntrl( 'a'));
          }
       } // cases
 
@@ -112,7 +112,7 @@ namespace poly_version
          cases::white();
          cases::classify();
       }
-   } // help::test
+   } // core::help::test
 
    namespace base::test
    {
@@ -163,16 +163,16 @@ namespace poly_version
             const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
             const node::binary man{ std::byte{0x4D}, std::byte{0x61}, std::byte{0x6E}};
 
-            assert( help::transform::binary( "SGVsbG8=") == hello);
-            assert( help::transform::binary( "TWFu") == man);
-            assert( help::transform::binary( "") == node::binary{});
+            assert( core::help::transform::binary( "SGVsbG8=") == hello);
+            assert( core::help::transform::binary( "TWFu") == man);
+            assert( core::help::transform::binary( "") == node::binary{});
 
             // whitespace tolerance
-            assert( help::transform::binary( "SGVs\nbG8=") == hello);
-            assert( help::transform::binary( "SGVs bG8=") == hello);
+            assert( core::help::transform::binary( "SGVs\nbG8=") == hello);
+            assert( core::help::transform::binary( "SGVs bG8=") == hello);
 
             // invalid character
-            assert( ! help::transform::binary( "SGVs!G8="));
+            assert( ! core::help::transform::binary( "SGVs!G8="));
          }
       } // cases
 
@@ -266,7 +266,7 @@ namespace poly_version
          void strict_gentle()
          {
             node source;
-            source[ "t"] = help::transform::instant( "2025-01-01").value();
+            source[ "t"] = core::help::transform::instant( "2025-01-01").value();
 
             // strict: throws on instant
             try { json::write( source); assert( false); }
@@ -293,7 +293,7 @@ namespace poly_version
 
               // round-trip via manual decode
               auto parsed = json::parse( text);
-              const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+              const auto decoded = core::help::transform::binary( parsed.at( "b").as_string());
               assert( decoded && *decoded == hello); }
          }
 
@@ -347,7 +347,7 @@ namespace poly_version
             }
 
             const auto text = write( source);
-            assert( text.size() > pipe::gage);
+            assert( text.size() > core::load::pipe::gage);
 
             std::istringstream stream{ text};
             assert( write( parse( stream)) == text);
@@ -695,7 +695,7 @@ earth = "\U0001F30D"
 
               // round-trip via manual decode
               auto parsed = toml::parse( text);
-              const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+              const auto decoded = core::help::transform::binary( parsed.at( "b").as_string());
               assert( decoded && *decoded == hello); }
 
             // gentle compact write contains base64
@@ -704,7 +704,7 @@ earth = "\U0001F30D"
               assert( text.contains( "SGVsbG8="));
 
               auto parsed = toml::parse( text);
-              const auto decoded = help::transform::binary( parsed.at( "b").as_string());
+              const auto decoded = core::help::transform::binary( parsed.at( "b").as_string());
               assert( decoded && *decoded == hello); }
          }
 
@@ -1465,7 +1465,7 @@ top: world
 
          void strict_gentle()
          {
-            const node source = help::transform::instant( "12:30:00").value();
+            const node source = core::help::transform::instant( "12:30:00").value();
 
             // strict: throws on local_time
             try { yaml::write( source); assert( false); }
@@ -1587,9 +1587,9 @@ top: world
                detail::roundtrip( nested);
 
                // chrono: local_date via tag 100 (packed)
-               detail::roundtrip( help::transform::instant( "2025-01-01").value());
+               detail::roundtrip( core::help::transform::instant( "2025-01-01").value());
                // chrono: zoned_datetime via tag 1 (packed)
-               detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56+00:00").value());
+               detail::roundtrip( core::help::transform::instant( "2025-01-01T12:34:56+00:00").value());
             }
 
             void simples()
@@ -1679,7 +1679,7 @@ top: world
                // local_date -> tag 1004 + text "2025-01-01"
                {
                   node source;
-                  source[ "d"] = help::transform::instant( "2025-01-01").value();
+                  source[ "d"] = core::help::transform::instant( "2025-01-01").value();
                   const auto wire = cbor::verbose::write( source);
                   // {"d": tag(1004) "2025-01-01"}
                   // A1 61 64                       map(1) "d"
@@ -1693,19 +1693,19 @@ top: world
                // strict: local_time / local_datetime throw
                {
                   node source;
-                  source[ "t"] = help::transform::instant( "12:34:56").value();
+                  source[ "t"] = core::help::transform::instant( "12:34:56").value();
                   assert( throws( [&]{ cbor::verbose::write( source); }));
                }
                {
                   node source;
-                  source[ "t"] = help::transform::instant( "2025-01-01T12:34:56").value();
+                  source[ "t"] = core::help::transform::instant( "2025-01-01T12:34:56").value();
                   assert( throws( [&]{ cbor::verbose::write( source); }));
                }
 
                // gentle: local_time / local_datetime written as bare text (no tag)
                {
                   node source;
-                  source[ "t"] = help::transform::instant( "12:34:56").value();
+                  source[ "t"] = core::help::transform::instant( "12:34:56").value();
                   const auto wire = cbor::verbose::gentle::write( source);
                   // A1 61 74 68 31 32 3A 33 34 3A 35 36
                   assert( wire == bytes({ 0xA1, 0x61, 0x74,
@@ -1732,8 +1732,8 @@ top: world
             {
                // strings and binaries larger than the internal buffer of non contiguous sources
                node source;
-               source[ "text"] = std::string( pipe::gage * 3, 'x');
-               source[ "blob"] = node::binary( pipe::gage * 2 + 1, std::byte{ 0x2A});
+               source[ "text"] = std::string( core::load::pipe::gage * 3, 'x');
+               source[ "blob"] = node::binary( core::load::pipe::gage * 2 + 1, std::byte{ 0x2A});
 
                const auto data = cbor::write( source);
 
@@ -1857,9 +1857,9 @@ top: world
             detail::roundtrip( nested);
 
             // timestamp32, timestamp64, timestamp96
-            detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56+00:00").value());
-            detail::roundtrip( help::transform::instant( "2025-01-01T12:34:56.5+00:00").value());
-            detail::roundtrip( help::transform::instant( "1960-01-01T12:34:56.5+00:00").value());
+            detail::roundtrip( core::help::transform::instant( "2025-01-01T12:34:56+00:00").value());
+            detail::roundtrip( core::help::transform::instant( "2025-01-01T12:34:56.5+00:00").value());
+            detail::roundtrip( core::help::transform::instant( "1960-01-01T12:34:56.5+00:00").value());
          }
 
          void parsing()
@@ -1971,7 +1971,7 @@ top: world
          void strictness()
          {
             node source;
-            source[ "t"] = help::transform::instant( "12:34:56").value();
+            source[ "t"] = core::help::transform::instant( "12:34:56").value();
 
             // strict: local_time throws
             assert( throws( [&]{ pack::write( source); }));
@@ -1984,8 +1984,8 @@ top: world
          {
             // strings and binaries larger than the internal buffer of non contiguous sources
             node source;
-            source[ "text"] = std::string( pipe::gage * 3, 'x');
-            source[ "blob"] = node::binary( pipe::gage * 2 + 1, std::byte{ 0x2A});
+            source[ "text"] = std::string( core::load::pipe::gage * 3, 'x');
+            source[ "blob"] = node::binary( core::load::pipe::gage * 2 + 1, std::byte{ 0x2A});
 
             const auto data = pack::write( source);
 
@@ -2084,14 +2084,14 @@ top: world
          {
             // strict: nothing and local instants cannot be represented
             assert( throws( []{ compact::write( nullptr); }));
-            assert( throws( []{ compact::write( help::transform::instant( "2026-11-05").value()); }));
-            assert( throws( []{ compact::write( help::transform::instant( "12:34:56").value()); }));
-            assert( throws( []{ compact::write( help::transform::instant( "2026-11-05T12:34:56").value()); }));
+            assert( throws( []{ compact::write( core::help::transform::instant( "2026-11-05").value()); }));
+            assert( throws( []{ compact::write( core::help::transform::instant( "12:34:56").value()); }));
+            assert( throws( []{ compact::write( core::help::transform::instant( "2026-11-05T12:34:56").value()); }));
 
             // gentle: written as strings
             assert( compact::gentle::write( nullptr) == "<string>null</string>");
-            assert( compact::gentle::write( help::transform::instant( "2026-11-05").value()) == "<string>2026-11-05</string>");
-            assert( compact::gentle::write( help::transform::instant( "12:34:56").value()) == "<string>12:34:56</string>");
+            assert( compact::gentle::write( core::help::transform::instant( "2026-11-05").value()) == "<string>2026-11-05</string>");
+            assert( compact::gentle::write( core::help::transform::instant( "12:34:56").value()) == "<string>12:34:56</string>");
          }
 
          void whole()
@@ -2420,7 +2420,7 @@ int main( const int argc, const char* const argv[])
       }
       else
       {
-         poly::help::test::all();
+         poly::core::help::test::all();
          poly::base::test::all();
          poly::tool::test::all();
          poly::json::test::all();

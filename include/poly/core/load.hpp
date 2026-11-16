@@ -7,54 +7,41 @@
 #pragma once
 
 #include "tale.hpp"
+#include "type.hpp"
+#include "help.hpp"
 
 #include <array>
 #include <tuple>
+#include <format>
 #include <ranges>
+#include <string>
 #include <cstring>
-#include <utility>
 #include <istream>
-#include <ostream>
+#include <utility>
+#include <charconv>
 #include <concepts>
 #include <algorithm>
+#include <stdexcept>
 #include <string_view>
 
 namespace poly_version
 {
-   namespace pipe
+   namespace core::load
    {
-      template< typename unit>
-      concept byte = sizeof( unit) == 1;
-
-      //! something the parsers can read from
-      template< typename type>
-      concept source = requires( type& origin) { origin.good(); origin.data(); origin.tell(); origin.hint(); };
-
-      //! something the writers can write to
-      template< typename type>
-      concept target = requires( type& output) { output.push( std::byte{}); output.copy( std::span< std::byte>{}); };
-      
-      
-      //! the size of the buffer for sources that need that
-      constexpr std::size_t gage = 1024;
-      //! the size hint when the actual remaining size isn't known
-      constexpr std::size_t seed = 1024;      
-
-
-      //! prevents copying (and moving) of types referring to their own members
-      struct pinned
+      namespace pipe
       {
-         pinned() = default;
-         pinned( const pinned&) = delete;
-         pinned& operator=( const pinned&) = delete;
-      };
+         //! something the parsers can read from
+         template< typename type>
+         concept source = requires( type& origin) { origin.good(); origin.data(); origin.tell(); origin.hint(); };
 
-      namespace parse
-      {
+         //! the size of the buffer for sources that need that
+         constexpr std::size_t gage = 1024;
+         //! the size hint when the actual remaining size isn't known
+         constexpr std::size_t seed = 1024;
 
          //! contiguous source, i.e. everything is already available
-         template< byte unit>
-         class memory : pinned
+         template< type::byte unit>
+         class memory : type::pinned
          {
          private:
 
@@ -80,8 +67,8 @@ namespace poly_version
          memory( const source&) -> memory< std::ranges::range_value_t< source>>;
 
          //! fills an internal buffer from a non contiguous range as needed
-         template< byte unit, typename iterator, typename sentinel>
-         class cursor : pinned
+         template< type::byte unit, typename iterator, typename sentinel>
+         class cursor : type::pinned
          {
          private:
 
@@ -114,10 +101,10 @@ namespace poly_version
 
             void fill( const std::size_t want)
             {
-               if( static_cast< std::size_t>( last - mark) < want) load();
+               if( static_cast< std::size_t>( last - mark) < want) fill();
             }
 
-            void load()
+            void fill()
             {
                past += mark - buffer.data();
                const auto left = static_cast< std::size_t>( last - mark);
@@ -146,8 +133,8 @@ namespace poly_version
          cursor( const source&) -> cursor< std::ranges::range_value_t< source>, std::ranges::iterator_t< const source>, std::ranges::sentinel_t< const source>>;
 
          //! fills an internal buffer from an istream as needed
-         template< byte unit>
-         class stream : pinned
+         template< type::byte unit>
+         class stream : type::pinned
          {
          private:
 
@@ -173,10 +160,10 @@ namespace poly_version
 
             void fill( const std::size_t want)
             {
-               if( static_cast< std::size_t>( last - mark) < want) load();
+               if( static_cast< std::size_t>( last - mark) < want) fill();
             }
 
-            void load()
+            void fill()
             {
                past += mark - buffer.data();
                const auto left = static_cast< std::size_t>( last - mark);
@@ -185,66 +172,283 @@ namespace poly_version
                last = mark + left + from.rdbuf()->sgetn( buffer.data() + left, gage - left);
             }
          };
-      } // parse
+      } // pipe
 
-      namespace write
+      template< type::byte unit, pipe::source origin>
+      struct source
       {
-         //! container target, i.e. appends directly to the container
-         template< byte unit, typename container>
-         class memory : pinned
+         origin feed;
+         const unit*& mark;
+         const unit* const& last;
+
+         explicit source( auto& input) : feed{ input}, mark{ std::get< 0>( feed.data())}, last{ std::get< 1>( feed.data())} {}
+
+         //! helper to prevent evil size
+         auto clip( const std::size_t size) const
          {
-         private:
+            return std::min( size, feed.hint());
+         }
 
-            container& into;
-
-         public:
-
-            explicit memory( container& target) : into{ target} {}
-
-            void push( const byte auto sign) { into.push_back( static_cast< unit>( sign)); }
-
-            void copy( const std::ranges::contiguous_range auto& data)
-               requires byte< std::ranges::range_value_t< decltype( data)>>
-            {
-               const auto lead = reinterpret_cast< const unit*>( std::ranges::data( data));
-               into.insert( into.end(), lead, lead + std::ranges::size( data));
-            }
-         };
-
-         template< std::ranges::range container>
-         memory( container&) -> memory< std::ranges::range_value_t< container>, container>;
-
-         //! writes to an ostream (that has a buffer of its own)
-         template< byte unit>
-         class stream : pinned
+         bool good()
          {
-         private:
+            return feed.good();
+         }
 
-            using traits = std::basic_ostream< unit>::traits_type;
+         void done()
+         {
+            if( good()) [[unlikely]] halt( "expected end of stream");
+         }
 
-            std::basic_ostream< unit>& into;
+         void drop()
+         {
+            ++mark;
+         }
 
-         public:
+         char look() const
+         {
+            return static_cast< char>( *mark);
+         }
 
-            explicit stream( std::basic_ostream< unit>& target) : into{ target} {}
+         char take()
+         {
+            return static_cast< char>( *mark++);
+         }
 
-            void push( const byte auto sign)
+         char peek()
+         {
+            if( good()) [[likely]] return look();
+            return static_cast< char>( std::char_traits< char>::eof());
+         }
+
+         char pull()
+         {
+            if( good()) [[likely]] return take();
+            halt( "unexpected end");
+         }
+
+         auto chop( const std::size_t size) -> std::string_view
+         {
+            auto [ head, tail] = feed.data( size);
+
+            if( static_cast< std::size_t>( tail - head) < size)
+               [[unlikely]] halt( "unexpected end");
+
+            const auto lead = reinterpret_cast< const char*>( head);
+            head += size;
+            return { lead, size};
+         }         
+
+         template< typename into>
+         auto grab( std::size_t size) -> into
+         {
+            using type = typename into::value_type;
+
+            into nrv;
+            nrv.reserve( clip( size));
+
+            while( size)
             {
-               if( traits::eq_int_type( into.rdbuf()->sputc( static_cast< unit>( sign)), traits::eof()))
-                  into.setstate( std::ios::badbit);
+               auto [ head, tail] = feed.data( size);
+
+               if( head == tail)
+                  [[unlikely]] halt( "unexpected end");
+
+               const auto part = std::min( size, static_cast< std::size_t>( tail - head));
+               const auto lead = reinterpret_cast< const type*>( head);
+               nrv.insert( nrv.end(), lead, lead + part);
+               head += part;
+               size -= part;
             }
 
-            void copy( const std::ranges::contiguous_range auto& data)
-               requires byte< std::ranges::range_value_t< decltype( data)>>
+            return nrv;
+         }
+
+         void test( const char want, const char pick) const
+         {
+            if( want != pick) [[unlikely]] halt( "unexpected sign");
+         }
+
+         void test( const char want)
+         {
+            test( want, pull());
+         }
+
+         void test( const std::string_view want)
+         {
+            if( chop( want.size()) != want)
+               [[unlikely]] halt( "unexpected data");
+         }
+
+         [[noreturn]] void halt( const std::string_view message) const
+         {
+            throw std::runtime_error{ std::format( "{} at byte {}", message, feed.tell())};
+         }
+
+         [[noreturn]] void deny( const std::string_view message) const
+         {
+            halt( std::format( "unsupported {}", message));
+         }
+      };
+
+      template< type::byte unit, pipe::source origin>
+      struct parser : source< unit, origin>
+      {
+         using base = source< unit, origin>;
+         using base::base;
+         using base::chop;
+         using base::deny;
+         using base::feed;
+         using base::good;
+         using base::halt;
+         using base::last;
+         using base::mark;
+         using base::look;
+         using base::pull;
+         using base::take;
+         using base::test;
+
+         void read( auto&& till, std::string& into)
+         {
+            do
             {
-               const auto size = static_cast< std::streamsize>( std::ranges::size( data));
-               const auto sent = into.rdbuf()->sputn( reinterpret_cast< const unit*>( std::ranges::data( data)), size);
-
-               if( sent != size)
-                  into.setstate( std::ios::badbit);
+               auto [ head, tail] = feed.data();
+               const auto lead = head;
+               head = std::find_if_not( head, tail, [&]( const unit sign) { return till( static_cast< char>( sign)); });
+               into.append( reinterpret_cast< const char*>( lead), static_cast< std::size_t>( head - lead));
             }
-         };
-      } // write
+            while( mark == last && good());
+         }
 
-   } // pipe
+         auto read( auto&& till)
+         {
+            std::string nrv;
+            read( till, nrv);
+            return nrv;
+         }
+
+         auto leap( auto&& till)
+         {
+            do
+            {
+               auto [ head, tail] = feed.data();
+               head = std::find_if_not( head, tail, [&]( const unit sign) { return till( static_cast< char>( sign)); });
+            }
+            while( mark == last && good());
+         }
+
+         //! rest of the line
+         void rest()
+         {
+            leap( help::till::line);
+            if( good()) ++mark; // '\n'
+         }
+
+         //! skip whitespace
+         void skip()
+         {
+            leap( [] ( const auto sign) { return help::is::white( sign);});
+         }
+
+         template< std::size_t nibs>
+         auto code()
+         {
+            const auto data = chop( nibs);
+
+            type::i32 nrv;
+
+            if( const auto [ stop, code] = std::from_chars( data.data(), data.data() + data.size(), nrv, 16); code != std::errc{} || stop != data.data() + data.size())
+               [[unlikely]] halt( "invalid code point");
+
+            return nrv;
+         }
+
+         auto half()
+         {
+            return code< 2>(); // \xHH
+         }
+
+         auto real()
+         {
+            return code< 4>(); // \uHHHH
+         }
+
+         auto full()
+         {
+            return code< 8>(); // \UHHHHHHHH
+         }
+
+
+         // unicode escape sequence
+         auto code()
+         {
+            const auto lead = real();
+
+            if( lead < 0xD800 || lead > 0xDFFF)
+               return lead;
+
+            if( lead > 0xDBFF)
+               [[unlikely]] halt( "invalid 1st surrogate");
+
+            test( "\\u");
+
+            const auto tail = real();
+
+            if( tail < 0xDC00 || tail > 0xDFFF)
+               [[unlikely]] halt( "invalid 2nd surrogate");
+
+            return 0x10000 + ( ( lead - 0xD800) << 10) + ( tail - 0xDC00);
+         }
+
+         // c-style escape sequences
+         auto cast( const type::byte auto sign) -> type::i32
+         {
+            switch( sign)
+            {
+            case '\\':return '\\';
+            case '"': return '\"';
+            case 'b': return '\b';
+            case 'f': return '\f';
+            case 'n': return '\n';
+            case 'r': return '\r';
+            case 't': return '\t';
+            case '/': return '/';
+            case 'u': return code();
+            default: [[unlikely]] halt( "invalid escape character");
+            }
+         }
+      };
+
+      namespace make
+      {
+         template< template< typename, typename, auto...> class parser, auto... flags>
+         auto source( const std::ranges::contiguous_range auto& value)
+         {
+            using unit = std::ranges::range_value_t< decltype( value)>;
+            return parser< unit, pipe::memory< unit>, flags...>( value);
+         }
+
+         template< template< typename, typename, auto...> class parser, auto... flags, typename unit>
+         auto source( std::basic_istream< unit>& value)
+         {
+            return parser< unit, pipe::stream< unit>, flags...>( value);
+         }
+
+         template< template< typename, typename, auto...> class parser, auto... flags>
+         auto source( const std::ranges::input_range auto& value)
+            requires ( ! std::ranges::contiguous_range< decltype( value)>)
+         {
+            using range = std::remove_cvref_t< decltype( value)>;
+            using unit  = std::ranges::range_value_t< range>;
+            using cursor = pipe::cursor< unit, std::ranges::iterator_t< const range>, std::ranges::sentinel_t< const range>>;
+            return parser< unit, cursor, flags...>( value);
+         }
+
+         // utility for string literals (automatically deduces size and type) (essentially for testing)
+         template< template< typename, typename, auto...> class parser, auto... flags, std::size_t size>
+         auto source( const char (&string)[ size])
+         {
+            return source< parser, flags...>( std::string_view{ string, size - 1});
+         }
+      } // make
+   } // core::load
 } // poly_version
