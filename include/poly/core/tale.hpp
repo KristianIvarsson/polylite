@@ -7,7 +7,7 @@
 #pragma once
 
 #define POLY_VERSION_MAJOR 5
-#define POLY_VERSION_MINOR 2
+#define POLY_VERSION_MINOR 3
 #define POLY_VERSION_PATCH 0
 
 #define POLY_PASTE( major, minor, patch) v##major##_##minor##_##patch
