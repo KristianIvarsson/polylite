@@ -7,8 +7,8 @@
 #pragma once
 
 #include "tale.hpp"
-#include "node.hpp"
-#include "pipe.hpp"
+#include "../node.hpp"
+#include "load.hpp"
 
 #include <chrono>
 #include <format>

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "tale.hpp"
+#include "core/tale.hpp"
 #include "fifo.hpp"
 
 #include <chrono>
