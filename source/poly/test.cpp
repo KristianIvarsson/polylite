@@ -3,7 +3,8 @@
 #include "poly/json.hpp"
 #include "poly/pack.hpp"
 #include "poly/toml.hpp"
-#include "poly/tool.hpp"
+#include "poly/tool/bom.hpp"
+#include "poly/tool/same.hpp"
 #include "poly/xml.hpp"
 #include "poly/yaml.hpp"
 
@@ -192,11 +193,26 @@ namespace poly_version
             assert( json::parse( tool::bom::skip( "\xEF\xBB\xBF{}")).is_object());
             assert( json::parse( tool::bom::skip( "{}")).is_object());
          }
+
+         void same()
+         {
+            assert( tool::same::test( json::parse( R"({"a":{"b":[1,{"c":2}]},"d":3})")));
+            assert( ! tool::same::test( json::parse( R"({"a":1,"a":2})")));
+            assert( ! tool::same::test( json::parse( R"({"a":{"b":1,"b":2}})")));
+            assert( ! tool::same::test( json::parse( R"([{"a":1,"a":2}])")));
+
+            auto data = json::parse( R"({"a":1,"b":[{"x":1,"x":2}],"a":{"y":1,"y":2},"c":{"z":1}})");
+            const auto copy = tool::same::cull( node{ data});
+            tool::same::cull( data);
+            assert( json::compact::write( data) == R"({"a":1,"b":[{"x":1}],"c":{"z":1}})");
+            assert( json::compact::write( copy) == json::compact::write( data));
+         }
       } // cases
 
       void all()
       {
          cases::bom();
+         cases::same();
       }
    } // tool::test
 
