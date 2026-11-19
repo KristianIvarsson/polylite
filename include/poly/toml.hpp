@@ -63,17 +63,7 @@ namespace poly_version
                   
                   if( const auto next = pick(); next == '=')
                   {
-                     auto afore = where;
-
-                     for( auto&& name : std::move( keys))
-                        where = &(*where)[ std::move( name)];
-
-                     if( where->is_nothing())
-                        *where = spot();
-                     else
-                        [[unlikely]] halt( "duplicate key");
-
-                     where = afore;
+                     slot( where, std::move( keys));
                   }
                   else
                   {
@@ -124,6 +114,17 @@ namespace poly_version
                default:
                   return scalar();
                }
+            }
+
+            void slot( node* item, auto&& keys)
+            {
+               for( auto&& name : keys)
+                  item = &(*item)[ std::move( name)];
+
+               if( item->is_nothing())
+                  *item = spot();
+               else
+                  [[unlikely]] halt( "duplicate key");
             }
 
             auto name()
@@ -202,17 +203,11 @@ namespace poly_version
                {
                   while( true)
                   {
-                     auto where = &root;
-
-                     for( auto&& name : keys())
-                        where = &(*where)[ std::move( name)];
+                     auto keys = this->keys();
 
                      test( '=', pick());
 
-                     if( where->is_nothing())
-                        *where = spot();
-                     else
-                        [[unlikely]] halt( "duplicate key");
+                     slot( &root, std::move( keys));
 
                      if( const auto sign = pick(); sign != ',')
                      {

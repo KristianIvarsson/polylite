@@ -1497,27 +1497,6 @@ top: world
             }
          }
 
-         void duplicate_key()
-         {
-            // repeated keys are invalid
-            assert( throws( []{ yaml::parse( "a: 1\na: 2\n"); }));
-            assert( throws( []{ yaml::parse( "x:\n  y: 1\n  y: 2\n"); }));
-            assert( throws( []{ yaml::parse( "{a: 1, a: 2}\n"); }));
-
-            // similar but valid
-            {
-               const auto map = yaml::parse( "x:\n  y: 1\nz:\n  y: 2\n");
-               assert( map.at( "x").at( "y").as_integer() == 1);
-               assert( map.at( "z").at( "y").as_integer() == 2);
-            }
-
-            {
-               const auto list = yaml::parse( "- a: 1\n- a: 2\n");
-               assert( list.at( 0).at( "a").as_integer() == 1);
-               assert( list.at( 1).at( "a").as_integer() == 2);
-            }
-         }
-
       } // cases
 
       void all()
@@ -1531,7 +1510,6 @@ top: world
          cases::timestamp();
          cases::strict_gentle();
          cases::binary();
-         cases::duplicate_key();
       }
 
    } // yaml::test

@@ -17,6 +17,8 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 
 `poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
 
+`poly::node::object` keeps its keys in insertion order and may contain duplicate keys. Key access (`find`, `contains`, `at`, `[]` and `try_emplace`) uses the first match, while `emplace` always appends and `count`, `equal_range` and `erase( key)` apply to every match. Parsers keep potential duplicate keys (except TOML, which has to reject them because tables and dotted keys are merged by key). Writers write every key as is, so an object with duplicate keys may produce invalid output for formats that forbid them (such as CBOR, TOML and YAML).
+
 `poly::node::integer` is `std::int64_t` and `poly::node::decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
 
 #### CBOR
@@ -208,6 +210,12 @@ auto integer = node.as_object().at( "a").as_array().at( 1).as_integer();
 auto integer = node( "a")( 1)->as_integer();
 ```
 
+```cpp
+// iterate over every value of a key, in insertion order
+for( const auto& [ name, data] : node.as_object().equal_range( "foo"))
+   std::println( "{}", data.as_integer());
+```
+
 #### Mutate
 ```cpp
 // mutate some data
@@ -220,6 +228,12 @@ poly::node node = poly::node::object{
    { "foo", 123},
    { "bar", poly::node::array{ 1, false, "oups"}}
 };
+```
+
+```cpp
+// keep the first "foo" and remove the rest
+if( auto [ head, tail] = node.as_object().equal_range( "foo"); head != tail)
+   node.as_object().erase( std::next( head), tail);
 ```
 
 #### Lookup

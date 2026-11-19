@@ -218,8 +218,7 @@ namespace poly_version
                      if( ! std::holds_alternative< name>( data))
                         [[unlikely]] halt( "expected key");
 
-                     if( ! nrv.emplace( std::get< name>( std::move( data)), spot()).second)
-                        [[unlikely]] halt( "duplicate key");
+                     nrv.emplace( std::get< name>( std::move( data)), spot());
 
                      if( peep() == '}') break;
 
@@ -482,8 +481,7 @@ namespace poly_version
                      if( edge( item))
                         break;
 
-                     if( ! object.emplace( std::get< name>( std::move( item)), bind( dent)).second)
-                        [[unlikely]] halt( "duplicate key");
+                     object.emplace( std::get< name>( std::move( item)), bind( dent));
 
                      if( dent < root)
                         break;

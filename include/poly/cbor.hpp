@@ -152,13 +152,13 @@ namespace poly_version
                   return std::make_pair( std::move( *name), spot());
                [[unlikely]] halt( "expected key");
             }
-
+ 
             auto object( auto size) -> node::object
             {
                node::object nrv;
                nrv.reserve( clip( size));
                while( size--)
-                  nrv.insert( pair());
+                  nrv.emplace( pair());
                return nrv;
             }
 
@@ -166,7 +166,7 @@ namespace poly_version
             {
                node::object nrv;
                while( more())
-                  nrv.insert( pair());
+                  nrv.emplace( pair());
                return nrv;
             }
 
