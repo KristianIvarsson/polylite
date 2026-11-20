@@ -15,16 +15,23 @@ namespace poly_version
 {
    namespace tool::same
    {
+      template< typename... parameters>
+      bool test( const fifo< parameters...>& data)
+      {
+         for( auto item = data.begin(); item != data.end(); ++item)
+            if( std::ranges::find( std::next( item), data.end(), item->first, &fifo< parameters...>::value_type::first) != data.end())
+               return false;
+         return true;
+      }
+
       //! test whether the node tree have only unique keys
       inline bool test( const node& data)
       {
          if( auto array = data.to_array())
-            return std::ranges::all_of( *array, test);
+            return std::ranges::all_of( *array, []( const auto& item){ return test( item);} );
 
          if( auto object = data.to_object())
-            for( auto item = object->begin(); item != object->end(); ++item)
-               if( std::ranges::find( std::next( item), object->end(), item->first, &node::object::value_type::first) != object->end() || ! test( item->second))
-                  return false;
+            return test( *object) && std::ranges::all_of( *object, []( const auto& item){ return test( item.second); });
 
          return true;
       }

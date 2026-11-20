@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/lint.hpp"
 #include "core/load.hpp"
 #include "core/save.hpp"
 
@@ -548,7 +549,7 @@ namespace poly_version
          namespace detail
          {
 
-            template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces, bool strict>
+            template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
             struct writer : xml::detail::writer< unit, output, spaces>
             {
                using base = xml::detail::writer< unit, output, spaces>;
@@ -607,16 +608,9 @@ namespace poly_version
 
                void operator() ( const node::nothing)
                {
-                  if constexpr( strict)
-                  {
-                      halt( "node::nothing");
-                  }
-                  else 
-                  {
-                     begin( types::string);
-                     copy( "null");
-                     cease( types::string);
-                  }
+                  begin( types::string);
+                  copy( "null");
+                  cease( types::string);
                }
 
                void operator() ( const node::boolean node)
@@ -660,23 +654,19 @@ namespace poly_version
                   cease( types::binary);
                }
 
-
                void operator() ( const node::local_date data)
                {
-                  if constexpr( strict) halt( "node::local_date");
-                  else date( data);
+                  date( data);
                }
 
                void operator() ( const node::local_time data)
                {
-                  if constexpr( strict) halt( "node::local_time");
-                  else date( data);
+                  date( data);
                }
 
                void operator() ( const node::local_datetime data)
                {
-                  if constexpr( strict) halt( "node::local_datetime");
-                  else date( data);
+                  date( data);
                }
             
                void operator() ( const node::zoned_datetime data)
@@ -697,10 +687,10 @@ namespace poly_version
             };
 
 
-            template< std::size_t spaces, bool strict, bool complete>
+            template< std::size_t spaces, bool complete>
             void write( const node& root, auto&& target)
             {
-               auto sink = core::save::make::target< writer, spaces, strict>( target);
+               auto sink = core::save::make::target< writer, spaces>( target);
 
                if constexpr( complete)
                {
@@ -722,11 +712,11 @@ namespace poly_version
             }
 
             // the default write function
-            template< std::size_t spaces, bool strict, bool complete>
+            template< std::size_t spaces, bool complete>
             auto write( const node& root)
             {
                std::string target;
-               write< spaces, strict, complete>( root, target);
+               write< spaces, complete>( root, target);
                return target;
             }
 
@@ -734,66 +724,45 @@ namespace poly_version
 
          inline namespace elegant
          {
-            inline namespace strict
+            template< std::size_t spaces = xml::detail::spaces>
+            auto write( auto&&... parameters)
             {
-               template< std::size_t spaces = xml::detail::spaces>
-               auto write( auto&&... parameters)
-               {
-                  return detail::write< spaces, true, false>( std::forward< decltype( parameters)>( parameters)...);
-               }
+               return detail::write< spaces, false>( std::forward< decltype( parameters)>( parameters)...);
+            }
 
-               template< std::size_t spaces = xml::detail::spaces>
-               auto whole( auto&&... parameters)
-               {
-                  return detail::write< spaces, true, true>( std::forward< decltype( parameters)>( parameters)...);
-               }
-            } // strict
-
-            namespace gentle
+            template< std::size_t spaces = xml::detail::spaces>
+            auto whole( auto&&... parameters)
             {
-               template< std::size_t spaces = xml::detail::spaces>
-               auto write( auto&&... parameters)
-               {
-                  return detail::write< spaces, false, false>( std::forward< decltype( parameters)>( parameters)...);
-               }
-
-               template< std::size_t spaces = xml::detail::spaces>
-               auto whole( auto&&... parameters)
-               {
-                  return detail::write< spaces, false, true>( std::forward< decltype( parameters)>( parameters)...);
-               }
-            } // gentle
+               return detail::write< spaces, true>( std::forward< decltype( parameters)>( parameters)...);
+            }
          } // elegant
 
          namespace compact
          {
-            inline namespace strict
+            auto write( auto&&... parameters)
             {
-               auto write( auto&&... parameters)
-               {
-                  return detail::write< 0, true, false>( std::forward< decltype( parameters)>( parameters)...);
-               }
+               return detail::write< 0, false>( std::forward< decltype( parameters)>( parameters)...);
+            }
 
-               auto whole( auto&&... parameters)
-               {
-                  return detail::write< 0, true, true>( std::forward< decltype( parameters)>( parameters)...);
-               }
-            } // strict
-
-            namespace gentle
+            auto whole( auto&&... parameters)
             {
-               auto write( auto&&... parameters)
-               {
-                  return detail::write< 0, false, false>( std::forward< decltype( parameters)>( parameters)...);
-               }
-
-               auto whole( auto&&... parameters)
-               {
-                  return detail::write< 0, false, true>( std::forward< decltype( parameters)>( parameters)...);
-               }
-            } // gentle
+               return detail::write< 0, true>( std::forward< decltype( parameters)>( parameters)...);
+            }
          } // compact
 
+         namespace detail
+         {
+            struct rule : core::lint::rule
+            {
+               template< typename type>
+               static constexpr bool block = core::type::some< type, node::nothing, node::local_date, node::local_time, node::local_datetime>;
+            };
+         } // detail
+
+         decltype( auto) check( auto&& data)
+         {
+            return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
+         }
       } // plist
 
    } // xml

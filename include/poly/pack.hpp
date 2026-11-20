@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/lint.hpp"
 #include "core/load.hpp"
 #include "core/save.hpp"
 
@@ -293,7 +294,7 @@ namespace poly_version
       namespace detail
       {
 
-         template< core::type::byte unit, core::save::pipe::target output, bool strict>
+         template< core::type::byte unit, core::save::pipe::target output>
          struct writer : core::save::target< unit, output>
          {
             using base = core::save::target< unit, output>;
@@ -400,20 +401,17 @@ namespace poly_version
 
             void operator() ( const node::local_date data)
             {
-               if constexpr( strict) halt( "node::local_date");
-               else time( data);
+               time( data);
             }
 
             void operator() ( const node::local_time data)
             {
-               if constexpr( strict) halt( "node::local_time");
-               else time( data);
+               time( data);
             }
 
             void operator() ( const node::local_datetime data)
             {
-               if constexpr( strict) halt( "node::local_datetime");
-               else time( data);
+               time( data);
             }
          
             void operator() ( const node::zoned_datetime data)
@@ -504,38 +502,39 @@ namespace poly_version
             }
          };
 
-         template< bool strict>
-         auto write( const node& root, auto&& target)
+         inline auto write( const node& root, auto&& target)
          {
-            std::visit( core::save::make::target< writer, strict>( target), root);
+            std::visit( core::save::make::target< writer>( target), root);
          }
 
          // the default write function
-         template< bool strict>
-         auto write( const node& root)
+         inline auto write( const node& root)
          {
             std::vector< std::byte> target;
-            write< strict>( root, target);
+            write( root, target);
             return target;
          }
 
       } // detail
 
-      inline namespace strict
+      auto write( auto&&... parameters)
       {
-         auto write( auto&&... parameters)
-         {
-            return detail::write< true>( std::forward< decltype( parameters)>( parameters)...);
-         }
-      } // strict
+         return detail::write( std::forward< decltype( parameters)>( parameters)...);
+      }
 
-      namespace gentle
+      namespace detail
       {
-         auto write( auto&&... parameters)
+         struct rule : core::lint::rule
          {
-            return detail::write< false>( std::forward< decltype( parameters)>( parameters)...);
-         }
-      } // gentle
+            template< typename type>
+            static constexpr bool block = core::type::some< type, node::local_date, node::local_time, node::local_datetime>;
+            static constexpr bool multi = true;
+         };
+      } // detail
 
+      decltype( auto) check( auto&& data)
+      {
+         return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
+      }
    } // pack
 } // poly_version

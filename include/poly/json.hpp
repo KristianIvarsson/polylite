@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/lint.hpp"
 #include "core/load.hpp"
 #include "core/save.hpp"
 
@@ -199,7 +200,7 @@ namespace poly_version
       {
          constexpr std::size_t spaces = 3;
 
-         template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces, bool strict>
+         template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
          struct writer : core::save::writer< unit, output>
          {
             using base = core::save::writer< unit, output>;
@@ -275,17 +276,10 @@ namespace poly_version
 
             void operator() ( const node::instant& node)
             {
-               if constexpr( strict)
-               {
-                  halt( "node::instant");
-               }
-               else
-               {
-                  fill();
-                  push( '"');
-                  std::visit( [ this]( const auto& data) { this->time( data); }, node);
-                  push( '"');
-               }
+               fill();
+               push( '"');
+               std::visit( [ this]( const auto& data) { this->time( data); }, node);
+               push( '"');
             }
 
             void operator() ( const node::string& node)
@@ -298,17 +292,10 @@ namespace poly_version
 
             void operator() ( const node::binary& node)
             {
-               if constexpr( strict)
-               {
-                  halt( "node::binary");
-               }
-               else
-               {
-                  fill();
-                  push( '"');
-                  flat( node);
-                  push( '"');
-               }
+               fill();
+               push( '"');
+               flat( node);
+               push( '"');
             }
 
          private:
@@ -354,65 +341,55 @@ namespace poly_version
 
          };
 
-         template< std::size_t spaces, bool strict>
+         template< std::size_t spaces>
          auto write( const node& root, auto&& target)
          {
-            auto sink = core::save::make::target< writer, spaces, strict>( target);
+            auto sink = core::save::make::target< writer, spaces>( target);
             std::visit( sink, root);
          }
 
          // the default write function
-         template< std::size_t spaces, bool strict>
+         template< std::size_t spaces>
          auto write( const node& root)
          {
             std::string target;
-            write< spaces, strict>( root, target);
+            write< spaces>( root, target);
             return target;
          }
 
       } // detail
 
-
       inline namespace elegant
       {
-         inline namespace strict
+         template< std::size_t spaces = detail::spaces>
+         auto write( auto&&... parameters)
          {
-            template< std::size_t spaces = detail::spaces>
-            auto write( auto&&... parameters)
-            {
-               return detail::write< spaces, true>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // strict
-
-         namespace gentle
-         {
-            template< std::size_t spaces = detail::spaces>
-            auto write( auto&&... parameters)
-            {
-               return detail::write< spaces, false>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // gentle
+            return detail::write< spaces>( std::forward< decltype( parameters)>( parameters)...);
+         }
       } // elegant
 
       namespace compact
       {
-         inline namespace strict
+         auto write( auto&&... parameters)
          {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< 0, true>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // strict
-
-         namespace gentle
-         {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< 0, false>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // gentle
+            return detail::write< 0>( std::forward< decltype( parameters)>( parameters)...);
+         }
       } // compact
 
+      namespace detail
+      {
+         struct rule : core::lint::rule
+         {
+            template< typename type>
+            static constexpr bool block = core::type::some< type, node::instant, node::binary>;
+            static constexpr bool multi = true;
+         };
+      } // detail
+
+      decltype( auto) check( auto&& data)
+      {
+         return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
+      }
    } // json
 
 } // poly_version

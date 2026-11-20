@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/help.hpp"
+#include "core/lint.hpp"
 #include "core/load.hpp"
 #include "core/save.hpp"
 
@@ -401,7 +402,7 @@ namespace poly_version
             std::string do_grouping() const override { return "\3"; }
          };
 
-         template< core::type::byte unit, core::save::pipe::target output, bool posh, bool firm>
+         template< core::type::byte unit, core::save::pipe::target output, bool posh>
          struct writer : core::save::writer< unit, output>
          {
             using base = core::save::writer< unit, output>;
@@ -421,10 +422,8 @@ namespace poly_version
                if( node.is_object())
                   (*this)( node.as_object());
                else
-                  if constexpr( firm)
-                     halt( "not node::object");
-                  else
-                     (*this)( node::object{ { {}, node}});
+                  // create an object
+                  (*this)( node::object{ { {}, node}});
             }
 
             void operator() ( const node::object& node)
@@ -532,10 +531,7 @@ namespace poly_version
 
             void operator() ( const node::nothing)
             {
-               if constexpr( firm)
-                  halt( "node::nothing");
-               else
-                  copy( R"("null")");
+               copy( R"("null")");
             }
 
             void operator() ( const node::boolean node)
@@ -572,24 +568,17 @@ namespace poly_version
 
             void operator() ( const node::binary& node)
             {
-               if constexpr( firm)
+               if constexpr( posh)
                {
-                  halt( "node::binary");
+                  copy( "'''");
+                  wrap( node);
+                  copy( "'''");
                }
                else
                {
-                  if constexpr( posh)
-                  {
-                     copy( "'''");
-                     wrap( node);
-                     copy( "'''");
-                  }
-                  else
-                  {
-                     push( '"');
-                     flat( node);
-                     push( '"');
-                  }
+                  push( '"');
+                  flat( node);
+                  push( '"');
                }
             }
 
@@ -699,19 +688,19 @@ namespace poly_version
          };
 
 
-         template< bool posh, bool firm>
+         template< bool posh>
          auto write( const node& root, auto&& target)
          {
-            core::save::make::target< writer, posh, firm>( target)( root);
+            core::save::make::target< writer, posh>( target)( root);
          }
 
 
          // the default write function
-         template< bool posh, bool firm>
+         template< bool posh>
          auto write( const node& root)
          {
             std::string target;
-            write< posh, firm>( root, target);
+            write< posh>( root, target);
             return target;
          }
 
@@ -719,42 +708,34 @@ namespace poly_version
 
       inline namespace elegant
       {
-         inline namespace strict
+         auto write( auto&&... parameters)
          {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< true, true>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // strict
-
-         namespace gentle
-         {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< true, false>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // gentle
+            return detail::write< true>( std::forward< decltype( parameters)>( parameters)...);
+         }
       } // elegant
 
       namespace compact
       {
-         inline namespace strict
+         auto write( auto&&... parameters)
          {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< false, true>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // strict
-
-         namespace gentle
-         {
-            auto write( auto&&... parameters)
-            {
-               return detail::write< false, false>( std::forward< decltype( parameters)>( parameters)...);
-            }
-         } // gentle
+            return detail::write< false>( std::forward< decltype( parameters)>( parameters)...);
+         }
       } // compact
 
+      namespace detail
+      {
+         struct rule : core::lint::rule
+         {
+            template< typename type>
+            static constexpr bool block = core::type::some< type, node::nothing, node::binary>;
+            static constexpr bool table = true;
+         };
+      } // detail
+
+      decltype( auto) check( auto&& data)
+      {
+         return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
+      }
    } // toml
 
 } // version

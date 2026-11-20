@@ -11,42 +11,53 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML and YAML are supported. The implementation may be somewhat naive but aims to be strict when writing and more relaxed when parsing.
+At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML and YAML are supported.
 
 ### Note
 
-`poly::node` is a superset of what any single format can represent. In strict mode (the default), writing a node containing an unsupported type will throw. In gentle mode, unsupported types are written as strings.
-
-`poly::node::object` keeps its keys in insertion order and may contain duplicate keys. Key access (`find`, `contains`, `at`, `[]` and `try_emplace`) uses the first match, while `emplace` always appends and `count`, `equal_range` and `erase( key)` apply to every match. Parsers keep potential duplicate keys (except TOML, which has to reject them because tables and dotted keys are merged by key). Writers write every key as is, so an object with duplicate keys may produce invalid output for formats that forbid them (such as CBOR, TOML and YAML).
+`poly::node::object` keeps its keys in insertion order and may contain duplicate keys. Key access (`find`, `contains`, `at`, `[]` and `try_emplace`) uses the first match, while `emplace` always appends and `count`, `equal_range` and `erase( key)` apply to every match. Parsers keep potential duplicate keys (except TOML, which has to reject them because tables and dotted keys are merged by key).
 
 `poly::node::integer` is `std::int64_t` and `poly::node::decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
 
 #### CBOR
 - `zoned_datetime` is written with its zone offset in *verbose* mode and as UTC in *compact* mode, but is always parsed as UTC
-- `local_time` and `local_datetime` inside `instant` have no standard CBOR tag but are written as strings in *gentle* mode
 
 #### JSON
-- `instant` (_time_) is not a native type
-- `binary` is not a native type
 - integers outside `node::integer` range are parsed as `decimal` (possibly losing precision)
 
 #### PACK
 - `zoned_datetime` is written and parsed as UTC, since the timestamp extension has no zone offset
 - `zoned_datetime` is written without fractions, since the specification mandates that
-- `local_date`, `local_time` and `local_datetime` inside `instant` are not native MSGPACK types but are written as strings in *gentle* mode
 
 #### PLIST
-- `nothing` (_null_) is not a native type
 - `zoned_datetime` is written as UTC without fractions, since `<date>` only allows `YYYY-MM-DDTHH:MM:SSZ`
-- `local_date`, `local_time` and `local_datetime` inside `instant` are not native PLIST types but are written as strings in *gentle* mode
 - `write()` produces only the value, while `whole()` also adds the XML declaration, the DOCTYPE and the `<plist>` element
 
-#### TOML
-- `nothing` (_null_) is not a native type
-- `binary` is not a native type
+### Unsupported Values
 
-#### YAML
-- `local_time` inside `instant` is not a native type
+`poly::node` is a superset of what any single format can represent. Writers always write, and values a format can't represent are written as follows. Calling `<format>::check( node)` before writing or after parsing is optional: it rejects these values and otherwise returns the node, e.g. `poly::toml::write( poly::toml::check( node))` or `poly::yaml::check( poly::yaml::parse( node))`.
+
+| Format | Value                   | Result
+|------- |------                   |-------
+| CBOR   | `local_time`            | text string (no tag)
+| CBOR   | `local_datetime`        | text string (no tag)
+| JSON   | `instant`               | string
+| JSON   | `binary`                | base64-encoded string
+| PACK   | `local_date`            | string
+| PACK   | `local_time`            | string
+| PACK   | `local_datetime`        | string
+| PLIST  | `nothing`               | `<string>null</string>`
+| PLIST  | `local_date`            | `<string>`
+| PLIST  | `local_time`            | `<string>`
+| PLIST  | `local_datetime`        | `<string>`
+| TOML   | `nothing`               | `"null"`
+| TOML   | `binary`                | base64-encoded string
+| TOML   | non `node::object` root | the value under the key `""`
+| YAML   | `local_time`            | plain scalar (parsed back as a string)
+
+### Duplicate Keys
+
+Duplicate keys are written and parsed _as is_, but `<format>::check( node)` rejects them for CBOR, PLIST, TOML and YAML.
 
 ### Known Limitations
 
@@ -160,33 +171,23 @@ auto json = poly::json::write( node);
 ```
 
 ```cpp
+// make sure the node is valid for the format before writing
+auto toml = poly::toml::write( poly::toml::check( node));
+```
+
+```cpp
 // write to a vector of bytes (default for cbor)
 auto cbor = poly::cbor::write( node);
 ```
 
 ```cpp
 // same as above (i.e. elegant) but with explicit version
-auto json = poly::json::v5_1_0::elegant::strict::write( node);
+auto json = poly::v5_3_0::json::elegant::write( node);
 ```
 
 ```cpp
 // write to a compact string
 auto json = poly::json::compact::write( node);
-```
-
-```cpp
-// same as above (i.e. compact and strict)
-auto json = poly::json::compact::strict::write( node);
-```
-
-```cpp
-// write to a string (accepts types not valid for the protocol)
-auto json = poly::json::gentle::write( node);
-```
-
-```cpp
-// same as above (i.e. elegant and gentle)
-auto json = poly::json::elegant::gentle::write( node);
 ```
 
 ```cpp
@@ -197,6 +198,12 @@ auto xml = poly::xml::plist::write( node);
 ```cpp
 // same as above but with xml declaration, doctype and plist root element
 auto xml = poly::xml::plist::whole( node);
+```
+
+#### Converting
+```cpp
+// convert yaml to json, and make sure nothing has to be degraded on the way
+auto json = poly::json::write( poly::json::check( poly::yaml::parse( input)));
 ```
 
 #### Access

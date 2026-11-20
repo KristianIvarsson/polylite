@@ -284,27 +284,30 @@ namespace poly_version
             node source;
             source[ "t"] = core::help::transform::instant( "2025-01-01").value();
 
-            // strict: throws on instant
-            try { json::write( source); assert( false); }
+            // strict: check throws on instant
+            try { json::check( source); assert( false); }
             catch( const std::invalid_argument&) {}
 
             // gentle: writes instant as quoted string
-            const auto text = json::elegant::gentle::write( source);
+            const auto text = json::elegant::write( source);
             auto parsed = json::parse( text);
             assert( parsed.at( "t").is_string());
+
+            // duplicate keys are allowed
+            assert( json::check( json::parse( R"({"a":1,"a":2})")).as_object().count( "a") == 2);
          }
 
          void binary()
          {
             const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
 
-            // strict: throws on binary
+            // strict: check throws on binary
             { node source; source[ "b"] = hello;
-              assert( throws( [&]{ json::write( source); })); }
+              assert( throws( [&]{ json::check( source); })); }
 
             // gentle write contains base64
             { node source; source[ "b"] = hello;
-              const auto text = json::elegant::gentle::write( source);
+              const auto text = json::elegant::write( source);
               assert( text.contains( "SGVsbG8="));
 
               // round-trip via manual decode
@@ -686,27 +689,38 @@ earth = "\U0001F30D"
             node source;
             source[ "n"] = nullptr;
 
-            // strict: throws on nothing
-            try { toml::write( source); assert( false); }
+            // strict: check throws on nothing
+            try { toml::check( source); assert( false); }
             catch( const std::invalid_argument&) {}
 
             // gentle: writes nothing as "null" string
-            const auto text = toml::elegant::gentle::write( source);
+            const auto text = toml::write( source);
             auto parsed = toml::parse( text);
             assert( parsed.at( "n").is_string());
+
+            // strict: check throws on a root that isn't a table, while write wraps it under an empty key
+            const node array = node::array{ 1, 2};
+            assert( throws( [&]{ toml::check( array); }));
+            assert( toml::parse( toml::write( array)).as_object().at( "").as_array().size() == 2);
+
+            // strict: check throws on duplicate keys
+            node twice = node::object{};
+            twice.as_object().emplace( "a", 1);
+            twice.as_object().emplace( "a", 2);
+            assert( throws( [&]{ toml::check( twice); }));
          }
 
          void binary()
          {
             const node::binary hello{ std::byte{0x48}, std::byte{0x65}, std::byte{0x6C}, std::byte{0x6C}, std::byte{0x6F}};
 
-            // strict: throws on binary
+            // strict: check throws on binary
             { node source; source[ "b"] = hello;
-              assert( throws( [&]{ toml::write( source); })); }
+              assert( throws( [&]{ toml::check( source); })); }
 
             // gentle elegant write contains base64
             { node source; source[ "b"] = hello;
-              const auto text = toml::elegant::gentle::write( source);
+              const auto text = toml::elegant::write( source);
               assert( text.contains( "SGVsbG8="));
 
               // round-trip via manual decode
@@ -716,7 +730,7 @@ earth = "\U0001F30D"
 
             // gentle compact write contains base64
             { node source; source[ "b"] = hello;
-              const auto text = toml::compact::gentle::write( source);
+              const auto text = toml::compact::write( source);
               assert( text.contains( "SGVsbG8="));
 
               auto parsed = toml::parse( text);
@@ -1483,12 +1497,12 @@ top: world
          {
             const node source = core::help::transform::instant( "12:30:00").value();
 
-            // strict: throws on local_time
-            try { yaml::write( source); assert( false); }
+            // strict: check throws on local_time
+            try { yaml::check( source); assert( false); }
             catch( const std::invalid_argument&) {}
 
             // gentle: writes local_time as bare value (parses back as string)
-            const auto text = yaml::elegant::gentle::write( source);
+            const auto text = yaml::elegant::write( source);
             assert( yaml::parse( text).is_string());
          }
 
@@ -1507,9 +1521,30 @@ top: world
             // compact write emits !!binary when node is binary directly
             { 
                node source = hello;
-               const auto text = yaml::compact::gentle::write( source);
+               const auto text = yaml::compact::write( source);
                assert( text.contains( "!!binary"));
                assert( text.contains( "SGVsbG8=")); 
+            }
+         }
+
+         void duplicate_key()
+         {
+            // repeated keys are invalid
+            assert( throws( []{ yaml::check( yaml::parse( "a: 1\na: 2\n")); }));
+            assert( throws( []{ yaml::check( yaml::parse( "x:\n  y: 1\n  y: 2\n")); }));
+            assert( throws( []{ yaml::check( yaml::parse( "{a: 1, a: 2}\n")); }));
+
+            // similar but valid
+            {
+               const auto map = yaml::check( yaml::parse( "x:\n  y: 1\nz:\n  y: 2\n"));
+               assert( map.at( "x").at( "y").as_integer() == 1);
+               assert( map.at( "z").at( "y").as_integer() == 2);
+            }
+
+            {
+               const auto list = yaml::check( yaml::parse( "- a: 1\n- a: 2\n"));
+               assert( list.at( 0).at( "a").as_integer() == 1);
+               assert( list.at( 1).at( "a").as_integer() == 2);
             }
          }
 
@@ -1526,6 +1561,7 @@ top: world
          cases::timestamp();
          cases::strict_gentle();
          cases::binary();
+         cases::duplicate_key();
       }
 
    } // yaml::test
@@ -1684,23 +1720,23 @@ top: world
                                           0x6A, 0x32, 0x30, 0x32, 0x35, 0x2D, 0x30, 0x31, 0x2D, 0x30, 0x31}));
                }
 
-               // strict: local_time / local_datetime throw
+               // strict: check throws on local_time / local_datetime
                {
                   node source;
                   source[ "t"] = core::help::transform::instant( "12:34:56").value();
-                  assert( throws( [&]{ cbor::verbose::write( source); }));
+                  assert( throws( [&]{ cbor::check( source); }));
                }
                {
                   node source;
                   source[ "t"] = core::help::transform::instant( "2025-01-01T12:34:56").value();
-                  assert( throws( [&]{ cbor::verbose::write( source); }));
+                  assert( throws( [&]{ cbor::check( source); }));
                }
 
                // gentle: local_time / local_datetime written as bare text (no tag)
                {
                   node source;
                   source[ "t"] = core::help::transform::instant( "12:34:56").value();
-                  const auto wire = cbor::verbose::gentle::write( source);
+                  const auto wire = cbor::verbose::write( source);
                   // A1 61 74 68 31 32 3A 33 34 3A 35 36
                   assert( wire == bytes({ 0xA1, 0x61, 0x74,
                                           0x68, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
@@ -1967,11 +2003,11 @@ top: world
             node source;
             source[ "t"] = core::help::transform::instant( "12:34:56").value();
 
-            // strict: local_time throws
-            assert( throws( [&]{ pack::write( source); }));
+            // strict: check throws on local_time
+            assert( throws( [&]{ pack::check( source); }));
 
             // gentle: local_time is written as text, A1 74 A8 "12:34:56"
-            assert( pack::gentle::write( source) == detail::bytes({ 0x81, 0xA1, 0x74, 0xA8, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
+            assert( pack::write( source) == detail::bytes({ 0x81, 0xA1, 0x74, 0xA8, 0x31, 0x32, 0x3A, 0x33, 0x34, 0x3A, 0x35, 0x36}));
          }
 
          void sources()
@@ -2076,16 +2112,16 @@ top: world
 
          void strictness()
          {
-            // strict: nothing and local instants cannot be represented
-            assert( throws( []{ compact::write( nullptr); }));
-            assert( throws( []{ compact::write( core::help::transform::instant( "2026-11-05").value()); }));
-            assert( throws( []{ compact::write( core::help::transform::instant( "12:34:56").value()); }));
-            assert( throws( []{ compact::write( core::help::transform::instant( "2026-11-05T12:34:56").value()); }));
+            // strict: check throws on nothing and local instants
+            assert( throws( []{ check( nullptr); }));
+            assert( throws( []{ check( core::help::transform::instant( "2026-11-05").value()); }));
+            assert( throws( []{ check( core::help::transform::instant( "12:34:56").value()); }));
+            assert( throws( []{ check( core::help::transform::instant( "2026-11-05T12:34:56").value()); }));
 
             // gentle: written as strings
-            assert( compact::gentle::write( nullptr) == "<string>null</string>");
-            assert( compact::gentle::write( core::help::transform::instant( "2026-11-05").value()) == "<string>2026-11-05</string>");
-            assert( compact::gentle::write( core::help::transform::instant( "12:34:56").value()) == "<string>12:34:56</string>");
+            assert( compact::write( nullptr) == "<string>null</string>");
+            assert( compact::write( core::help::transform::instant( "2026-11-05").value()) == "<string>2026-11-05</string>");
+            assert( compact::write( core::help::transform::instant( "12:34:56").value()) == "<string>12:34:56</string>");
          }
 
          void whole()

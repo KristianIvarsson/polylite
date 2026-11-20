@@ -10,6 +10,7 @@
 
 #include <limits>
 #include <cstdint>
+#include <concepts>
 
 #if __has_include(<stdfloat>)
 #include <stdfloat>
@@ -53,5 +54,8 @@ namespace poly_version
          pinned( const pinned&) = delete;
          pinned& operator=( const pinned&) = delete;
       };
+
+      template< typename type, typename... types>
+      constexpr bool some = ( std::same_as< type, types> || ...);
    } // core::type
 } // poly_version
