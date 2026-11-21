@@ -75,6 +75,7 @@ The following are detected and rejected with an error:
 
 #### JSON
 - Numbers longer than 128 characters may be rejected with an error when parsed from a stream or a non-contiguous container (e.g. `std::istream`, `std::deque` or `std::list`)
+- Object keys are written without escaping, so keys containing `"`, `\` or control characters produce invalid JSON
 
 #### PACK
 The following are detected and rejected with an error:

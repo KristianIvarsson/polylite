@@ -195,7 +195,6 @@ namespace poly_version
          return core::load::make::source< detail::parser>( source)();
       }
 
-
       namespace detail
       {
          constexpr std::size_t spaces = 3;
@@ -356,7 +355,6 @@ namespace poly_version
             write< spaces>( root, target);
             return target;
          }
-
       } // detail
 
       inline namespace elegant
@@ -391,5 +389,4 @@ namespace poly_version
          return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
       }
    } // json
-
 } // poly_version
