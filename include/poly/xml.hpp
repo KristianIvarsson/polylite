@@ -50,6 +50,76 @@ namespace poly_version
                done,
             };
 
+            node operator()()
+            {
+               node::object nrv;
+               auto [ type, data] = sift();
+
+               while( type != form::done)
+               {
+                  nrv.emplace( word( data), spot( type, data));
+                  std::tie( type, data) = sift();
+               }
+
+               return nrv;
+            }
+
+            node spot( const form type, const std::string_view data)
+            {
+               switch( type)
+               {
+               case form::open:
+                  return object( word( data));
+               case form::bare:
+                  return scalar( {});
+               default:
+                  [[unlikely]] halt( "expected element");
+               }
+            }
+
+            node object( const std::string_view name)
+            {
+               node::object children;
+
+               while( true)
+               {
+                  auto item = text();
+
+                  const auto [ type, data] = sift();
+
+                  if( type == form::seal)
+                  {
+                     if( word( data) != name)
+                        [[unlikely]] halt( "unexpected name");
+
+                     if( children.empty())
+                        return scalar( std::move( item));
+                  }
+
+                  if( std::ranges::all_of( item, [] ( const auto sign) { return core::help::is::white( sign); }))
+                     if( type == form::seal)
+                        return children;
+                     else
+                        children.emplace( word( data), spot( type, data));
+                  else
+                     [[unlikely]] halt( "mixed content");
+               }
+            }
+
+            static node scalar( std::string data)
+            {
+               // if( data.empty())
+               //    return nullptr;
+               // if( auto item = core::help::transform::simple( data))
+               //    return std::move( *item);
+               // if( auto item = core::help::transform::number( data))
+               //    return std::move( *item);
+               // if( auto item = core::help::transform::instant( data))
+               //    return std::move( *item);
+
+               return data;
+            }
+
             auto till( const std::string_view stop)
             {
                std::string nrv;
@@ -112,13 +182,17 @@ namespace poly_version
                {
                   auto item = next();
 
-                  const auto type = std::get< form>( item);
-
-                  if( type != form::hint && type != form::note)
+                  switch( std::get< form>( item))
                   {
-                     if( type == form::lump)
-                        [[unlikely]] deny( "CDATA");
-
+                  case form::hint:
+                     scan( std::get< std::string>( item));
+                  [[fallthrough]];
+                  case form::note:
+                  case form::kind:
+                     break;
+                  case form::lump:
+                     [[unlikely]] deny( "CDATA");
+                  default:
                      return item;
                   }
                }
@@ -243,11 +317,9 @@ namespace poly_version
                }
             }
 
-            auto lead()
+            void scan( const std::string_view data) const
             {
-               auto [ type, data] = next();
-
-               if( type == form::hint && word( data) == "xml")
+               if( word( data) == "xml")
                {
                   auto equal = [] ( const std::string_view lhs, const std::string_view rhs)
                   {
@@ -263,15 +335,33 @@ namespace poly_version
                   if( const auto value = slot( data, "encoding"); value && ! equal( *value, "UTF-8"))
                      [[unlikely]] halt( "unsupported xml encoding");
                }
+            }
 
-               if( type == form::hint || type == form::note)
-                  std::tie( type, data) = sift();               
+            auto lead()
+            {
+               auto [ type, data] = next();
+
+               switch( type)
+               {
+               case form::hint:
+                  scan( data);
+               [[fallthrough]];
+               case form::note:
+                  std::tie( type, data) = sift();
+               }
 
                return std::make_tuple( type, std::move( data));
             }
-
          };
+      } // detail
 
+      auto parse( auto&& source)
+      {
+         return core::load::make::source< detail::parser>( source)();
+      }
+
+      namespace detail
+      {
          constexpr std::size_t spaces = 3;
          template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
          struct writer : core::save::writer< unit, output>
@@ -544,11 +634,7 @@ namespace poly_version
 
                auto operator()()
                {
-                  auto [ type, data] = lead();
-
-                  // skipping potential doctype
-                  if( type == form::kind)
-                     std::tie( type, data) = sift();
+                  auto [ type, data] = sift();
 
                   const auto root = type == form::open && word( data) == types::root;
 

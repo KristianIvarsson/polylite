@@ -11,19 +11,19 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML, YAML and XML (writer only so far) are supported.
+At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML, YAML and XML are supported.
 
 ### Note
 
-`poly::node::object` keeps its keys in insertion order and may contain duplicate keys. Key access (`find`, `contains`, `at`, `[]` and `try_emplace`) uses the first match, while `emplace` always appends and `count`, `equal_range` and `erase( key)` apply to every match. Parsers keep potential duplicate keys (except TOML, which has to reject them because tables and dotted keys are merged by key).
+`object` keeps its keys in insertion order and may contain duplicate keys. Key access (`find`, `contains`, `at`, `[]` and `try_emplace`) uses the first match, while `emplace` always appends and `count`, `equal_range` and `erase( key)` apply to every match. Parsers keep potential duplicate keys (except TOML, which has to reject them because tables and dotted keys are merged by key).
 
-`poly::node::integer` is `std::int64_t` and `poly::node::decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
+`integer` is `std::int64_t` and `decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
 
 #### CBOR
 - `zoned_datetime` is written with its zone offset in *verbose* mode and as UTC in *compact* mode, but is always parsed as UTC
 
 #### JSON
-- integers outside `node::integer` range are parsed as `decimal` (possibly losing precision)
+- integers outside `integer` range are parsed as `decimal` (possibly losing precision)
 
 #### PACK
 - `zoned_datetime` is written and parsed as UTC, since the timestamp extension has no zone offset
@@ -34,7 +34,8 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 - `write()` produces only the value, while `whole()` also adds the XML declaration, the DOCTYPE and the `<plist>` element
 
 #### XML
-Object entries containing nothing or an empty string/binary/object/array are written as self-closing elements, such as `<name/>`, so their original types cannot be distinguished
+- `object` entries containing `nothing` or an empty `string`/`binary`/`object`/`array` are written as self-closing elements, such as `<name/>`, so their original types cannot be distinguished
+- Element text is parsed as `string`, including empty elements
 
 ### Unsupported Values
 
@@ -107,6 +108,9 @@ The following are detected and rejected with an error:
 
 #### XML
 - The `poly::xml::check()` validates element names using ASCII rules only
+- CDATA sections are rejected
+- Mixed content (text interleaved with child elements) is rejected
+- Attributes are discarded
 
 ## Roadmap
 
