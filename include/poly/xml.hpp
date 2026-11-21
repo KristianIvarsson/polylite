@@ -243,7 +243,7 @@ namespace poly_version
                }
             }
 
-            auto head()
+            auto lead()
             {
                auto [ type, data] = next();
 
@@ -280,16 +280,121 @@ namespace poly_version
             using base::base;
             using base::copy;
             using base::emit;
+            using base::flat;
             using base::halt;
             using base::fold;
             using base::push;
+            using base::time;
 
             char column{};
             bool indent{};
 
+            void operator() ( const node& node)
+            {
+               if( node.is_object())
+                  (*this)( node.as_object());
+               else
+                  // create an object
+                  (*this)( node::object{ { { "root"}, node}});
+            }
+
+            static bool null( const node::nothing&)
+            {
+               return true;
+            }
+
+            static bool null( const auto& data)
+            {
+               if constexpr( requires { data.empty(); })
+                  return data.empty();
+               else
+                  return false;
+            }
+
+            void operator() ( const node::object& node)
+            {
+               for( const auto& [ name, data] : node)
+               {
+                  if( std::visit( []( const auto& item) { return null( item); }, data))
+                  {
+                     bare( name);
+                  }
+                  else
+                  {
+                     open( name);
+
+                     std::visit( *this, data);
+
+                     if( data.is_scalar())
+                     {
+                        if constexpr( spaces) --column;
+                        tail( name);
+                     }
+                     else
+                     {
+                        seal( name);
+                     }
+                  }
+               }
+            }
+
+            void operator() ( const node::array& node)
+            {
+               if constexpr( spaces)
+               {
+                  for( const auto& item : node)
+                  {
+                     if( item.is_scalar())
+                        fill();
+
+                     std::visit( *this, item);
+                  }
+               }
+               else
+               {
+                  bool first = true;
+
+                  for( const auto& item : node)
+                  {
+                     if( first)
+                        first = false;
+                     else
+                        push( ' ');
+
+                     std::visit( *this, item);
+                  }
+               }
+            }
+
+            void operator() ( const node::nothing&)
+            {
+
+            }
+
+            void operator() ( const node::instant& node)
+            {
+               std::visit( [ this]( const auto& data) { this->time( data); }, node);
+            }
+
+            void operator() ( const node::binary& node)
+            {
+               flat( node);
+            }
+
+            void operator() ( const node::string& node)
+            {
+               cast( node);
+            }
+
+            void operator() ( const auto& node)
+            {
+               copy( std::format( "{}", node));
+            }
+
+
             void open( const std::string_view name)
             {
-               begin( name);
+               head( name);
                if constexpr( spaces) ++column;
             }
 
@@ -297,10 +402,10 @@ namespace poly_version
             {
                if constexpr( spaces) --column;
                fill();
-               cease( name);
+               tail( name);
             }
 
-            void begin( const std::string_view name)
+            void head( const std::string_view name)
             {
                fill();
                push( '<');
@@ -308,7 +413,7 @@ namespace poly_version
                push( '>');
             }
 
-            void cease( const std::string_view name)
+            void tail( const std::string_view name)
             {
                push( '<');
                push( '/');
@@ -361,10 +466,40 @@ namespace poly_version
                      indent = true;
                }
             }
-
          };
 
+         template< std::size_t spaces>
+         auto write( const node& root, auto&& target)
+         {
+            core::save::make::target< writer, spaces>( target)( root);
+         }
+
+         // the default write function
+         template< std::size_t spaces>
+         auto write( const node& root)
+         {
+            std::string target;
+            write< spaces>( root, target);
+            return target;
+         }
       } // detail
+
+      inline namespace elegant
+      {
+         template< std::size_t spaces = detail::spaces>
+         auto write( auto&&... parameters)
+         {
+            return detail::write< spaces>( std::forward< decltype( parameters)>( parameters)...);
+         }
+      } // elegant
+
+      namespace compact
+      {
+         auto write( auto&&... parameters)
+         {
+            return detail::write< 0>( std::forward< decltype( parameters)>( parameters)...);
+         }
+      } // compact
 
       namespace plist
       {
@@ -399,18 +534,18 @@ namespace poly_version
                using base = xml::detail::parser< unit, origin>;
                using base::base;
                using base::halt;
-               using base::head;
-               using base::word;
+               using base::lead;
                using base::sift;
                using base::slot;
                using base::text;
                using base::want;
+               using base::word;
 
                using typename base::form;
 
                auto operator()()
                {
-                  auto [ type, data] = head();
+                  auto [ type, data] = lead();
 
                   // skipping potential doctype
                   if( type == form::kind)
@@ -553,19 +688,19 @@ namespace poly_version
             struct writer : xml::detail::writer< unit, output, spaces>
             {
                using base = xml::detail::writer< unit, output, spaces>;
+               using base::bare;
                using base::base;
                using base::cast;
                using base::copy;
                using base::emit;
                using base::halt;
+               using base::head;
                using base::flat;
                using base::open;
                using base::push;
                using base::seal;
+               using base::tail;
                using base::time;
-               using base::begin;
-               using base::cease;
-               using base::bare;
 
                void operator() ( const node::object& node)
                {
@@ -579,9 +714,9 @@ namespace poly_version
 
                      for( const auto& [ name, data] : node)
                      {
-                        begin( types::name);
+                        head( types::name);
                         cast( name);
-                        cease( types::name);
+                        tail( types::name);
                         std::visit( *this, data);
                      }
 
@@ -608,9 +743,9 @@ namespace poly_version
 
                void operator() ( const node::nothing)
                {
-                  begin( types::string);
+                  head( types::string);
                   copy( "null");
-                  cease( types::string);
+                  tail( types::string);
                }
 
                void operator() ( const node::boolean node)
@@ -623,16 +758,16 @@ namespace poly_version
 
                void operator() ( const node::integer node)
                {
-                  begin( types::integer);
+                  head( types::integer);
                   emit( std::format( "{}", node));
-                  cease( types::integer);
+                  tail( types::integer);
                }
 
                void operator() ( const node::decimal node)
                {
-                  begin( types::decimal);
+                  head( types::decimal);
                   emit( std::format( "{}", node));
-                  cease( types::decimal);
+                  tail( types::decimal);
                }
 
                void operator() ( const node::instant& node)
@@ -642,16 +777,16 @@ namespace poly_version
 
                void operator() ( const node::string& node)
                {
-                  begin( types::string);
+                  head( types::string);
                   cast( node);
-                  cease( types::string);
+                  tail( types::string);
                }
 
                void operator() ( const node::binary& node)
                {
-                  begin( types::binary);
+                  head( types::binary);
                   flat( node);
-                  cease( types::binary);
+                  tail( types::binary);
                }
 
                void operator() ( const node::local_date data)
@@ -671,18 +806,18 @@ namespace poly_version
             
                void operator() ( const node::zoned_datetime data)
                {
-                  begin( types::instant);
+                  head( types::instant);
                   emit( std::format( "{:%FT%TZ}", std::chrono::floor< std::chrono::seconds>( data.get_sys_time())));
-                  cease( types::instant);
+                  tail( types::instant);
                }
 
             private:
 
                void date( const auto& data)
                {
-                  begin( types::string);
+                  head( types::string);
                   time( data);
-                  cease( types::string);
+                  tail( types::string);
                }
             };
 
@@ -765,5 +900,20 @@ namespace poly_version
          }
       } // plist
 
+      namespace detail
+      {
+         struct rule : core::lint::rule
+         {
+            template< typename type>
+            static constexpr bool block = core::type::some< type, node::array>;
+            static constexpr bool multi = true;
+            static constexpr bool table = true;
+         };
+      } // detail
+
+      decltype( auto) check( auto&& data)
+      {
+         return core::lint::test< detail::rule>( std::forward< decltype( data)>( data));
+      }
    } // xml
 } // poly_version
