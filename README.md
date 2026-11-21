@@ -11,7 +11,7 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML and YAML are supported.
+At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML, YAML and XML (writer only so far) are supported.
 
 ### Note
 
@@ -32,6 +32,9 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 #### PLIST
 - `zoned_datetime` is written as UTC without fractions, since `<date>` only allows `YYYY-MM-DDTHH:MM:SSZ`
 - `write()` produces only the value, while `whole()` also adds the XML declaration, the DOCTYPE and the `<plist>` element
+
+#### XML
+Object entries containing nothing or an empty string/binary/object/array are written as self-closing elements, such as `<name/>`, so their original types cannot be distinguished
 
 ### Unsupported Values
 
@@ -54,6 +57,7 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 | TOML   | `binary`                | base64-encoded string
 | TOML   | non `node::object` root | the value under the key `""`
 | YAML   | `local_time`            | plain scalar (parsed back as a string)
+| XML    | `node::array`           | items written in order, without array structure
 
 ### Duplicate Keys
 
@@ -100,6 +104,9 @@ The following are detected and rejected with an error:
 - Merge keys (for anchors and aliases)
 - Explicit keys (`? key` / `: value` syntax) — use `key: value` form
 - Custom tags (e.g. `!mytag`) — `!!` core tags only
+
+#### XML
+- The `poly::xml::check()` validates element names using ASCII rules only
 
 ## Roadmap
 

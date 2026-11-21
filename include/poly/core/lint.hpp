@@ -21,7 +21,8 @@ namespace poly_version
          template< typename type>
          static constexpr bool block = false;
          static constexpr bool multi = false;
-         static constexpr bool table = false;         
+         static constexpr bool table = false;
+         static constexpr auto valid = [](const auto&) { return true; };
       };
 
       namespace detail
@@ -41,7 +42,11 @@ namespace poly_version
                      throw std::invalid_argument{ "duplicated key"};
                
                for( const auto& [ name, item] : data)
-                  std::visit( *this, item);
+                  if( rules::valid( name))
+                     std::visit( *this, item);
+                  else
+                     throw std::invalid_argument{ "invalid key"};
+
             }
 
             void operator() ( const node::array& data) const

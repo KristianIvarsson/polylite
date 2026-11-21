@@ -525,7 +525,6 @@ namespace poly_version
 
          } // detail
 
-
          namespace detail
          {
             template< core::type::byte unit, core::load::pipe::source origin>
@@ -902,12 +901,33 @@ namespace poly_version
 
       namespace detail
       {
+         inline constexpr auto name_start_character = [](const auto sign)
+         {
+            return 
+               core::help::is::alpha( sign) or 
+               core::help::is::some< ':', '_'>( sign);
+         };
+
+         inline constexpr auto name_character = [](const auto sign)
+         {
+            return name_start_character( sign) or
+               core::help::is::digit( sign) or
+               core::help::is::some< '-', '.'>( sign);
+         };
+         
          struct rule : core::lint::rule
          {
             template< typename type>
             static constexpr bool block = core::type::some< type, node::array>;
             static constexpr bool multi = true;
             static constexpr bool table = true;
+            //! just a naive ascii check that doesn't care about unicode
+            static constexpr auto valid = [](const std::string& name) 
+            {  
+               if( name.empty()) return false;
+               if( ! name_start_character( name.front())) return false;
+               return std::ranges::all_of( std::next( std::begin( name)), std::end( name), name_character);
+            };
          };
       } // detail
 
