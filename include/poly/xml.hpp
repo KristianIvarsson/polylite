@@ -186,34 +186,35 @@ namespace poly_version
                {
                   std::string nrv;
 
-                  while( good() && look() != '<')
+                  while( true)
                   {
-                     switch( const auto sign = take())
+                     constexpr auto stop = [] ( const auto sign)
+                     {
+                        return core::help::is::in::range< 0x0, 0x1F>( sign) ?
+                           core::help::is::some< '\t', '\n'>( sign) :
+                           core::help::is::none< '<', '&', '\r'>( sign);
+                     };
+
+                     read( stop, nrv);
+
+                     if( peek() == '<')
+                        return nrv;
+
+                     switch( pull())
                      {
                      case '&':
                         nrv.append( cast( till( ';')));
                         break;
-
                      case '\r':
                         if( peek() != '\n')
                            nrv.push_back( '\n');
                         break;
-
-                     case '\t':
-                     case '\n':
-                        nrv.push_back( sign);
-                        break;
-
                      default:
-                        if( core::help::is::in::range< 0x0, 0x1F>( sign))
-                           [[unlikely]] halt( "invalid character");
-                        nrv.push_back( sign);
+                        [[unlikely]] halt( "invalid character");
                      }
                   }
-
-                  return nrv;
                }
-
+               
                //! @return the raw value of the attribute, or nullopt if absent or malformed
                static auto slot( std::string_view data, const std::string_view name) -> std::optional< std::string_view>
                {
