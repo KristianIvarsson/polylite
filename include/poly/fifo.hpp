@@ -82,33 +82,7 @@ namespace poly_version
       auto equal_range( this auto&& self, const auto& key)
       {
          using iterator = decltype( std::ranges::begin( self));
-
-         struct twin
-         {
-            using value_type = fifo::value_type;
-            using difference_type = std::iter_difference_t< iterator>;
-
-            twin() = default;
-            twin( iterator mark, iterator last) : mark{ mark}, last{ last} {}
-
-            auto base() const { return mark; }
-
-            decltype( auto) operator *() const { return *mark; }
-            auto operator ->() const { return mark; }
-
-            auto& operator ++() { mark = std::ranges::find( std::next( mark), last, mark->first, &value_type::first); return *this; }
-            auto operator ++( int) { auto copy = *this; ++*this; return copy; }
-
-            bool operator ==( const twin&) const = default;
-            bool operator ==( std::default_sentinel_t) const { return mark == last; }
-
-         private:
-
-            iterator mark{};
-            iterator last{};
-         };
-
-         return std::ranges::subrange{ twin{ self.find( key), std::ranges::end( self)}, std::default_sentinel};
+         return std::ranges::subrange{ twin< iterator>{ self.find( key), std::ranges::end( self)}, std::default_sentinel};
       }
 
       auto erase( const auto& key)
@@ -127,6 +101,34 @@ namespace poly_version
          return base_type::erase( head, std::next( last));
       }
       //! @}
+
+   private:
+
+      template< typename iterator>
+      struct twin
+      {
+         using value_type = fifo::value_type;
+         using difference_type = std::iter_difference_t< iterator>;
+
+         twin() = default;
+         twin( iterator mark, iterator last) : mark{ mark}, last{ last} {}
+
+         auto base() const { return mark; }
+
+         decltype( auto) operator *() const { return *mark; }
+         auto operator ->() const { return mark; }
+
+         auto& operator ++() { mark = std::ranges::find( std::next( mark), last, mark->first, &value_type::first); return *this; }
+         auto operator ++( int) { auto copy = *this; ++*this; return copy; }
+
+         bool operator ==( const twin&) const = default;
+         bool operator ==( std::default_sentinel_t) const { return mark == last; }
+
+      private:
+
+         iterator mark{};
+         iterator last{};
+      };   
 
    private:
    
