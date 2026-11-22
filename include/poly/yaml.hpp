@@ -877,7 +877,7 @@ namespace poly_version
 
                      if constexpr( spaces)
                      {
-                        if( data.is_trivial())
+                        if( data.is_trivial() || ( data.is_array() && data.as_array().empty()))
                         {
                            push( ' ');
                            std::visit( *this, data);
@@ -900,24 +900,27 @@ namespace poly_version
                void operator() ( const node::array& node)
                {
                   if constexpr( spaces)
-                     for( const auto& data : node)
-                     {
-                        fill();
-                        copy( "- ");
+                     if( node.empty())
+                        flow< unit, output&>{ sink}( node);
+                     else
+                        for( const auto& data : node)
+                        {
+                           fill();
+                           copy( "- ");
 
-                        if( data.is_trivial())
-                        {
-                           std::visit( *this, data);
+                           if( data.is_trivial())
+                           {
+                              std::visit( *this, data);
+                           }
+                           else
+                           {
+                              indent = false;
+                              ++column;
+                              std::visit( *this, data);
+                              --column;
+                              indent = true;
+                           }
                         }
-                        else
-                        {
-                           indent = false;
-                           ++column;
-                           std::visit( *this, data);
-                           --column;
-                           indent = true;
-                        }
-                     }
                   else
                      flow< unit, output&>{ sink}( node);
                }
