@@ -11,7 +11,16 @@ PolyLite is a multiprotocol lightweight, header-only C++ library designed for ea
 Due to the complexity of the supported formats, parts of the implementation are intentionally simple or naive. The primary goal is correctness and a minimal memory footprint — the parser operates directly on input buffers without intermediate allocations where possible. Elegance has occasionally been sacrificed for practicality.
 
 ## Current Status
-At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property list), TOML, YAML and XML are supported.
+
+| Format | Description 
+|--------|-------------
+| CBOR   | Concise Binary Object Representation, a binary data format
+| JSON   | JavaScript Object Notation, a text-based data format
+| PACK   | MessagePack, a binary data format
+| PLIST  | Apple property list, using its XML representation
+| TOML   | Tom's Obvious Minimal Language, a configuration format
+| YAML   | YAML Ain't Markup Language, a text-based data format
+| XML    | Extensible Markup Language, a markup format
 
 ### Note
 
@@ -36,29 +45,31 @@ At the moment, CBOR, JSON, PACK (MSGPACK/MessagePack), PLIST (Apple XML property
 #### XML
 - `object` entries containing `nothing` or an empty `string`/`binary`/`object`/`array` are written as self-closing elements, such as `<name/>`, so their original types cannot be distinguished
 - Element text is parsed as `string`, including empty elements
+- Scalar values are written as text and parsed back as `string`
+- - The writer and parser support fragments with multiple top-level elements; these are not well-formed XML documents
 
 ### Unsupported Values
 
 `poly::node` is a superset of what any single format can represent. Writers always write, and values a format can't represent are written as follows. Calling `<format>::check( node)` before writing or after parsing is optional: it rejects these values and otherwise returns the node, e.g. `poly::toml::write( poly::toml::check( node))` or `poly::yaml::check( poly::yaml::parse( node))`.
 
-| Format | Value                   | Result
-|------- |------                   |-------
-| CBOR   | `local_time`            | text string (no tag)
-| CBOR   | `local_datetime`        | text string (no tag)
-| JSON   | `instant`               | string
-| JSON   | `binary`                | base64-encoded string
-| PACK   | `local_date`            | string
-| PACK   | `local_time`            | string
-| PACK   | `local_datetime`        | string
-| PLIST  | `nothing`               | `<string>null</string>`
-| PLIST  | `local_date`            | `<string>`
-| PLIST  | `local_time`            | `<string>`
-| PLIST  | `local_datetime`        | `<string>`
-| TOML   | `nothing`               | `"null"`
-| TOML   | `binary`                | base64-encoded string
-| TOML   | non `node::object` root | the value under the key `""`
-| YAML   | `local_time`            | plain scalar (parsed back as a string)
-| XML    | `node::array`           | items written in order, without array structure
+| Format | Value             | Result
+|--------|-------            |--------
+| CBOR   | `local_time`      | text string (no tag)
+|        | `local_datetime`  | text string (no tag)
+| JSON   | `instant`         | string
+|        | `binary`          | base64-encoded string
+| PACK   | `local_date`      | string
+|        | `local_time`      | string
+|        | `local_datetime`  | string
+| PLIST  | `nothing`         | `<string>null</string>`
+|        | `local_date`      | `<string>`
+|        | `local_time`      | `<string>`
+|        | `local_datetime`  | `<string>`
+| TOML   | `nothing`         | `"null"`
+|        | `binary`          | base64-encoded string
+|        | non `object` root | the value under the key `""`
+| YAML   | `local_time`      | plain scalar (parsed back as a string)
+| XML    | `array`           | items written in order, without array structure
 
 ### Duplicate Keys
 
@@ -69,10 +80,10 @@ Duplicate keys are written and parsed _as is_, but `<format>::check( node)` reje
 #### CBOR
 
 The following are detected and rejected with an error:
-- Bignums (tags 2 and 3) — including values that would otherwise fit in `node::integer`
+- Bignums (tags 2 and 3) — including values that would otherwise fit in `integer`
 - Decimal fractions (tag 4) and bigfloats (tag 5)
 - All other unregistered or unrecognised tags
-- Integer values outside `node::integer` range
+- Integer values outside `integer` range
 - Reserved additional-info values (28–30) and reserved simple values
 - Tagged items using indefinite-length encoding
 - Nested indefinite-length string chunks (RFC 8949 §3.2.3 violation)
@@ -84,7 +95,7 @@ The following are detected and rejected with an error:
 
 #### PACK
 The following are detected and rejected with an error:
-- Integer values outside `node::integer` range
+- Integer values outside `integer` range
 - Extension types other than _timestamp_ (due to the nature of poly::node)
 - Map keys that aren't strings (due to the nature of poly::node::object)
 
