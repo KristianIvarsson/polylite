@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "core/heap.hpp"
 #include "core/help.hpp"
 #include "core/lint.hpp"
 #include "core/load.hpp"
@@ -215,7 +216,7 @@ namespace poly_version
                   }
                }
                
-               //! @return the raw value of the attribute, or nullopt if absent or malformed
+               //! @return the raw value of the attribute or nullopt if absent or malformed
                static auto slot( std::string_view data, const std::string_view name) -> std::optional< std::string_view>
                {
                   auto part = [ &data]( const std::string_view signs) -> std::optional< std::string_view>
@@ -303,8 +304,8 @@ namespace poly_version
             node operator()()
             {
                node::object nrv;
-               auto [ type, data] = sift();
 
+               auto [ type, data] = sift();
                while( type != form::done)
                {
                   nrv.emplace( word( data), spot( type, data));
@@ -313,6 +314,10 @@ namespace poly_version
 
                return nrv;
             }
+
+         private:
+
+            core::heap< node::object> pair{};
 
             node spot( const form type, const std::string_view data)
             {
@@ -329,8 +334,8 @@ namespace poly_version
 
             node object( const std::string_view name)
             {
-               node::object children;
-
+               const auto from = pair.base();
+               
                while( true)
                {
                   auto item = text();
@@ -342,15 +347,15 @@ namespace poly_version
                      if( word( data) != name)
                         [[unlikely]] halt( "unexpected name");
 
-                     if( children.empty())
-                        return scalar( std::move( item));
+                     if( pair.base() == from) // empty
+                         return scalar( std::move( item));
                   }
 
                   if( std::ranges::all_of( item, [] ( const auto sign) { return core::help::is::white( sign); }))
                      if( type == form::seal)
-                        return children;
+                        return pair.seal( from);
                      else
-                        children.emplace( word( data), spot( type, data));
+                        pair.push( word( data), spot( type, data));
                   else
                      [[unlikely]] halt( "mixed content");
                }
@@ -695,6 +700,10 @@ namespace poly_version
 
             private:
 
+               core::heap< node::object>  pair{};
+               core::heap< node::array>   item{};
+
+
                auto leaf( const std::string_view name, const bool bare) -> std::string
                {
                   if( bare)
@@ -728,14 +737,14 @@ namespace poly_version
 
                auto object()
                {
-                  node::object nrv;
-
+                  const auto from = pair.base();
+                  
                   while( true)
                   {
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::object)
-                        return nrv;
+                        return pair.seal( from);
 
                      if( type != form::open || word( data) != types::name)
                         [[unlikely]] halt( "unexpected element");
@@ -743,22 +752,22 @@ namespace poly_version
                      auto name = text();
                      want( form::seal, types::name);
                      std::tie( type, data) = sift();
-                     nrv.emplace( std::move( name), spot( type, data));
+                     pair.push( std::move( name), spot( type, data));
                   }
                }
 
                auto array()
                {
-                  node::array nrv;
-
+                  const auto from = item.base();
+                  
                   while( true)
                   {
                      auto [type, data] = sift();
 
                      if( type == form::seal && word( data) == types::array)
-                        return nrv;
+                        return item.seal( from);
 
-                     nrv.push_back( spot( type, data));
+                     item.push( spot( type, data));
                   }
                }
 

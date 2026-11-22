@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "core/heap.hpp"
 #include "core/help.hpp"
 #include "core/lint.hpp"
 #include "core/load.hpp"
@@ -27,15 +28,15 @@ namespace poly_version
       {
          constexpr auto bare = [] ( const auto sign)
          {
-            return poly::core::help::is::alnum( sign) || poly::core::help::is::some< '_', '-', '.'>( sign);
+            return core::help::is::alnum( sign) || core::help::is::some< '_', '-', '.'>( sign);
          };
 
          namespace parser
          {
-            template< poly::core::type::byte unit, poly::core::load::pipe::source origin>
-            struct core : poly::core::load::parser< unit, origin>
+            template< core::type::byte unit, core::load::pipe::source origin>
+            struct basic : core::load::parser< unit, origin>
             {
-               using base = poly::core::load::parser< unit, origin>;
+               using base = core::load::parser< unit, origin>;
                using base::base;
                using base::full;
                using base::half;
@@ -51,6 +52,9 @@ namespace poly_version
                using base::test;
 
             protected:
+
+               core::heap< node::array>   item{};
+               core::heap< node::object>  pair{};
 
                using nill = std::monostate;
                using name = node::object::key_type;
@@ -82,12 +86,12 @@ namespace poly_version
 
                   while( true)
                   {
-                     read( poly::core::help::till::quot, nrv);
+                     read( core::help::till::quot, nrv);
 
                      if( pull() == '"')
                         return nrv;
 
-                     nrv.append( poly::core::help::transform::point( cast( pull())));
+                     nrv.append( core::help::transform::point( cast( pull())));
                   }
                }
 
@@ -99,7 +103,7 @@ namespace poly_version
 
                   while( true)
                   {
-                     read( poly::core::help::till::apos, nrv);
+                     read( core::help::till::apos, nrv);
 
                      pull(); // '\''
 
@@ -136,13 +140,13 @@ namespace poly_version
                   if( data == "~")
                      return node{ nullptr};
 
-                  if( auto result = poly::core::help::transform::simple( data))
+                  if( auto result = core::help::transform::simple( data))
                      return std::move( *result);
 
                   if( data == ".nan" || data == ".inf" || data == "+.inf" || data == "-.inf")
                      std::erase( data, '.');
 
-                  if( auto result = poly::core::help::transform::number( data))
+                  if( auto result = core::help::transform::number( data))
                      return std::move( *result);
 
                   return node{ std::move( data)};
@@ -150,20 +154,22 @@ namespace poly_version
 
                bool cusp()
                {
-                  return ! good() || poly::core::help::is::white( look());
+                  return ! good() || core::help::is::white( look());
                }
             };
 
-            template< poly::core::type::byte unit, poly::core::load::pipe::source origin>
-            struct flow : core< unit, origin>
+            template< core::type::byte unit, core::load::pipe::source origin>
+            struct flow : basic< unit, origin>
             {
-               using base = parser::core< unit, origin>;
+               using base = basic< unit, origin>;
                using base::base;
                using base::cusp;
                using base::good;
                using base::halt;
+               using base::item;
                using base::mark;
                using base::look;
+               using base::pair;
                using base::peep;
                using base::pull;
                using base::take;
@@ -210,7 +216,7 @@ namespace poly_version
                {
                   ++mark; // '{'
 
-                  node::object nrv;
+                  const auto from = pair.base();
 
                   while( peep() != '}')
                   {
@@ -219,7 +225,7 @@ namespace poly_version
                      if( ! std::holds_alternative< name>( data))
                         [[unlikely]] halt( "expected key");
 
-                     nrv.emplace( std::get< name>( std::move( data)), spot());
+                     pair.push( std::get< name>( std::move( data)), spot());
 
                      if( peep() == '}') break;
 
@@ -228,18 +234,18 @@ namespace poly_version
 
                   ++mark; // '}'
 
-                  return nrv;
+                  return pair.seal( from);
                }
 
                auto array() -> node::array
                {
                   ++mark; // '['
 
-                  node::array nrv;
+                  const auto from = item.base();
 
                   while( peep() != ']')
                   {
-                     nrv.emplace_back( spot());
+                     item.push( spot());
 
                      if( peep() == ']') break;
                      
@@ -248,12 +254,12 @@ namespace poly_version
 
                   ++mark; // ']'
 
-                  return nrv;
+                  return item.seal( from);
                }
 
                bool more( const std::string& data)
                {
-                  return good() and not ( poly::core::help::is::some< ',', '}', ']'>( look()) || ( look() == '#' && data.ends_with( ' ')));
+                  return good() and not ( core::help::is::some< ',', '}', ']'>( look()) || ( look() == '#' && data.ends_with( ' ')));
                }
 
                info absent()
@@ -265,34 +271,36 @@ namespace poly_version
                      data.push_back( take());
 
                      if( data.back() == ':' && cusp())
-                        return data.pop_back(), poly::core::help::trim( std::move( data));
+                        return data.pop_back(), core::help::trim( std::move( data));
                   }
 
-                  return resolve( poly::core::help::trim( std::move( data)));
+                  return resolve( core::help::trim( std::move( data)));
                }
 
             };
 
-            template< poly::core::type::byte unit, poly::core::load::pipe::source origin>
-            struct block : core< unit, origin>
+            template< core::type::byte unit, core::load::pipe::source origin>
+            struct block : basic< unit, origin>
             {
-               using base = parser::core< unit, origin>;
+               using base = basic< unit, origin>;
                using base::base;
-               using base::mark;
-               using base::last;
+               using base::cusp;
+               using base::deny;
                using base::good;
-               using base::pull;
-               using base::peek;
+               using base::halt;
+               using base::item;
+               using base::last;
+               using base::leap;
                using base::look;
+               using base::mark;
+               using base::pair;
+               using base::peek;
+               using base::peep;
+               using base::pull;
+               using base::read;
+               using base::rest;
                using base::take;
                using base::test;
-               using base::read;
-               using base::leap;
-               using base::rest;
-               using base::halt;
-               using base::deny;
-               using base::cusp;
-               using base::peep;
                using base::tidy;
                using base::quoted;
                using base::single;
@@ -345,7 +353,7 @@ namespace poly_version
                   auto part = [this]
                   {
                      tidy();
-                     return read( [] ( const auto sign) { return ! poly::core::help::is::white( sign); });
+                     return read( [] ( const auto sign) { return ! core::help::is::white( sign); });
                   };
 
                   while( peep() == '%')
@@ -398,7 +406,7 @@ namespace poly_version
 
                bool edge( const info& data)
                {
-                  if( poly::core::help::hold< begin, cease>( data))
+                  if( core::help::hold< begin, cease>( data))
                      return line(), dent = 0, true;
 
                   return false;
@@ -415,12 +423,12 @@ namespace poly_version
                {
                   while( good())
                   {
-                     auto item = scan();
+                     auto data = scan();
 
-                     if( poly::core::help::hold< begin, nill>( item))
+                     if( core::help::hold< begin, nill>( data))
                         dent = next();
                      else
-                        return item;
+                        return data;
                   }
 
                   return std::nullopt;
@@ -429,15 +437,15 @@ namespace poly_version
                auto bind( const size root) -> node
                {
                   step();
-                  auto item = scan();
+                  auto data = scan();
 
-                  if( poly::core::help::hold< name>( item))
+                  if( core::help::hold< name>( data))
                      halt( "unexpected key");
 
                   wrap();
 
-                  if( poly::core::help::hold< node>( item))
-                     return std::move( std::get< node>( std::move( item)));
+                  if( core::help::hold< node>( data))
+                     return std::move( std::get< node>( std::move( data)));
 
                   if( root < dent || ( root == dent && peek() == '-'))
                      return *spot( dent);
@@ -451,38 +459,38 @@ namespace poly_version
 
                   if( ! gist) return root ? std::optional< node>{ nullptr} : std::nullopt;
 
-                  auto& item = *gist;
+                  auto& data = *gist;
 
-                  if( edge( item)) return node{ nullptr};
+                  if( edge( data)) return node{ nullptr};
 
-                  if( poly::core::help::hold< node>( item))
-                     return line(), dent = next(), std::get< node>( std::move( item));
+                  if( core::help::hold< node>( data))
+                     return line(), dent = next(), std::get< node>( std::move( data));
 
-                  if( poly::core::help::hold< dash>( item))
+                  if( core::help::hold< dash>( data))
                   {
-                     node::array array;
+                     const auto from = item.base();
 
                      do
-                        array.emplace_back( *spot( dent + 1 + step()));
-                     while( dent >= root && peek() == '-' && poly::core::help::hold< dash>( scan()));
+                        item.push( *spot( dent + 1 + step()));
+                     while( dent >= root && peek() == '-' && core::help::hold< dash>( scan()));
 
-                     return { array};
+                     return item.seal( from);
                   }
 
-                  node::object object;
-
+                  const auto from = pair.base();
+                  
                   while( good())
                   {
-                     while( good() && poly::core::help::hold< nill>( item))
-                        line(), item = scan();
+                     while( good() && core::help::hold< nill>( data))
+                        line(), data = scan();
 
                      if( ! good())
                         break;
 
-                     if( edge( item))
+                     if( edge( data))
                         break;
 
-                     object.emplace( std::get< name>( std::move( item)), bind( dent));
+                     pair.push( std::get< name>( std::move( data)), bind( dent));
 
                      if( dent < root)
                         break;
@@ -492,10 +500,10 @@ namespace poly_version
                      if( dent < root)
                         break;
 
-                     item = scan();
+                     data = scan();
                   }
 
-                  return { object};
+                  return pair.seal( from);
                }
 
                bool more( const std::string& data)
@@ -514,7 +522,7 @@ namespace poly_version
                      if( data.back() == ':' && cusp())
                      {
                         data.pop_back();
-                        auto key = poly::core::help::trim( std::move( data));
+                        auto key = core::help::trim( std::move( data));
                         if( key == "<<") deny( "merge keys");
                         return key;
                      }
@@ -536,12 +544,12 @@ namespace poly_version
                      if( data.starts_with( "...")) return cease{};
                   }
 
-                  return resolve( poly::core::help::trim( std::move( data)));
+                  return resolve( core::help::trim( std::move( data)));
                }
 
                bool idle()
                {
-                  return poly::core::help::is::some< '\n', '#'>( peek());
+                  return core::help::is::some< '\n', '#'>( peek());
                }
 
                info alias()
@@ -562,10 +570,10 @@ namespace poly_version
                   
                   auto word = read( bare);
                   tidy();
-                  auto item = scan();
+                  auto data = scan();
 
-                  if( std::holds_alternative< node>( item))
-                     return anchors[ std::move( word)] = std::get< node>( std::move( item));
+                  if( std::holds_alternative< node>( data))
+                     return anchors[ std::move( word)] = std::get< node>( std::move( data));
 
                   [[unlikely]] halt( "invalid anchor");                  
                }
@@ -587,45 +595,45 @@ namespace poly_version
                   // only support core tags
                   test( '!');
 
-                  const auto tag = read( []( const auto sign) { return poly::core::help::is::lower( sign); });
+                  const auto tag = read( []( const auto sign) { return core::help::is::lower( sign); });
 
                   tidy();
 
                   if( tag == "str")
-                     if( poly::core::help::is::none< '"', '\''>( peek()))
-                        return node{ poly::core::help::trim( scalar())};
+                     if( core::help::is::none< '"', '\''>( peek()))
+                        return node{ core::help::trim( scalar())};
    
-                  auto item = scan();
+                  auto data = scan();
 
-                  if( std::holds_alternative< nill>( item))
-                     item = node{ nullptr};
+                  if( std::holds_alternative< nill>( data))
+                     data = node{ nullptr};
 
-                  if( auto data = std::get_if< node>( &item))
+                  if( auto what = std::get_if< node>( &data))
                   {
-                     if( data->is_string() && tag == "str")
-                        return item;
+                     if( what->is_string() && tag == "str")
+                        return data;
 
-                     if( data->is_nothing() && tag == "null")  
-                        return item;
+                     if( what->is_nothing() && tag == "null")  
+                        return data;
 
-                     if( data->is_boolean() && tag == "bool")  
-                        return item;
+                     if( what->is_boolean() && tag == "bool")  
+                        return data;
 
-                     if( data->is_integer() && tag == "int")  
-                        return item;
+                     if( what->is_integer() && tag == "int")  
+                        return data;
 
-                     if( data->is_decimal() && tag == "float")
-                        return item;
+                     if( what->is_decimal() && tag == "float")
+                        return data;
 
-                     if( data->is_integer() && tag == "float")
-                        return node{ static_cast< node::decimal>( data->as_integer())};
+                     if( what->is_integer() && tag == "float")
+                        return node{ static_cast< node::decimal>( what->as_integer())};
                      
-                     if( data->is_string() && tag == "timestamp")
-                        if( auto result = poly::core::help::transform::instant( poly::core::help::trim( data->as_string())))
+                     if( what->is_string() && tag == "timestamp")
+                        if( auto result = core::help::transform::instant( core::help::trim( what->as_string())))
                            return *result;
                      
-                     if( data->is_string() && tag == "binary")
-                        if( auto result = poly::core::help::transform::binary( poly::core::help::trim( data->as_string())))
+                     if( what->is_string() && tag == "binary")
+                        if( auto result = core::help::transform::binary( core::help::trim( what->as_string())))
                            return *result;
                   }
 
@@ -635,7 +643,7 @@ namespace poly_version
                info styled()
                {
                   const auto style = take();
-                  const auto chomp = poly::core::help::is::some< '+', '-'>( peek()) ? take() : '\0';
+                  const auto chomp = core::help::is::some< '+', '-'>( peek()) ? take() : '\0';
 
                   std::string text;
                   size root{};
@@ -650,7 +658,7 @@ namespace poly_version
                      if( dent < root && peek() != '\n')
                         break;
 
-                     const auto line = read( poly::core::help::till::line);
+                     const auto line = read( core::help::till::line);
 
                      if( line.empty())
                      {
@@ -692,7 +700,7 @@ namespace poly_version
       {
          auto parse( auto&& source)
          {
-            return poly::core::load::make::source< detail::parser::block>( source)().value();
+            return core::load::make::source< detail::parser::block>( source)().value();
          }
       } // one
 
@@ -700,7 +708,7 @@ namespace poly_version
       {
          auto parse( auto&& source)
          {
-            auto parser = poly::core::load::make::source< detail::parser::block>( source);
+            auto parser = core::load::make::source< detail::parser::block>( source);
 
             node::array nrv;
 
@@ -719,10 +727,10 @@ namespace poly_version
          namespace writer
          {
 
-            template< poly::core::type::byte unit, poly::core::save::pipe::target output>
-            struct core : poly::core::save::writer< unit, output>
+            template< core::type::byte unit, core::save::pipe::target output>
+            struct basic : core::save::writer< unit, output>
             {
-               using base = poly::core::save::writer< unit, output>;
+               using base = core::save::writer< unit, output>;
                using base::base;
                using base::push;
                using base::copy;
@@ -777,13 +785,13 @@ namespace poly_version
                      case '.': case '\'':case '?': case '`': case '%':
                         return false;
 
-                     if( poly::core::help::is::space( node.front()) || poly::core::help::is::space( node.back()))
+                     if( core::help::is::space( node.front()) || core::help::is::space( node.back()))
                         return false;
 
                      if( node.find_first_of( ":#\n") != std::string::npos)
                         return false;
 
-                     return ! poly::core::help::transform::simple( node) && ! poly::core::help::transform::number( node);
+                     return ! core::help::transform::simple( node) && ! core::help::transform::number( node);
                   };
 
                   if( plain())
@@ -793,10 +801,10 @@ namespace poly_version
                }
             };
 
-            template< poly::core::type::byte unit, poly::core::save::pipe::target output>
-            struct flow : core< unit, output>
+            template< core::type::byte unit, core::save::pipe::target output>
+            struct flow : basic< unit, output>
             {
-               using base = writer::core< unit, output>;
+               using base = basic< unit, output>;
                using base::base;
                using base::push;
                using base::copy;
@@ -845,10 +853,10 @@ namespace poly_version
                }
             };
 
-            template< poly::core::type::byte unit, poly::core::save::pipe::target output, std::size_t spaces>
-            struct block : core< unit, output>
+            template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
+            struct block : basic< unit, output>
             {
-               using base = writer::core< unit, output>;
+               using base = basic< unit, output>;
                using base::base;
                using base::sink;
                using base::push;
@@ -937,7 +945,7 @@ namespace poly_version
          template< std::size_t spaces>
          auto write( const node& root, auto&& target)
          {
-            auto sink = poly::core::save::make::target< writer::block, spaces>( target);
+            auto sink = core::save::make::target< writer::block, spaces>( target);
             std::visit( sink, root);
          }
 

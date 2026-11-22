@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "core/heap.hpp"
 #include "core/help.hpp"
 #include "core/lint.hpp"
 #include "core/load.hpp"
@@ -49,6 +50,9 @@ namespace poly_version
 
          private:
 
+            core::heap< node::array>   item{};
+            core::heap< node::object>  pair{};
+
             auto spot() -> node
             {
                switch( peep())
@@ -80,7 +84,7 @@ namespace poly_version
             {
                ++mark; // '{'
 
-               node::object nrv;
+               const auto from = pair.base();
 
                if( peep() != '}')
                {
@@ -92,7 +96,7 @@ namespace poly_version
 
                      test( ':', pick());
 
-                     nrv.emplace( std::move( name), spot());
+                     pair.push( std::move( name), spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -106,20 +110,20 @@ namespace poly_version
                   ++mark; // '}'
                }
 
-               return nrv;
+               return pair.seal( from);
             }
 
             auto array() -> node::array
             {
                ++mark; // '['
 
-               node::array nrv;
+               const auto from = item.base();
 
                if( peep() != ']')
                {
                   while( true)
                   {
-                     nrv.emplace_back( spot());
+                     item.push( spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -133,7 +137,7 @@ namespace poly_version
                   ++mark; // ']'
                }
 
-               return nrv;
+               return item.seal( from);
             }
 
             auto string() -> node::string

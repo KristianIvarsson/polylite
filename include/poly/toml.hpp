@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "core/heap.hpp"
 #include "core/help.hpp"
 #include "core/lint.hpp"
 #include "core/load.hpp"
@@ -98,6 +99,8 @@ namespace poly_version
 
          private:
 
+            core::heap< node::array> item{};
+
             auto spot() -> node
             {
                switch( peep())
@@ -117,13 +120,13 @@ namespace poly_version
                }
             }
 
-            void slot( node* item, auto&& keys)
+            void slot( node* what, auto&& keys)
             {
                for( auto&& name : keys)
-                  item = &(*item)[ std::move( name)];
+                  what = &(*what)[ std::move( name)];
 
-               if( item->is_nothing())
-                  *item = spot();
+               if( what->is_nothing())
+                  *what = spot();
                else
                   [[unlikely]] halt( "duplicate key");
             }
@@ -229,12 +232,12 @@ namespace poly_version
             {
                ++mark; // '['
 
-               node::array nrv;
+               const auto from = item.base();
 
                if( peep() != ']')
                   while( true)
                   {
-                     nrv.emplace_back( spot());
+                     item.push( spot());
 
                      if( const auto sign = pick(); sign != ',')
                      {
@@ -245,7 +248,7 @@ namespace poly_version
                else
                   ++mark; // ']'
 
-               return nrv;
+               return item.seal( from);
             }
 
             auto multi_basic() -> node::string
@@ -472,11 +475,11 @@ namespace poly_version
                {
                   auto section = [&]
                   {
-                     for( const auto& item : node)
+                     for( const auto& what : node)
                      {
                         array();
 
-                        for( const auto& [ name, data] : item.as_object())
+                        for( const auto& [ name, data] : what.as_object())
                            if( trivial( data))
                            {
                               key( name);
@@ -485,7 +488,7 @@ namespace poly_version
                               push( '\n');
                            }
 
-                        for( const auto& [ name, data] : item.as_object())
+                        for( const auto& [ name, data] : what.as_object())
                            if( complex( data))
                            {
                               stack.emplace_back( name);
@@ -615,9 +618,9 @@ namespace poly_version
                {
                   push( '[');
                   auto tail = node.as_array().size();
-                  for( const auto& item : node.as_array())
+                  for( const auto& what : node.as_array())
                   {
-                     place( item);
+                     place( what);
                      if( --tail) copy( ", ");
                   }
                   push( ']');
@@ -654,35 +657,35 @@ namespace poly_version
                }
             }
 
-            static bool complex( const node& item) noexcept
+            static bool complex( const node& what) noexcept
             {
-               if( item.is_trivial()) return false;
-               if( item.is_object()) return true;
-               return std::ranges::any_of( item.as_array(), complex);
+               if( what.is_trivial()) return false;
+               if( what.is_object()) return true;
+               return std::ranges::any_of( what.as_array(), complex);
             }
 
-            static bool trivial( const node& item) noexcept
+            static bool trivial( const node& what) noexcept
             {
-               if( item.is_trivial()) return true;
-               if( item.is_object()) return false;
-               return std::ranges::any_of( item.as_array(), trivial);
+               if( what.is_trivial()) return true;
+               if( what.is_object()) return false;
+               return std::ranges::any_of( what.as_array(), trivial);
             }
 
             static bool shallow( const node::array& array) noexcept
             {
-               return std::ranges::all_of( array, [] ( const node& item)
+               return std::ranges::all_of( array, [] ( const node& what)
                   {
-                     return item.is_object() && std::ranges::all_of( item.as_object(), trivial, &node::object::value_type::second);
+                     return what.is_object() && std::ranges::all_of( what.as_object(), trivial, &node::object::value_type::second);
                   });
             }
 
-            static bool section( const node& item) noexcept
+            static bool section( const node& what) noexcept
             {
-               if( item.is_object()) return true;
-               if( ! item.is_array()) return false;
-               if( ! std::ranges::all_of( item.as_array(), &node::is_object)) return false;
+               if( what.is_object()) return true;
+               if( ! what.is_array()) return false;
+               if( ! std::ranges::all_of( what.as_array(), &node::is_object)) return false;
                if constexpr( posh) return true;
-               else return ! shallow( item.as_array());
+               else return ! shallow( what.as_array());
             }
 
          };
