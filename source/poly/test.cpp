@@ -871,7 +871,7 @@ g: "hello\nworld")";
                assert( document.at( "g").as_string() == "hello\nworld");
             }
 
-            // same-line value, nested value, and implicit null
+            // same-line value, nested value and implicit null
             {
                const auto inline_value = yaml::parse( "a: 123\n");
                assert( inline_value.at( "a").as_integer() == 123);
@@ -1990,7 +1990,7 @@ top: world
             assert( pack::write( detail::timestamp( 1000ms)) == detail::bytes({ 0xD6, 0xFF, 0x00, 0x00, 0x00, 0x01}));
             assert( pack::write( detail::timestamp( 4294967295000ms)) == detail::bytes({ 0xD6, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}));
 
-            // Timestamp64: nanoseconds are present, or seconds need more than 32 bits
+            // Timestamp64: nanoseconds are present or seconds need more than 32 bits
             assert( pack::write( detail::timestamp( 1500ms)) == detail::bytes({ 0xD7, 0xFF, 0x77, 0x35, 0x94, 0x00, 0x00, 0x00, 0x00, 0x01}));
             assert( pack::write( detail::timestamp( 4294967296000ms)) == detail::bytes({ 0xD7, 0xFF, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}));
 

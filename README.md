@@ -28,6 +28,8 @@ Due to the complexity of the supported formats, parts of the implementation are 
 
 `integer` is `std::int64_t` and `decimal` is `std::float64_t` (or `double` where `std::float64_t` isn't available), regardless of platform.
 
+The following describe how values are represented and are mostly of interest when converting between formats.
+
 #### CBOR
 - `zoned_datetime` is written with its zone offset in *verbose* mode and as UTC in *compact* mode, but is always parsed as UTC
 
@@ -46,11 +48,11 @@ Due to the complexity of the supported formats, parts of the implementation are 
 - `object` entries containing `nothing` or an empty `string`/`binary`/`object`/`array` are written as self-closing elements, such as `<name/>`, so their original types cannot be distinguished
 - Element text is parsed as `string`, including empty elements
 - Scalar values are written as text and parsed back as `string`
-- - The writer and parser support fragments with multiple top-level elements; these are not well-formed XML documents
+- The writer and parser support fragments with multiple top-level elements; these are not well-formed XML documents
 
 ### Unsupported Values
 
-`poly::node` is a superset of what any single format can represent. Writers always write, and values a format can't represent are written as follows. Calling `<format>::check( node)` before writing or after parsing is optional: it rejects these values and otherwise returns the node, e.g. `poly::toml::write( poly::toml::check( node))` or `poly::yaml::check( poly::yaml::parse( node))`.
+`poly::node` is a superset of what any single format can represent. Writers always write, even values a format can't represent, which are written as follows.
 
 | Format | Value             | Result
 |--------|-------            |--------
@@ -71,11 +73,15 @@ Due to the complexity of the supported formats, parts of the implementation are 
 | YAML   | `local_time`      | plain scalar (parsed back as a string)
 | XML    | `array`           | items written in order, without array structure
 
+Calling `<format>::check( node)` before writing or after parsing is optional: it rejects these values and otherwise returns the node, e.g. `poly::toml::write( poly::toml::check( node))` or `poly::yaml::check( poly::yaml::parse( text))`.
+
 ### Duplicate Keys
 
 Duplicate keys are written and parsed _as is_, but `<format>::check( node)` rejects them for CBOR, PLIST, TOML and YAML.
 
 ### Known Limitations
+
+The following are corner cases that rarely occur in practice and several of them are not handled by other libraries either. They are listed for completeness and most of them are detected and rejected with an error rather than silently misread.
 
 #### CBOR
 
@@ -205,7 +211,7 @@ auto cbor = poly::cbor::write( node);
 
 ```cpp
 // same as above (i.e. elegant) but with explicit version
-auto json = poly::v5_3_0::json::elegant::write( node);
+auto json = poly::v6_0_0::json::elegant::write( node);
 ```
 
 ```cpp
@@ -225,7 +231,7 @@ auto xml = poly::xml::plist::whole( node);
 
 #### Converting
 ```cpp
-// convert yaml to json, and make sure nothing has to be degraded on the way
+// convert yaml to json and make sure nothing has to be degraded on the way
 auto json = poly::json::write( poly::json::check( poly::yaml::parse( input)));
 ```
 

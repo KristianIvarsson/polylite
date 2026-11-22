@@ -6,8 +6,8 @@
 
 #pragma once
 
-#define POLY_VERSION_MAJOR 5
-#define POLY_VERSION_MINOR 3
+#define POLY_VERSION_MAJOR 6
+#define POLY_VERSION_MINOR 0
 #define POLY_VERSION_PATCH 0
 
 #define POLY_PASTE( major, minor, patch) v##major##_##minor##_##patch
@@ -19,7 +19,6 @@ namespace poly_version
 {
    namespace core::inline tale
    {
-
       constexpr struct
       {
          int major = POLY_VERSION_MAJOR;
@@ -27,6 +26,5 @@ namespace poly_version
          int patch = POLY_VERSION_PATCH;
          int whole = major * 10000 + minor * 100 + patch;
       } version{};
-
    } // core::tale
 } // poly_version
