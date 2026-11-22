@@ -8,7 +8,7 @@
 
 #define POLY_VERSION_MAJOR 6
 #define POLY_VERSION_MINOR 0
-#define POLY_VERSION_PATCH 1
+#define POLY_VERSION_PATCH 2
 
 #define POLY_PASTE( major, minor, patch) v##major##_##minor##_##patch
 #define POLY_SPACE( major, minor, patch) POLY_PASTE( major, minor, patch)
