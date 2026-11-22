@@ -21,34 +21,283 @@ namespace poly_version
    {
       namespace detail
       {
-         template< core::type::byte unit, core::load::pipe::source origin>
-         struct parser : core::load::parser< unit, origin>
+         namespace basic
          {
-            using base = core::load::parser< unit, origin>;
-            using base::base;
-            using base::deny;
-            using base::drop;
-            using base::good;
-            using base::halt;
-            using base::look;
-            using base::peek;
-            using base::pull;
-            using base::read;
-            using base::skip;
-            using base::take;
-            using base::test;
-
-            enum class form
+            template< core::type::byte unit, core::load::pipe::source origin>
+            struct parser : core::load::parser< unit, origin>
             {
-               hint,
-               kind,
-               note,
-               lump,
-               open,
-               seal,
-               bare,
-               done,
+               using base = core::load::parser< unit, origin>;
+               using base::base;
+               using base::deny;
+               using base::drop;
+               using base::good;
+               using base::halt;
+               using base::look;
+               using base::peek;
+               using base::pull;
+               using base::read;
+               using base::skip;
+               using base::take;
+               using base::test;
+
+               enum class form
+               {
+                  hint,
+                  kind,
+                  note,
+                  lump,
+                  open,
+                  seal,
+                  bare,
+                  done,
+               };
+
+               auto till( const std::string_view stop)
+               {
+                  std::string nrv;
+                  do
+                  {
+                     read( [ back = stop.back()]( const auto sign) { return sign != back; }, nrv);
+                     nrv.push_back( pull());
+                  }
+                  while( ! nrv.ends_with( stop));
+                  nrv.resize( nrv.size() - stop.size());
+                  return nrv;
+               }
+
+               auto till( const core::type::byte auto stop)
+               {
+                  auto nrv = read( [ stop]( const auto sign) { return sign != stop; });
+                  pull(); // stop
+                  return nrv;
+               }
+
+               auto next() -> std::tuple< form, std::string>
+               {
+                  skip();
+
+                  if( ! good())
+                     return { form::done, {}};
+
+                  test( '<', take());
+
+                  const auto sign = pull();
+
+                  if( sign == '?')
+                     return { form::hint, core::help::trim( till( "?>"))};
+               
+                  if( sign == '!')
+                  {
+                     switch( pull())
+                     {
+                     case '-': test( '-');      return { form::note, till( "-->")};
+                     case '[': test( "CDATA["); return { form::lump, till( "]]>")};
+                     case 'D': test( "OCTYPE"); return { form::kind, core::help::trim( till( '>'))};
+                     default: [[unlikely]] halt( "unexpected data");
+                     }
+                  }
+
+                  if( sign == '/')
+                     return { form::seal, core::help::trim( till( '>'))};
+
+                  std::string data = sign + till( '>');
+
+                  if( data.ends_with( '/'))
+                     return data.pop_back(), std::tuple{ form::bare, core::help::trim( std::move( data))};
+
+                  return { form::open, core::help::trim( std::move( data))};
+               }
+
+               auto sift()
+               {
+                  while( true)
+                  {
+                     auto item = next();
+
+                     switch( std::get< form>( item))
+                     {
+                     case form::hint:
+                        scan( std::get< std::string>( item));
+                     [[fallthrough]];
+                     case form::note:
+                     case form::kind:
+                        break;
+                     case form::lump:
+                        [[unlikely]] deny( "CDATA");
+                     default:
+                        return item;
+                     }
+                  }
+               }
+
+               static auto word( const std::string_view data) -> std::string_view
+               {
+                  const auto last = std::ranges::find_if( data, []( const auto sign){ return core::help::is::white( sign);});
+                  return data.substr( 0, last - std::begin( data));
+               }
+
+               auto want( const form wish)
+               {
+                  auto [type, data] = sift();
+
+                  if( type != wish) [[unlikely]] halt( "unexpected type");
+
+                  return std::move( data);
+               }
+
+               void want( const form wish, const auto name)
+               {
+                  if( word( want( wish)) != name) [[unlikely]] halt( "unexpected name");
+               }
+
+               auto cast( std::string_view data) -> std::string
+               {
+                  if( data == "amp")  return "&";
+                  if( data == "lt")   return "<";
+                  if( data == "gt")   return ">";
+                  if( data == "quot") return "\"";
+                  if( data == "apos") return "'";
+
+                  if( data.starts_with( '#'))
+                  {
+                     data = data.substr( 1);
+                     const bool hexa = data.starts_with( 'x');
+                     data = data.substr( hexa);
+
+                     core::type::i32 code{};
+                     const auto [ ptr, ec] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
+
+                     auto scan = [] ( const core::type::i32 rune)
+                        {
+                           return core::help::is::some< '\t', '\n', '\r'>( rune)
+                              || core::help::is::in::range< 0x20, 0xD7FF>( rune)
+                              || core::help::is::in::range< 0xE000, 0xFFFD>( rune)
+                              || core::help::is::in::range< 0x10000, 0x10FFFF>( rune);
+                        };
+
+                     if( ptr == data.data() + data.size() && ec == std::errc{} && scan( code))
+                        return core::help::transform::point( code);
+                  }
+
+                  [[unlikely]] halt( "invalid entity");
+               }
+
+               auto text()
+               {
+                  std::string nrv;
+
+                  while( good() && look() != '<')
+                  {
+                     switch( const auto sign = take())
+                     {
+                     case '&':
+                        nrv.append( cast( till( ';')));
+                        break;
+
+                     case '\r':
+                        if( peek() != '\n')
+                           nrv.push_back( '\n');
+                        break;
+
+                     case '\t':
+                     case '\n':
+                        nrv.push_back( sign);
+                        break;
+
+                     default:
+                        if( core::help::is::in::range< 0x0, 0x1F>( sign))
+                           [[unlikely]] halt( "invalid character");
+                        nrv.push_back( sign);
+                     }
+                  }
+
+                  return nrv;
+               }
+
+               //! @return the raw value of the attribute, or nullopt if absent or malformed
+               static auto slot( std::string_view data, const std::string_view name) -> std::optional< std::string_view>
+               {
+                  auto part = [ &data]( const std::string_view signs) -> std::optional< std::string_view>
+                  {
+                     const auto spot = data.find_first_of( signs);
+                     if( spot == std::string_view::npos)
+                        return std::nullopt;
+
+                     const auto nrv = data.substr( 0, spot);
+                     data.remove_prefix( spot + 1);
+                     return nrv;
+                  };
+
+                  data.remove_prefix( word( data).size());
+
+                  while( true)
+                  {
+                     auto view = part( "=");
+                     if( ! view)
+                        return std::nullopt;
+
+                     while( ! view->empty() && core::help::is::white( view->front())) view->remove_prefix( 1);
+                     while( ! view->empty() && core::help::is::white( view->back())) view->remove_suffix( 1);
+
+                     if( ! part( "\"'"))
+                        return std::nullopt;
+
+                     // value ends at the same kind of sign that opened it
+                     const auto crop = part( { data.data() - 1, 1});
+                     if( ! crop || view == name)
+                        return crop;
+                  }
+               }
+
+               void scan( const std::string_view data) const
+               {
+                  if( word( data) == "xml")
+                  {
+                     auto equal = [] ( const std::string_view lhs, const std::string_view rhs)
+                     {
+                        return std::ranges::equal( lhs, rhs, [] ( const auto first, const auto other) 
+                        { 
+                           return core::help::to::lower( first) == core::help::to::lower( other); 
+                        });
+                     };
+
+                     if( const auto value = slot( data, "version"); value && ! equal( *value, "1.0"))
+                        [[unlikely]] halt( "unsupported xml version");
+
+                     if( const auto value = slot( data, "encoding"); value && ! equal( *value, "UTF-8"))
+                        [[unlikely]] halt( "unsupported xml encoding");
+                  }
+               }
+
+               auto lead()
+               {
+                  auto [ type, data] = next();
+
+                  switch( type)
+                  {
+                  case form::hint:
+                     scan( data);
+                  [[fallthrough]];
+                  case form::note:
+                     std::tie( type, data) = sift();
+                  }
+
+                  return std::make_tuple( type, std::move( data));
+               }
             };
+         } // basic
+
+         template< core::type::byte unit, core::load::pipe::source origin>
+         struct parser : basic::parser< unit, origin>
+         {
+            using base = basic::parser< unit, origin>;
+            using base::base;
+            using base::halt;
+            using base::sift;
+            using base::text;
+            using base::word;
+
+            using typename base::form;
 
             node operator()()
             {
@@ -119,239 +368,6 @@ namespace poly_version
 
                return data;
             }
-
-            auto till( const std::string_view stop)
-            {
-               std::string nrv;
-               do
-               {
-                  read( [ back = stop.back()]( const auto sign) { return sign != back; }, nrv);
-                  nrv.push_back( pull());
-               }
-               while( ! nrv.ends_with( stop));
-               nrv.resize( nrv.size() - stop.size());
-               return nrv;
-            }
-
-            auto till( const core::type::byte auto stop)
-            {
-               auto nrv = read( [ stop]( const auto sign) { return sign != stop; });
-               pull(); // stop
-               return nrv;
-            }
-
-            auto next() -> std::tuple< form, std::string>
-            {
-               skip();
-
-               if( ! good())
-                  return { form::done, {}};
-
-               test( '<', take());
-
-               const auto sign = pull();
-
-               if( sign == '?')
-                  return { form::hint, core::help::trim( till( "?>"))};
-               
-               if( sign == '!')
-               {
-                  switch( pull())
-                  {
-                  case '-': test( '-');      return { form::note, till( "-->")};
-                  case '[': test( "CDATA["); return { form::lump, till( "]]>")};
-                  case 'D': test( "OCTYPE"); return { form::kind, core::help::trim( till( '>'))};
-                  default: [[unlikely]] halt( "unexpected data");
-                  }
-               }
-
-               if( sign == '/')
-                  return { form::seal, core::help::trim( till( '>'))};
-
-               std::string data = sign + till( '>');
-
-               if( data.ends_with( '/'))
-                  return data.pop_back(), std::tuple{ form::bare, core::help::trim( std::move( data))};
-
-               return { form::open, core::help::trim( std::move( data))};
-            }
-
-            auto sift()
-            {
-               while( true)
-               {
-                  auto item = next();
-
-                  switch( std::get< form>( item))
-                  {
-                  case form::hint:
-                     scan( std::get< std::string>( item));
-                  [[fallthrough]];
-                  case form::note:
-                  case form::kind:
-                     break;
-                  case form::lump:
-                     [[unlikely]] deny( "CDATA");
-                  default:
-                     return item;
-                  }
-               }
-            }
-
-            static auto word( const std::string_view data) -> std::string_view
-            {
-               const auto last = std::ranges::find_if( data, []( const auto sign){ return core::help::is::white( sign);});
-               return data.substr( 0, last - std::begin( data));
-            }
-
-            auto want( const form wish)
-            {
-               auto [type, data] = sift();
-
-               if( type != wish) [[unlikely]] halt( "unexpected type");
-
-               return std::move( data);
-            }
-
-            void want( const form wish, const auto name)
-            {
-               if( word( want( wish)) != name) [[unlikely]] halt( "unexpected name");
-            }
-
-            auto cast( std::string_view data) -> std::string
-            {
-               if( data == "amp")  return "&";
-               if( data == "lt")   return "<";
-               if( data == "gt")   return ">";
-               if( data == "quot") return "\"";
-               if( data == "apos") return "'";
-
-               if( data.starts_with( '#'))
-               {
-                  data = data.substr( 1);
-                  const bool hexa = data.starts_with( 'x');
-                  data = data.substr( hexa);
-
-                  core::type::i32 code{};
-                  const auto [ ptr, ec] = std::from_chars( data.data(), data.data() + data.size(), code, hexa ? 16 : 10);
-
-                  auto scan = [] ( const core::type::i32 rune)
-                     {
-                        return core::help::is::some< '\t', '\n', '\r'>( rune)
-                           || core::help::is::in::range< 0x20, 0xD7FF>( rune)
-                           || core::help::is::in::range< 0xE000, 0xFFFD>( rune)
-                           || core::help::is::in::range< 0x10000, 0x10FFFF>( rune);
-                     };
-
-                  if( ptr == data.data() + data.size() && ec == std::errc{} && scan( code))
-                     return core::help::transform::point( code);
-               }
-
-               [[unlikely]] halt( "invalid entity");
-            }
-
-            auto text()
-            {
-               std::string nrv;
-
-               while( good() && look() != '<')
-               {
-                  switch( const auto sign = take())
-                  {
-                  case '&':
-                     nrv.append( cast( till( ';')));
-                     break;
-
-                  case '\r':
-                     if( peek() != '\n')
-                        nrv.push_back( '\n');
-                     break;
-
-                  case '\t':
-                  case '\n':
-                     nrv.push_back( sign);
-                     break;
-
-                  default:
-                     if( core::help::is::in::range< 0x0, 0x1F>( sign))
-                        [[unlikely]] halt( "invalid character");
-                     nrv.push_back( sign);
-                  }
-               }
-
-               return nrv;
-            }
-
-            //! @return the raw value of the attribute, or nullopt if absent or malformed
-            static auto slot( std::string_view data, const std::string_view name) -> std::optional< std::string_view>
-            {
-               auto part = [ &data]( const std::string_view signs) -> std::optional< std::string_view>
-               {
-                  const auto spot = data.find_first_of( signs);
-                  if( spot == std::string_view::npos)
-                     return std::nullopt;
-
-                  const auto nrv = data.substr( 0, spot);
-                  data.remove_prefix( spot + 1);
-                  return nrv;
-               };
-
-               data.remove_prefix( word( data).size());
-
-               while( true)
-               {
-                  auto view = part( "=");
-                  if( ! view)
-                     return std::nullopt;
-
-                  while( ! view->empty() && core::help::is::white( view->front())) view->remove_prefix( 1);
-                  while( ! view->empty() && core::help::is::white( view->back())) view->remove_suffix( 1);
-
-                  if( ! part( "\"'"))
-                     return std::nullopt;
-
-                  // value ends at the same kind of sign that opened it
-                  const auto crop = part( { data.data() - 1, 1});
-                  if( ! crop || view == name)
-                     return crop;
-               }
-            }
-
-            void scan( const std::string_view data) const
-            {
-               if( word( data) == "xml")
-               {
-                  auto equal = [] ( const std::string_view lhs, const std::string_view rhs)
-                  {
-                     return std::ranges::equal( lhs, rhs, [] ( const auto first, const auto other) 
-                     { 
-                        return core::help::to::lower( first) == core::help::to::lower( other); 
-                     });
-                  };
-
-                  if( const auto value = slot( data, "version"); value && ! equal( *value, "1.0"))
-                     [[unlikely]] halt( "unsupported xml version");
-
-                  if( const auto value = slot( data, "encoding"); value && ! equal( *value, "UTF-8"))
-                     [[unlikely]] halt( "unsupported xml encoding");
-               }
-            }
-
-            auto lead()
-            {
-               auto [ type, data] = next();
-
-               switch( type)
-               {
-               case form::hint:
-                  scan( data);
-               [[fallthrough]];
-               case form::note:
-                  std::tie( type, data) = sift();
-               }
-
-               return std::make_tuple( type, std::move( data));
-            }
          };
       } // detail
 
@@ -363,21 +379,118 @@ namespace poly_version
       namespace detail
       {
          constexpr std::size_t spaces = 3;
-         template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
-         struct writer : core::save::writer< unit, output>
-         {
-            using base = core::save::writer< unit, output>;
-            using base::base;
-            using base::copy;
-            using base::emit;
-            using base::flat;
-            using base::halt;
-            using base::fold;
-            using base::push;
-            using base::time;
 
-            char column{};
-            bool indent{};
+         namespace basic
+         {
+            template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
+            struct writer : core::save::writer< unit, output>
+            {
+               using base = core::save::writer< unit, output>;
+               using base::base;
+               using base::copy;
+               using base::emit;
+               using base::flat;
+               using base::halt;
+               using base::fold;
+               using base::push;
+               using base::time;
+
+               char column{};
+               bool indent{};
+
+               void open( const std::string_view name)
+               {
+                  head( name);
+                  if constexpr( spaces) ++column;
+               }
+
+               void seal( const std::string_view name)
+               {
+                  if constexpr( spaces) --column;
+                  fill();
+                  tail( name);
+               }
+
+               void head( const std::string_view name)
+               {
+                  fill();
+                  push( '<');
+                  emit( name);
+                  push( '>');
+               }
+
+               void tail( const std::string_view name)
+               {
+                  push( '<');
+                  push( '/');
+                  emit( name);
+                  push( '>');
+               }
+
+               void bare( const std::string_view name)
+               {
+                  fill();
+                  push( '<');
+                  emit( name);
+                  push( '/');
+                  push( '>');
+               }
+
+               void cast( const std::string& data)
+               {
+                  for( const auto sign : data)
+                  {
+                     if( core::help::is::in::range< 0x0, 0x1F>( sign))
+                        switch( sign)
+                        {
+                        case '\t': case '\n': case '\r':
+                           break;
+                        default:
+                           [[unlikely]] halt( "character");
+                        }
+                  
+                     switch( sign)
+                     {
+                        case '\r':  copy( "&#13;"); break;
+                        case '&':   copy( "&amp;"); break;
+                        case '<':   copy( "&lt;"); break;
+                        case '>':   copy( "&gt;"); break;
+                        default:    push( sign); break;
+                     }
+                  }
+               }
+
+            protected:
+
+               void fill()
+               {
+                  if constexpr( spaces)
+                  {
+                     if( indent)
+                        fold( column * spaces);
+                     else
+                        indent = true;
+                  }
+               }
+            };
+         } // basic
+
+         template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
+         struct writer : basic::writer< unit, output, spaces>
+         {
+            using base = basic::writer< unit, output, spaces>;
+            using base::bare;
+            using base::base;
+            using base::cast;
+            using base::copy;
+            using base::fill;
+            using base::flat;
+            using base::open;
+            using base::push;
+            using base::seal;
+            using base::tail;
+            using base::time;
+            using base::column;
 
             void operator() ( const node& node)
             {
@@ -480,82 +593,6 @@ namespace poly_version
             {
                copy( std::format( "{}", node));
             }
-
-
-            void open( const std::string_view name)
-            {
-               head( name);
-               if constexpr( spaces) ++column;
-            }
-
-            void seal( const std::string_view name)
-            {
-               if constexpr( spaces) --column;
-               fill();
-               tail( name);
-            }
-
-            void head( const std::string_view name)
-            {
-               fill();
-               push( '<');
-               emit( name);
-               push( '>');
-            }
-
-            void tail( const std::string_view name)
-            {
-               push( '<');
-               push( '/');
-               emit( name);
-               push( '>');
-            }
-
-            void bare( const std::string_view name)
-            {
-               fill();
-               push( '<');
-               emit( name);
-               push( '/');
-               push( '>');
-            }
-
-            void cast( const std::string& data)
-            {
-               for( const auto sign : data)
-               {
-                  if( core::help::is::in::range< 0x0, 0x1F>( sign))
-                     switch( sign)
-                     {
-                     case '\t': case '\n': case '\r':
-                        break;
-                     default:
-                        [[unlikely]] halt( "character");
-                     }
-                  
-                  switch( sign)
-                  {
-                     case '\r':  copy( "&#13;"); break;
-                     case '&':   copy( "&amp;"); break;
-                     case '<':   copy( "&lt;"); break;
-                     case '>':   copy( "&gt;"); break;
-                     default:    push( sign); break;
-                  }
-               }
-            }
-
-         private:
-
-            void fill()
-            {
-               if constexpr( spaces)
-               {
-                  if( indent)
-                     fold( column * spaces);
-                  else
-                     indent = true;
-               }
-            }
          };
 
          template< std::size_t spaces>
@@ -618,9 +655,9 @@ namespace poly_version
          namespace detail
          {
             template< core::type::byte unit, core::load::pipe::source origin>
-            struct parser : xml::detail::parser< unit, origin>
+            struct parser : xml::detail::basic::parser< unit, origin>
             {
-               using base = xml::detail::parser< unit, origin>;
+               using base = xml::detail::basic::parser< unit, origin>;
                using base::base;
                using base::halt;
                using base::lead;
@@ -770,9 +807,9 @@ namespace poly_version
          {
 
             template< core::type::byte unit, core::save::pipe::target output, std::size_t spaces>
-            struct writer : xml::detail::writer< unit, output, spaces>
+            struct writer : xml::detail::basic::writer< unit, output, spaces>
             {
-               using base = xml::detail::writer< unit, output, spaces>;
+               using base = xml::detail::basic::writer< unit, output, spaces>;
                using base::bare;
                using base::base;
                using base::cast;
