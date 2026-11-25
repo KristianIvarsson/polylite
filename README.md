@@ -124,6 +124,7 @@ The following are detected and rejected with an error:
 - Custom tags (e.g. `!mytag`) — `!!` core tags only
 
 #### XML
+- Only UTF-8 encoding is supported; other declared encodings are rejected
 - The `poly::xml::check()` validates element names using ASCII rules only
 - CDATA sections are rejected
 - Mixed content (text interleaved with child elements) is rejected
